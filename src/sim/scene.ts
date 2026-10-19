@@ -1,7 +1,44 @@
 import * as THREE from "three";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import type RAPIER from "@dimforge/rapier3d-compat";
-import { asphaltTexture, padTexture } from "./textures";
+
+export type GraphicsQuality = "low" | "high";
+
+export interface Atmosphere {
+  background: string;
+  fog: string;
+  fogNear: number;
+  fogFar: number;
+  hemiSky: number;
+  hemiGround: number;
+  hemiIntensity: number;
+  sunColor: number;
+  sunIntensity: number;
+  exposure: number;
+  zenith: string;
+  horizon: string;
+  skyGround: string;
+}
+
+export const CITY_ATMOSPHERE: Atmosphere = {
+  background: "#8eabc8",
+  fog: "#b9c6d4",
+  fogNear: 55,
+  fogFar: 190,
+  hemiSky: 0xc5daf0,
+  hemiGround: 0x6d8a52,
+  hemiIntensity: 0.85,
+  sunColor: 0xfff1d4,
+  sunIntensity: 3.1,
+  exposure: 1.12,
+  zenith: "#5480b8",
+  horizon: "#edddb8",
+  skyGround: "#8c8578",
+};
 
 type Rapier = typeof RAPIER;
 
@@ -17,7 +54,13 @@ export class SimView {
   readonly scene = new THREE.Scene();
   readonly camera: THREE.PerspectiveCamera;
   private readonly sun: THREE.DirectionalLight;
+  private readonly hemi: THREE.HemisphereLight;
   private readonly sunTarget = new THREE.Object3D();
+  private readonly sky: THREE.ShaderMaterial;
+  private composer: EffectComposer | null = null;
+  private quality: GraphicsQuality = "high";
+  private viewportWidth = 1;
+  private viewportHeight = 1;
 
   constructor(viewport: HTMLElement) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
@@ -25,25 +68,26 @@ export class SimView {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.12;
+    this.renderer.toneMappingExposure = CITY_ATMOSPHERE.exposure;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.domElement.tabIndex = 0;
     viewport.prepend(this.renderer.domElement);
 
     this.camera = new THREE.PerspectiveCamera(48, 1, 0.1, 600);
-    this.scene.background = new THREE.Color("#8eabc8");
-    this.scene.fog = new THREE.Fog("#b9c6d4", 60, 200);
+    this.scene.background = new THREE.Color(CITY_ATMOSPHERE.background);
+    this.scene.fog = new THREE.Fog(CITY_ATMOSPHERE.fog, CITY_ATMOSPHERE.fogNear, CITY_ATMOSPHERE.fogFar);
 
     const pmrem = new THREE.PMREMGenerator(this.renderer);
     this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0).texture;
     pmrem.dispose();
 
-    this.scene.add(new THREE.HemisphereLight(0xc5daf0, 0x6d8a52, 0.85));
+    this.hemi = new THREE.HemisphereLight(CITY_ATMOSPHERE.hemiSky, CITY_ATMOSPHERE.hemiGround, CITY_ATMOSPHERE.hemiIntensity);
+    this.scene.add(this.hemi);
     const fill = new THREE.DirectionalLight(0xc9d7ea, 0.35);
     fill.position.set(-12, 8, -8);
     this.scene.add(fill);
 
-    this.sun = new THREE.DirectionalLight(0xfff1d4, 3.1);
+    this.sun = new THREE.DirectionalLight(CITY_ATMOSPHERE.sunColor, CITY_ATMOSPHERE.sunIntensity);
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(2048, 2048);
     this.sun.shadow.camera.near = 4;
@@ -58,15 +102,47 @@ export class SimView {
     this.scene.add(this.sunTarget);
     this.sun.target = this.sunTarget;
 
-    this.scene.add(createSky());
+    this.sky = createSky(CITY_ATMOSPHERE);
+    const sky = new THREE.Mesh(new THREE.SphereGeometry(420, 28, 16), this.sky);
+    sky.frustumCulled = false;
+    this.scene.add(sky);
+  }
+
+  setQuality(quality: GraphicsQuality): void {
+    this.quality = quality;
+    const ratio = quality === "high" ? Math.min(window.devicePixelRatio || 1, 2) : 1;
+    this.renderer.setPixelRatio(ratio);
+    const size = quality === "high" ? 2048 : 1024;
+    this.sun.shadow.mapSize.set(size, size);
+    this.sun.shadow.map?.dispose();
+    this.sun.shadow.map = null;
+    if (quality === "high") this.ensureComposer();
+    this.resize(this.viewportWidth, this.viewportHeight);
+  }
+
+  setAtmosphere(atmosphere: Atmosphere): void {
+    this.scene.background = new THREE.Color(atmosphere.background);
+    this.scene.fog = new THREE.Fog(atmosphere.fog, atmosphere.fogNear, atmosphere.fogFar);
+    this.hemi.color.set(atmosphere.hemiSky);
+    this.hemi.groundColor.set(atmosphere.hemiGround);
+    this.hemi.intensity = atmosphere.hemiIntensity;
+    this.sun.color.set(atmosphere.sunColor);
+    this.sun.intensity = atmosphere.sunIntensity;
+    this.renderer.toneMappingExposure = atmosphere.exposure;
+    this.sky.uniforms.zenith!.value.set(atmosphere.zenith);
+    this.sky.uniforms.horizon!.value.set(atmosphere.horizon);
+    this.sky.uniforms.below!.value.set(atmosphere.skyGround);
   }
 
   resize(width: number, height: number): void {
     const w = Math.max(1, width);
     const h = Math.max(1, height);
+    this.viewportWidth = w;
+    this.viewportHeight = h;
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h, false);
+    this.composer?.setSize(w, h);
   }
 
   followSun(x: number, z: number): void {
@@ -76,7 +152,19 @@ export class SimView {
   }
 
   render(): void {
-    this.renderer.render(this.scene, this.camera);
+    if (this.quality === "high" && this.composer) this.composer.render();
+    else this.renderer.render(this.scene, this.camera);
+  }
+
+  private ensureComposer(): void {
+    if (this.composer) return;
+    const composer = new EffectComposer(this.renderer);
+    composer.addPass(new RenderPass(this.scene, this.camera));
+    const bloom = new UnrealBloomPass(new THREE.Vector2(this.viewportWidth, this.viewportHeight), 0.22, 0.35, 0.86);
+    composer.addPass(bloom);
+    composer.addPass(new OutputPass());
+    composer.setSize(this.viewportWidth, this.viewportHeight);
+    this.composer = composer;
   }
 
   dispose(): void {
@@ -84,35 +172,8 @@ export class SimView {
   }
 }
 
-export function addGround(RAPIER: Rapier, world: InstanceType<Rapier["World"]>, scene: THREE.Scene): void {
-  const asphalt = asphaltTexture();
-  asphalt.anisotropy = 8;
-  const ground = new THREE.Mesh(
-    new THREE.BoxGeometry(220, 1, 220),
-    new THREE.MeshStandardMaterial({ map: asphalt, roughness: 0.94, metalness: 0.02, color: 0xffffff }),
-  );
-  ground.position.y = -0.5;
-  ground.receiveShadow = true;
-  scene.add(ground);
-
-  const pad = new THREE.Mesh(
-    new THREE.PlaneGeometry(48, 48),
-    new THREE.MeshStandardMaterial({
-      map: padTexture(),
-      transparent: true,
-      roughness: 0.85,
-      metalness: 0,
-      depthWrite: false,
-      polygonOffset: true,
-      polygonOffsetFactor: -1,
-      polygonOffsetUnits: -1,
-    }),
-  );
-  pad.rotation.x = -Math.PI / 2;
-  pad.position.y = 0.015;
-  pad.receiveShadow = true;
-  scene.add(pad);
-
+/** Flat physics ground. Each environment draws its own surface on top. */
+export function addPhysicsGround(RAPIER: Rapier, world: InstanceType<Rapier["World"]>): void {
   const body = world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(0, -0.5, 0));
   world.createCollider(
     RAPIER.ColliderDesc.cuboid(110, 0.5, 110).setFriction(1.05).setRestitution(0.02),
@@ -120,12 +181,17 @@ export function addGround(RAPIER: Rapier, world: InstanceType<Rapier["World"]>, 
   );
 }
 
-function createSky(): THREE.Mesh {
+function createSky(atmosphere: Atmosphere): THREE.ShaderMaterial {
   const material = new THREE.ShaderMaterial({
     side: THREE.BackSide,
     depthWrite: false,
     fog: false,
     toneMapped: false,
+    uniforms: {
+      zenith: { value: new THREE.Color(atmosphere.zenith) },
+      horizon: { value: new THREE.Color(atmosphere.horizon) },
+      below: { value: new THREE.Color(atmosphere.skyGround) },
+    },
     vertexShader: `
       varying vec3 vDir;
       void main() {
@@ -136,20 +202,18 @@ function createSky(): THREE.Mesh {
     `,
     fragmentShader: `
       varying vec3 vDir;
+      uniform vec3 zenith;
+      uniform vec3 horizon;
+      uniform vec3 below;
       void main() {
         float h = normalize(vDir).y;
-        vec3 zenith = vec3(0.33, 0.50, 0.72);
-        vec3 mid = vec3(0.55, 0.69, 0.84);
-        vec3 horizon = vec3(0.93, 0.84, 0.72);
-        vec3 below = vec3(0.55, 0.52, 0.47);
+        vec3 mid = mix(horizon, zenith, 0.45);
         vec3 col = mix(mid, zenith, smoothstep(0.05, 0.75, h));
-        col = mix(horizon, col, smoothstep(0.0, 0.16, abs(h)));
-        col = mix(below, col, smoothstep(-0.2, 0.02, h));
+        col = mix(horizon, col, smoothstep(0.0, 0.18, abs(h)));
+        col = mix(below, col, smoothstep(-0.25, 0.02, h));
         gl_FragColor = vec4(col, 1.0);
       }
     `,
   });
-  const sky = new THREE.Mesh(new THREE.SphereGeometry(420, 28, 16), material);
-  sky.frustumCulled = false;
-  return sky;
+  return material;
 }

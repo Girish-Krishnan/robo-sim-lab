@@ -3,11 +3,20 @@ import type RAPIER from "@dimforge/rapier3d-compat";
 import { ACKERMANN_BUGGY, ackermannAngles, clamp, yawFromQuaternion, type ControlCommand } from "../api";
 import { quatConjugate, quatRotate } from "../api/math";
 import type { ChassisFocus, SimRobot, VehicleTelemetry } from "../robots/types";
+import { createResearchCar, type WheelVisual } from "./car-mesh";
 import { forwardSpeed, SensorSuite } from "./sensors";
 
 type Rapier = typeof RAPIER;
 
-const SPAWN = { x: 5.4, y: 0.84, z: 0 };
+export interface SpawnPose {
+  x: number;
+  y: number;
+  z: number;
+  /** Same yaw as `focus()`. Zero points the nose along +Z. */
+  yaw: number;
+}
+
+export const DEFAULT_SPAWN: SpawnPose = { x: 5.4, y: 0.84, z: 0, yaw: 0 };
 const HALF = { x: 0.64, y: 0.34, z: 1.14 };
 const WHEEL_RADIUS = 0.3;
 const WHEEL_WIDTH = 0.2;
@@ -59,11 +68,14 @@ export class AckermannBuggy implements SimRobot {
   private readonly vehicle: InstanceType<Rapier["DynamicRayCastVehicleController"]>;
   private readonly sensors: SensorSuite;
   private readonly chassis: THREE.Group;
-  private readonly wheelMeshes: THREE.Group[] = [];
+  private readonly wheels: WheelVisual[];
+  private readonly headlight: THREE.MeshStandardMaterial;
+  private readonly brakeLight: THREE.MeshStandardMaterial;
   private readonly steerQuat = new THREE.Quaternion();
   private readonly rollQuat = new THREE.Quaternion();
   private readonly axle = new THREE.Vector3(-1, 0, 0);
   private readonly up = new THREE.Vector3(0, 1, 0);
+  private spawn: SpawnPose = DEFAULT_SPAWN;
 
   private command: ControlCommand = { steering: 0, throttle: 0 };
   private brake = 0;
@@ -76,7 +88,7 @@ export class AckermannBuggy implements SimRobot {
   ) {
     this.body = world.createRigidBody(
       RAPIER.RigidBodyDesc.dynamic()
-        .setTranslation(SPAWN.x, SPAWN.y, SPAWN.z)
+        .setTranslation(DEFAULT_SPAWN.x, DEFAULT_SPAWN.y, DEFAULT_SPAWN.z)
         .setCanSleep(false)
         .setCcdEnabled(true)
         .setLinearDamping(0.12)
@@ -130,24 +142,25 @@ export class AckermannBuggy implements SimRobot {
       this.vehicle.setWheelMaxSuspensionForce(i, 18000);
     }
 
-    this.chassis = createChassisMesh();
+    const visual = createResearchCar(WHEEL_RADIUS, WHEEL_WIDTH);
+    this.chassis = visual.group;
+    this.wheels = visual.wheels;
+    this.headlight = visual.headlight;
+    this.brakeLight = visual.brakeLight;
     scene.add(this.chassis);
-    for (let i = 0; i < 4; i++) {
-      const wheel = createWheelMesh(WHEEL_RADIUS, WHEEL_WIDTH);
-      this.chassis.add(wheel);
-      this.wheelMeshes.push(wheel);
-    }
     this.syncVisuals();
 
     this.sensors = new SensorSuite(RAPIER, world, this.body, this.vehicle, WHEEL_RADIUS);
   }
 
-  reset(): void {
+  reset(pose?: SpawnPose): void {
+    if (pose) this.spawn = pose;
     this.command = { steering: 0, throttle: 0 };
     this.brake = 0;
     this.steer = 0;
-    this.body.setTranslation({ x: SPAWN.x, y: SPAWN.y, z: SPAWN.z }, true);
-    this.body.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true);
+    this.body.setTranslation({ x: this.spawn.x, y: this.spawn.y, z: this.spawn.z }, true);
+    const heading = new THREE.Quaternion().setFromAxisAngle(this.up, -this.spawn.yaw);
+    this.body.setRotation({ x: heading.x, y: heading.y, z: heading.z, w: heading.w }, true);
     this.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
     this.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
     for (let i = 0; i < 4; i++) {
@@ -233,18 +246,23 @@ export class AckermannBuggy implements SimRobot {
     this.chassis.position.set(translation.x, translation.y, translation.z);
     this.chassis.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w);
 
-    for (let i = 0; i < this.wheelMeshes.length; i++) {
-      const wheel = this.wheelMeshes[i]!;
+    for (let i = 0; i < this.wheels.length; i++) {
+      const wheel = this.wheels[i]!;
       const connection = this.vehicle.wheelChassisConnectionPointCs(i);
       const suspension = this.vehicle.wheelSuspensionLength(i) ?? SUSPENSION_REST;
       const steering = this.vehicle.wheelSteering(i) ?? 0;
       const spin = this.vehicle.wheelRotation(i) ?? 0;
       if (!connection) continue;
-      wheel.position.set(connection.x, connection.y - suspension, connection.z);
+      wheel.steer.position.set(connection.x, connection.y - suspension, connection.z);
       this.steerQuat.setFromAxisAngle(this.up, steering);
       this.rollQuat.setFromAxisAngle(this.axle, spin);
-      wheel.quaternion.copy(this.steerQuat).multiply(this.rollQuat);
+      wheel.steer.quaternion.copy(this.steerQuat);
+      wheel.spin.quaternion.copy(this.rollQuat);
     }
+    const throttle = this.command.throttle;
+    const braking = this.brake > 0.2 || throttle < -0.05;
+    this.headlight.emissiveIntensity = 0.4 + Math.max(0, throttle) * 2.6;
+    this.brakeLight.emissiveIntensity = braking ? 2.6 : 0.12;
   }
 
   sampleSensors(dt: number) {
@@ -282,112 +300,3 @@ export class AckermannBuggy implements SimRobot {
   }
 }
 
-function createChassisMesh(): THREE.Group {
-  const group = new THREE.Group();
-  const paint = new THREE.MeshStandardMaterial({
-    color: 0x128f86,
-    roughness: 0.32,
-    metalness: 0.22,
-  });
-  const dark = new THREE.MeshStandardMaterial({
-    color: 0x171b1f,
-    roughness: 0.62,
-    metalness: 0.18,
-  });
-  const glass = new THREE.MeshStandardMaterial({
-    color: 0xc6eef2,
-    roughness: 0.06,
-    metalness: 0.05,
-    transparent: true,
-    opacity: 0.42,
-  });
-  const amber = new THREE.MeshStandardMaterial({
-    color: 0xffc56b,
-    emissive: 0xff8e1f,
-    emissiveIntensity: 0.9,
-    roughness: 0.35,
-  });
-  const tail = new THREE.MeshStandardMaterial({
-    color: 0xff5340,
-    emissive: 0xc42016,
-    emissiveIntensity: 0.7,
-    roughness: 0.4,
-  });
-  const stripeMat = new THREE.MeshStandardMaterial({
-    color: 0xe3a23a,
-    roughness: 0.42,
-    metalness: 0.12,
-  });
-
-  const tray = new THREE.Mesh(new THREE.BoxGeometry(1.28, 0.14, 2.2), dark);
-  tray.position.y = -0.16;
-  const body = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.3, 2.08), paint);
-  body.position.set(0, 0.02, 0.02);
-  const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.02, 0.36, 0.98), glass);
-  cabin.position.set(0, 0.3, -0.08);
-  const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.02, 1.55), stripeMat);
-  stripe.position.set(0, 0.18, 0.12);
-
-  const lamp = new THREE.BoxGeometry(0.2, 0.07, 0.05);
-  const headL = new THREE.Mesh(lamp, amber);
-  headL.position.set(-0.38, 0.04, 1.06);
-  const headR = headL.clone();
-  headR.position.x = 0.38;
-  const tailGeom = new THREE.BoxGeometry(0.24, 0.07, 0.05);
-  const tailL = new THREE.Mesh(tailGeom, tail);
-  tailL.position.set(-0.38, 0.05, -1.02);
-  const tailR = tailL.clone();
-  tailR.position.x = 0.38;
-
-  const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 0.16, 12), dark);
-  mast.position.set(0, 0.2, 0.46);
-  const puck = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.055, 28), dark);
-  puck.position.set(0, 0.28, 0.46);
-  const ring = new THREE.Mesh(
-    new THREE.TorusGeometry(0.145, 0.012, 8, 28),
-    new THREE.MeshStandardMaterial({
-      color: 0x9dfff0,
-      emissive: 0x1c8f86,
-      emissiveIntensity: 1.4,
-      roughness: 0.25,
-    }),
-  );
-  ring.rotation.x = Math.PI / 2;
-  ring.position.copy(puck.position);
-
-  group.add(tray, body, cabin, stripe, headL, headR, tailL, tailR, mast, puck, ring);
-  group.traverse((obj) => {
-    if (obj instanceof THREE.Mesh) {
-      obj.castShadow = true;
-      obj.receiveShadow = true;
-    }
-  });
-  return group;
-}
-
-function createWheelMesh(radius: number, width: number): THREE.Group {
-  const group = new THREE.Group();
-  const tire = new THREE.Mesh(
-    new THREE.CylinderGeometry(radius, radius, width, 22),
-    new THREE.MeshStandardMaterial({ color: 0x1b1d20, roughness: 0.9, metalness: 0.02 }),
-  );
-  tire.rotation.z = Math.PI / 2;
-  const rim = new THREE.Mesh(
-    new THREE.CylinderGeometry(radius * 0.58, radius * 0.58, width + 0.02, 16),
-    new THREE.MeshStandardMaterial({ color: 0xd7dbdf, roughness: 0.28, metalness: 0.85 }),
-  );
-  rim.rotation.z = Math.PI / 2;
-  const hub = new THREE.Mesh(
-    new THREE.CylinderGeometry(radius * 0.16, radius * 0.16, width + 0.045, 10),
-    new THREE.MeshStandardMaterial({ color: 0x8d9399, roughness: 0.35, metalness: 0.7 }),
-  );
-  hub.rotation.z = Math.PI / 2;
-  group.add(tire, rim, hub);
-  group.traverse((obj) => {
-    if (obj instanceof THREE.Mesh) {
-      obj.castShadow = true;
-      obj.receiveShadow = true;
-    }
-  });
-  return group;
-}

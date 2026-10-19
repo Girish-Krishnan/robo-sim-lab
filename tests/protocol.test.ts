@@ -134,6 +134,6 @@ describe("sandbox source", () => {
   it("ships Python examples that define control(sensors)", () => {
     const examples = readFileSync("src/editor/examples.ts", "utf8");
     expect(examples.includes("function update")).toBe(false);
-    expect(examples.match(/def control\(sensors\)/g)?.length).toBe(2);
+    expect(examples.match(/def control\(sensors\)/g)?.length).toBe(3);
   });
 });

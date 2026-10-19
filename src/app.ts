@@ -3,10 +3,19 @@ import { ACKERMANN_BUGGY, CONTROL_DT, clampCommand } from "./api";
 import { EXAMPLES, DEFAULT_EXAMPLE } from "./editor/examples";
 import { createEditor, type CodeEditor } from "./editor/editor";
 import { ChaseCamera } from "./sim/camera";
-import { addCourse } from "./sim/course";
 import { LidarView } from "./sim/lidar-view";
-import { addGround, SimView } from "./sim/scene";
+import { addPhysicsGround, SimView, type GraphicsQuality } from "./sim/scene";
 import { AckermannBuggy, SERVICE_BRAKE, STOP_BRAKE } from "./sim/vehicle";
+import {
+  QUALITY_STORAGE_KEY,
+  WORLD_STORAGE_KEY,
+  WORLDS,
+  disposeWorld,
+  isWorldId,
+  mountWorld,
+  type SimWorld,
+  type WorldId,
+} from "./sim/worlds";
 import { CodeSandbox, type SandboxState } from "./sandbox/controller";
 import { ConsolePanel } from "./ui/console-panel";
 import { Hud, type AppMode } from "./ui/hud";
@@ -55,9 +64,16 @@ export async function mountApp(): Promise<void> {
     world.timestep = PHYSICS_DT;
 
     const view = new SimView(viewport);
-    addGround(RAPIER, world, view.scene);
-    addCourse(RAPIER, world, view.scene);
+    const savedQuality = localStorage.getItem(QUALITY_STORAGE_KEY);
+    const quality: GraphicsQuality = savedQuality === "low" ? "low" : "high";
+    view.setQuality(quality);
+    addPhysicsGround(RAPIER, world);
+    const savedWorld = localStorage.getItem(WORLD_STORAGE_KEY);
+    const initialWorld: WorldId = isWorldId(savedWorld) ? savedWorld : "city";
+    let yard: SimWorld = await mountWorld(initialWorld, RAPIER, world, view.scene);
+    view.setAtmosphere(yard.atmosphere);
     const robot = new AckermannBuggy(RAPIER, world, view.scene);
+    robot.reset(yard.spawn);
     const lidar = new LidarView(view.scene, viewport);
     const camera = new ChaseCamera(view.camera, viewport);
 
@@ -149,6 +165,45 @@ export async function mountApp(): Promise<void> {
     mustGet("reset").addEventListener("click", () => resetWorld());
     mustGet("clear-console").addEventListener("click", () => consolePanel.clear());
     mustGet("camera-reset").addEventListener("click", () => camera.reset());
+    const worldSelect = mustGet<HTMLSelectElement>("world");
+    for (const item of WORLDS) {
+      const option = document.createElement("option");
+      option.value = item.id;
+      option.textContent = item.label;
+      worldSelect.append(option);
+    }
+    worldSelect.value = yard.id;
+    let switchingWorld = false;
+    const switchWorld = async (id: WorldId) => {
+      if (switchingWorld || id === yard.id) return;
+      switchingWorld = true;
+      worldSelect.disabled = true;
+      try {
+        if (mode === "code") stopProgram();
+        disposeWorld(world, yard);
+        yard = await mountWorld(id, RAPIER, world, view.scene);
+        view.setAtmosphere(yard.atmosphere);
+        robot.reset(yard.spawn);
+        camera.reset();
+        localStorage.setItem(WORLD_STORAGE_KEY, id);
+        if (mode === "drive") applyDrive();
+      } finally {
+        worldSelect.disabled = false;
+        switchingWorld = false;
+      }
+    };
+    worldSelect.addEventListener("change", () => {
+      if (!isWorldId(worldSelect.value)) return;
+      void switchWorld(worldSelect.value);
+    });
+    const qualitySelect = mustGet<HTMLSelectElement>("quality");
+    qualitySelect.value = quality;
+    qualitySelect.addEventListener("change", () => {
+      const next: GraphicsQuality = qualitySelect.value === "low" ? "low" : "high";
+      view.setQuality(next);
+      view.resize(viewport.clientWidth, viewport.clientHeight);
+      localStorage.setItem(QUALITY_STORAGE_KEY, next);
+    });
     const lidarButton = mustGet<HTMLButtonElement>("lidar-toggle");
     const setLidarButton = (enabled: boolean) => {
       lidar.setEnabled(enabled);

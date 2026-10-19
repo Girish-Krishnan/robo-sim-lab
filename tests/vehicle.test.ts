@@ -2,6 +2,7 @@ import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { describe, expect, it } from "vitest";
 import { placeChaseCamera } from "../src/sim/camera";
+import { LIDAR_LOCAL } from "../src/sim/sensors";
 import { AckermannBuggy, STOP_BRAKE } from "../src/sim/vehicle";
 
 const DT = 1 / 60;
@@ -43,7 +44,7 @@ function chassisOf(scene: THREE.Scene): THREE.Group {
 
 /** Horizontal direction the front tires are pointing, in the chassis frame. +X is the driver's left. */
 function frontWheelAimX(scene: THREE.Scene): number {
-  const wheels = chassisOf(scene).children.filter((child) => child instanceof THREE.Group);
+  const wheels = chassisOf(scene).children.filter((child) => child.name === "wheel");
   let aim = 0;
   let count = 0;
   for (const wheel of wheels) {
@@ -77,6 +78,16 @@ describe("ackermann buggy", () => {
     expect(mid.x).toBeGreaterThan(start.x + 0.45);
     expect(projectX(camera, midPoint)).toBeLessThan(projectX(camera, origin) - 0.04);
     expect(frontWheelAimX(scene)).toBeGreaterThan(0.2);
+    const chassisNow = chassisOf(scene);
+    const puck = chassisNow.getObjectByName("lidar-puck");
+    expect(puck).toBeTruthy();
+    expect(puck!.position.x).toBeCloseTo(LIDAR_LOCAL.x);
+    expect(puck!.position.y).toBeCloseTo(LIDAR_LOCAL.y);
+    expect(puck!.position.z).toBeCloseTo(LIDAR_LOCAL.z);
+    const spun = chassisNow.children
+      .filter((child) => child.name === "wheel")
+      .some((wheel) => Math.abs(wheel.children[0]?.quaternion.x ?? 0) > 0.05);
+    expect(spun).toBe(true);
 
     // Keep the left lock until the nose has come back toward the original camera.
     const chassis = chassisOf(scene);
@@ -96,6 +107,19 @@ describe("ackermann buggy", () => {
     robot.setCommand({ steering: 0.45, throttle: -0.75 }, 0);
     step(world, robot, 50);
     expect(frontWheelAimX(scene)).toBeGreaterThan(0.2);
+  });
+
+  it("rests the tire centers about one radius off the ground", async () => {
+    const { world, scene, robot } = await makeRobot();
+    step(world, robot, 180);
+    const wheels = chassisOf(scene).children.filter((child) => child.name === "wheel");
+    expect(wheels).toHaveLength(4);
+    for (const wheel of wheels) {
+      const center = new THREE.Vector3();
+      wheel.getWorldPosition(center);
+      expect(center.y).toBeGreaterThan(0.24);
+      expect(center.y).toBeLessThan(0.4);
+    }
   });
 
   it("stays upright when a circle is brought to a stop", async () => {

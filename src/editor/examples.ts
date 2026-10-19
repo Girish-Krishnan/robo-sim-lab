@@ -126,9 +126,54 @@ def control(sensors):
     return steering, throttle
 `;
 
+/**
+ * Right-biased follow-the-gap. Useful on the racetrack, where a wall sits
+ * on the driver's right along the straight and obstacles leave a gap.
+ * Negative lidar angles are the driver's right. Positive steering is left.
+ */
+const wall = `# Wall follow
+#
+# Follow the gap, with a preference for keeping space on the driver's right.
+# On the F1TENTH track that laps the oval: the inner wall starts out on the
+# right, and cones on the racing line are something to pass rather than hit.
+# It also runs in the other yards.
+#
+# angles: 0 is straight ahead, positive is the driver's left.
+# steering uses the same sign.
+
+import numpy as np
+
+aim = 0.0
+
+def control(sensors):
+    global aim
+    ranges = np.asarray(sensors.lidar.ranges, dtype=float)
+    angles = np.asarray(sensors.lidar.angles, dtype=float)
+    window = np.abs(angles) < 1.55
+    # Prefer open space near straight ahead, with a small pull to the right
+    # so an oval is lapped with the inner wall on that side.
+    score = ranges * (1.0 - 0.18 * np.abs(angles))
+    score = score + np.where(angles < -0.05, 0.6, 0.0)
+    score = np.where(window, score, -1.0)
+    index = int(np.argmax(score))
+    gap_angle = float(angles[index])
+    gap_range = float(ranges[index])
+    aim = 0.65 * aim + 0.35 * gap_angle
+    steering = float(np.clip(aim * 0.85, -0.48, 0.48))
+    throttle = 0.46
+    if gap_range < 8.0:
+        throttle = 0.32
+    if gap_range < 4.0:
+        throttle = 0.18
+    if gap_range < 2.0:
+        throttle = 0.0
+    return steering, throttle
+`;
+
 export const EXAMPLES: CodeExample[] = [
   { id: "circle", label: "Circle drive", source: circle },
   { id: "avoid", label: "Lidar avoid", source: avoid },
+  { id: "wall", label: "Wall follow", source: wall },
 ];
 
 export const DEFAULT_EXAMPLE = EXAMPLES[0]!;

@@ -1,0 +1,102 @@
+import * as THREE from "three";
+import type RAPIER from "@dimforge/rapier3d-compat";
+import type { Solid } from "../course";
+import { mountSolids, type WorldMount } from "../course";
+import type { Atmosphere } from "../scene";
+import { concreteTexture } from "../textures";
+import type { SpawnPose } from "../vehicle";
+import { cuboid } from "./factory";
+
+type Rapier = typeof RAPIER;
+
+export const WAREHOUSE_SPAWN: SpawnPose = { x: 0, y: 0.84, z: -10, yaw: 0 };
+
+export const WAREHOUSE_ATMOSPHERE: Atmosphere = {
+  background: "#4c545c",
+  fog: "#6e767e",
+  fogNear: 10,
+  fogFar: 48,
+  hemiSky: 0xc5ccd2,
+  hemiGround: 0x3a4046,
+  hemiIntensity: 0.55,
+  sunColor: 0xf0f2f4,
+  sunIntensity: 1.7,
+  exposure: 1.02,
+  zenith: "#5c656e",
+  horizon: "#8b9298",
+  skyGround: "#3e444a",
+};
+
+export function buildWarehouseSolids(): Solid[] {
+  const solids: Solid[] = [];
+  const shelf = (x: number, z: number, length: number) => {
+    solids.push(cuboid(x, z, 1.35, 2.35, length, "shelf"));
+  };
+  shelf(-6.2, 14, 26);
+  shelf(6.2, 14, 26);
+  shelf(-11.4, 14, 26);
+  shelf(11.4, 14, 26);
+  solids.push(cuboid(0, 33.2, 12, 2.35, 1.2, "shelf"));
+
+  // Perimeter walls.
+  solids.push(cuboid(0, 36, 28, 3.2, 0.4, "concrete"));
+  solids.push(cuboid(0, -16, 28, 3.2, 0.4, "concrete"));
+  solids.push(cuboid(-14.2, 10, 0.4, 3.2, 52, "concrete"));
+  solids.push(cuboid(14.2, 10, 0.4, 3.2, 52, "concrete"));
+
+  // Pallets in the main aisle. Each leaves a gap wider than the car.
+  solids.push(cuboid(2.15, 6, 1.2, 1.35, 1.05, "pallet", 0.08));
+  solids.push(cuboid(-2.05, 14, 1.15, 1.4, 1.1, "pallet", -0.12));
+  solids.push(cuboid(1.9, 22, 1.2, 1.3, 1.15, "pallet", 0.2));
+  solids.push(cuboid(-1.7, 28, 1.05, 1.45, 1.05, "crate", -0.05));
+  solids.push(cuboid(-8.8, 8, 1.1, 1.35, 1.0, "pallet", 0.4));
+  solids.push(cuboid(8.6, 18, 1.15, 1.4, 1.05, "barrel"));
+  return solids;
+}
+
+export function mountWarehouse(RAPIER: Rapier, world: InstanceType<Rapier["World"]>, scene: THREE.Scene): WorldMount {
+  const group = new THREE.Group();
+  group.name = "world-warehouse";
+  scene.add(group);
+
+  const concrete = concreteTexture();
+  const floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(40, 70),
+    new THREE.MeshStandardMaterial({ map: concrete, roughness: 0.86, metalness: 0.08, color: 0xffffff }),
+  );
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.set(0, 0.012, 10);
+  floor.receiveShadow = true;
+  group.add(floor);
+
+  const ceiling = new THREE.Mesh(
+    new THREE.PlaneGeometry(30, 54),
+    new THREE.MeshStandardMaterial({ color: 0x3c434a, roughness: 0.9, side: THREE.DoubleSide }),
+  );
+  ceiling.rotation.x = Math.PI / 2;
+  ceiling.position.set(0, 4.6, 12);
+  group.add(ceiling);
+
+  const lampMat = new THREE.MeshStandardMaterial({
+    color: 0xfff6e0,
+    emissive: 0xffe2a0,
+    emissiveIntensity: 0.8,
+    roughness: 0.3,
+  });
+  for (const z of [-4, 6, 16, 26]) {
+    const lamp = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.06, 0.35), lampMat);
+    lamp.position.set(0, 4.35, z);
+    group.add(lamp);
+  }
+
+  const stripe = new THREE.MeshBasicMaterial({ color: 0xe3a23a });
+  for (const x of [-3.4, 3.4]) {
+    const line = new THREE.Mesh(new THREE.PlaneGeometry(0.08, 28), stripe);
+    line.rotation.x = -Math.PI / 2;
+    line.position.set(x, 0.02, 14);
+    group.add(line);
+  }
+
+  const bodies = mountSolids(RAPIER, world, group, buildWarehouseSolids());
+  return { group, bodies };
+}

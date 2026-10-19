@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import type RAPIER from "@dimforge/rapier3d-compat";
 import { quatRotate } from "../api/math";
-import { bollardTexture, buildingTexture, crateTexture, rampTexture } from "./textures";
+import { asphaltTexture, bollardTexture, buildingTexture, crateTexture, padTexture, rampTexture } from "./textures";
 
 type Rapier = typeof RAPIER;
 type World = InstanceType<Rapier["World"]>;
@@ -31,7 +31,12 @@ export type SolidLook =
   | "sign"
   | "planter"
   | "silo"
-  | "fountain";
+  | "fountain"
+  | "foam"
+  | "signal"
+  | "shelf"
+  | "log"
+  | "pallet";
 
 export interface Solid {
   shape: SolidShape;
@@ -210,16 +215,16 @@ export function buildCourseSolids(): Solid[] {
   box(-11.5, 8.8, 1.5, 1.35, 2.4, "dumpster", 0.15);
 
   // Park dressing.
-  ball(18.2, -16, 0.85, "rock", 0x6e7370);
-  ball(16.4, -17.6, 0.7, "rock", 0x8a8680);
-  ball(19.5, -14.2, 0.62, "rock", 0x5e6664);
-  ball(-14, -12, 0.9, "rock", 0x7a756e);
-  ball(-22, 16, 0.75, "bush", 0x2f6b45);
-  ball(-20, 18.5, 0.68, "bush", 0x3d7d52);
-  ball(20, 18, 0.72, "bush", 0x2a5e3d);
-  ball(30, 22, 0.8, "bush", 0x346b46);
-  ball(12.8, -12, 0.66, "bush", 0x3f7a50);
-  ball(-6, -16, 0.7, "bush", 0x2c6240);
+  ball(18.2, -16, 0.9, "rock", 0x6e7370);
+  ball(16.4, -17.6, 0.85, "rock", 0x8a8680);
+  ball(19.5, -14.2, 0.82, "rock", 0x5e6664);
+  ball(-14, -12, 0.95, "rock", 0x7a756e);
+  ball(-22, 16, 0.88, "bush", 0x2f6b45);
+  ball(-20, 18.5, 0.84, "bush", 0x3d7d52);
+  ball(20, 18, 0.86, "bush", 0x2a5e3d);
+  ball(30, 22, 0.9, "bush", 0x346b46);
+  ball(12.8, -12, 0.84, "bush", 0x3f7a50);
+  ball(-6, -16, 0.86, "bush", 0x2c6240);
 
   cyl(11.6, 46, 0.22, 2.6, "pine", 0, 0x2a4a34);
   cyl(-14, 28, 0.24, 3.1, "pine", 0, 0x234432);
@@ -278,6 +283,16 @@ export function buildCourseSolids(): Solid[] {
   box(48, 0, 0.4, 1.6, 28, "concrete");
   box(48, 40, 0.4, 1.6, 24, "concrete");
 
+  // Signals on the sidewalks, outside the avenue and the cross street.
+  cyl(-1.4, 20.6, 0.08, 3.5, "signal", 0, 0x2c3338);
+  box(-1.4, 20.6, 0.55, 0.9, 0.28, "signal", 0, 0, 2.85, 0x1c2126);
+  cyl(12.4, 20.6, 0.08, 3.5, "signal", 0, 0x2c3338);
+  box(12.4, 20.6, 0.55, 0.9, 0.28, "signal", 0, 0, 2.85, 0x1c2126);
+  cyl(-1.4, 34.2, 0.08, 3.5, "signal", 0, 0x2c3338);
+  box(-1.4, 34.2, 0.55, 0.9, 0.28, "signal", Math.PI, 0, 2.85, 0x1c2126);
+  cyl(12.4, 34.2, 0.08, 3.5, "signal", 0, 0x2c3338);
+  box(12.4, 34.2, 0.55, 0.9, 0.28, "signal", Math.PI, 0, 2.85, 0x1c2126);
+
   // Bollards marking the cross-street corners, off the driving lines.
   cyl(1.3, 22.2, 0.22, 1.45, "bollard");
   cyl(9.8, 22.2, 0.22, 1.45, "bollard");
@@ -287,10 +302,15 @@ export function buildCourseSolids(): Solid[] {
   return solids;
 }
 
-export function addCourse(RAPIER: Rapier, world: World, scene: THREE.Scene): void {
-  addGroundDressing(scene);
+export interface WorldMount {
+  group: THREE.Group;
+  bodies: InstanceType<Rapier["RigidBody"]>[];
+}
+
+export function mountSolids(RAPIER: Rapier, world: World, parent: THREE.Object3D, solids: readonly Solid[]): WorldMount["bodies"] {
   const mats = createMaterials();
-  for (const solid of buildCourseSolids()) {
+  const bodies: WorldMount["bodies"] = [];
+  for (const solid of solids) {
     const visual = buildVisual(solid, mats);
     visual.position.set(solid.x, solid.y, solid.z);
     const q = solidQuaternion(solid.yaw, solid.pitch);
@@ -301,46 +321,112 @@ export function addCourse(RAPIER: Rapier, world: World, scene: THREE.Scene): voi
         obj.receiveShadow = true;
       }
     });
-    scene.add(visual);
-
-    const body = world.createRigidBody(
-      RAPIER.RigidBodyDesc.fixed()
-        .setTranslation(solid.x, solid.y, solid.z)
-        .setRotation(q),
-    );
-    const desc =
-      solid.shape === "cuboid"
-        ? RAPIER.ColliderDesc.cuboid(solid.hx, solid.hy, solid.hz)
-        : solid.shape === "cylinder"
-          ? RAPIER.ColliderDesc.cylinder(solid.hy, solid.hx)
-          : solid.shape === "cone"
-            ? RAPIER.ColliderDesc.cone(solid.hy, solid.hx)
-            : RAPIER.ColliderDesc.ball(solid.hx);
-    world.createCollider(desc.setFriction(solid.friction).setRestitution(0.02), body);
+    parent.add(visual);
+    bodies.push(addSolidBody(RAPIER, world, solid, q));
   }
+  return bodies;
 }
 
-function addGroundDressing(scene: THREE.Scene): void {
+function addSolidBody(
+  RAPIER: Rapier,
+  world: World,
+  solid: Solid,
+  q: { x: number; y: number; z: number; w: number },
+): InstanceType<Rapier["RigidBody"]> {
+  const body = world.createRigidBody(
+    RAPIER.RigidBodyDesc.fixed().setTranslation(solid.x, solid.y, solid.z).setRotation(q),
+  );
+  const desc =
+    solid.shape === "cuboid"
+      ? RAPIER.ColliderDesc.cuboid(solid.hx, solid.hy, solid.hz)
+      : solid.shape === "cylinder"
+        ? RAPIER.ColliderDesc.cylinder(solid.hy, solid.hx)
+        : solid.shape === "cone"
+          ? RAPIER.ColliderDesc.cone(solid.hy, solid.hx)
+          : RAPIER.ColliderDesc.ball(solid.hx);
+  world.createCollider(desc.setFriction(solid.friction).setRestitution(0.02), body);
+  return body;
+}
+
+export function releaseMount(world: World, mount: WorldMount): void {
+  for (const body of mount.bodies) world.removeRigidBody(body);
+  const textures = new Set<THREE.Texture>();
+  mount.group.traverse((obj) => {
+    if (!(obj instanceof THREE.Mesh)) return;
+    obj.geometry.dispose();
+    const materials = Array.isArray(obj.material) ? obj.material : [obj.material];
+    for (const material of materials) {
+      for (const value of Object.values(material)) {
+        if (value instanceof THREE.Texture) textures.add(value);
+      }
+      material.dispose();
+    }
+  });
+  for (const texture of textures) texture.dispose();
+  mount.group.removeFromParent();
+}
+
+export function mountCity(RAPIER: Rapier, world: World, scene: THREE.Scene): WorldMount {
+  const group = new THREE.Group();
+  group.name = "world-city";
+  scene.add(group);
+  addCityGround(group);
+  addGroundDressing(group);
+  const bodies = mountSolids(RAPIER, world, group, buildCourseSolids());
+  return { group, bodies };
+}
+
+function addCityGround(parent: THREE.Object3D): void {
+  const asphalt = asphaltTexture();
+  asphalt.anisotropy = 8;
+  const ground = new THREE.Mesh(
+    new THREE.BoxGeometry(220, 1, 220),
+    new THREE.MeshStandardMaterial({ map: asphalt, roughness: 0.94, metalness: 0.02, color: 0xffffff }),
+  );
+  ground.position.y = -0.5;
+  ground.receiveShadow = true;
+  parent.add(ground);
+
+  const pad = new THREE.Mesh(
+    new THREE.PlaneGeometry(48, 48),
+    new THREE.MeshStandardMaterial({
+      map: padTexture(),
+      transparent: true,
+      roughness: 0.85,
+      metalness: 0,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1,
+    }),
+  );
+  pad.rotation.x = -Math.PI / 2;
+  pad.position.y = 0.015;
+  pad.receiveShadow = true;
+  parent.add(pad);
+}
+
+function addGroundDressing(parent: THREE.Object3D): void {
   const grass = new THREE.MeshStandardMaterial({ color: 0x4a7c49, roughness: 1, metalness: 0 });
   const lawn = (x: number, z: number, w: number, d: number) => {
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, d), grass);
     mesh.rotation.x = -Math.PI / 2;
     mesh.position.set(x, 0.012, z);
     mesh.receiveShadow = true;
-    scene.add(mesh);
+    parent.add(mesh);
   };
   lawn(-20, 8, 36, 70);
   lawn(28, 10, 34, 80);
   lawn(6, -24, 40, 28);
   lawn(8, 70, 50, 18);
 
-  const roadMat = new THREE.MeshStandardMaterial({ color: 0x2a3036, roughness: 0.92, metalness: 0.04 });
+  const roadMat = new THREE.MeshStandardMaterial({ color: 0x4a525a, roughness: 0.9, metalness: 0.05 });
   const road = (x: number, z: number, w: number, d: number) => {
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, d), roadMat);
     mesh.rotation.x = -Math.PI / 2;
     mesh.position.set(x, 0.02, z);
     mesh.receiveShadow = true;
-    scene.add(mesh);
+    parent.add(mesh);
   };
   // Gap around z = 0 so the painted start pad stays visible.
   road(5.5, 37, 9.2, 66);
@@ -350,7 +436,7 @@ function addGroundDressing(scene: THREE.Scene): void {
   plaza.rotation.x = -Math.PI / 2;
   plaza.position.set(5.5, 0.025, 58);
   plaza.receiveShadow = true;
-  scene.add(plaza);
+  parent.add(plaza);
 
   const paint = new THREE.MeshBasicMaterial({ color: 0xf4f1e6 });
   const amber = new THREE.MeshBasicMaterial({ color: 0xe0b15a });
@@ -360,25 +446,75 @@ function addGroundDressing(scene: THREE.Scene): void {
     const dash = new THREE.Mesh(new THREE.PlaneGeometry(0.16, 1.7), paint);
     dash.rotation.x = -Math.PI / 2;
     dash.position.set(5.5, 0.03, z);
-    scene.add(dash);
+    parent.add(dash);
   }
   for (const edge of [1.15, 9.85]) {
     const line = new THREE.Mesh(new THREE.PlaneGeometry(0.12, 64), amber);
     line.rotation.x = -Math.PI / 2;
     line.position.set(edge, 0.03, 38);
-    scene.add(line);
+    parent.add(line);
   }
   for (let x = -12; x <= 30; x += 3.4) {
     if (x > 0.5 && x < 10.5) continue;
     const dash = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 0.14), paint);
     dash.rotation.x = -Math.PI / 2;
     dash.position.set(x, 0.032, 27.2);
-    scene.add(dash);
+    parent.add(dash);
   }
   const ring = new THREE.Mesh(new THREE.RingGeometry(2.7, 2.9, 40), amber);
   ring.rotation.x = -Math.PI / 2;
   ring.position.set(5.5, 0.035, 58);
-  scene.add(ring);
+  parent.add(ring);
+
+  const walk = new THREE.MeshStandardMaterial({ color: 0xd2cdc4, roughness: 0.92, metalness: 0.02 });
+  const curbMat = new THREE.MeshStandardMaterial({ color: 0x9a9ea2, roughness: 0.8 });
+  const sidewalk = (x: number, z: number, w: number, d: number) => {
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, d), walk);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.set(x, 0.028, z);
+    mesh.receiveShadow = true;
+    parent.add(mesh);
+  };
+  sidewalk(-0.8, 36, 1.7, 64);
+  sidewalk(11.6, 36, 1.7, 64);
+  sidewalk(8, 21.4, 50, 1.5);
+  sidewalk(8, 33, 50, 1.5);
+
+  const curb = (x: number, z: number, w: number, d: number) => {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, 0.12, d), curbMat);
+    mesh.position.set(x, 0.06, z);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    parent.add(mesh);
+  };
+  curb(0.15, 38, 0.18, 60);
+  curb(10.85, 38, 0.18, 60);
+
+  const stripe = new THREE.MeshBasicMaterial({ color: 0xf7f4ee });
+  const cross = (x: number, z: number, alongX: boolean) => {
+    for (let i = -3; i <= 3; i++) {
+      const band = new THREE.Mesh(new THREE.PlaneGeometry(alongX ? 0.45 : 2.4, alongX ? 2.4 : 0.45), stripe);
+      band.rotation.x = -Math.PI / 2;
+      band.position.set(alongX ? x + i * 0.85 : x, 0.034, alongX ? z : z + i * 0.85);
+      parent.add(band);
+    }
+  };
+  cross(5.5, 23.15, true);
+  cross(5.5, 31.3, true);
+  cross(0.7, 27.2, false);
+  cross(10.3, 27.2, false);
+
+  const wearMat = new THREE.MeshBasicMaterial({ color: 0x1c2126, transparent: true, opacity: 0.28, depthWrite: false });
+  for (const [x, z, w, d] of [
+    [4.2, 18, 1.4, 6],
+    [7.1, 44, 1.1, 8],
+    [5.2, 62, 2.2, 3.5],
+  ] as const) {
+    const patch = new THREE.Mesh(new THREE.PlaneGeometry(w, d), wearMat);
+    patch.rotation.x = -Math.PI / 2;
+    patch.position.set(x, 0.033, z);
+    parent.add(patch);
+  }
 }
 
 interface Materials {
@@ -516,6 +652,21 @@ function buildVisual(solid: Solid, mats: Materials): THREE.Object3D {
     case "shelter":
       buildShelter(group, solid, mats);
       break;
+    case "signal":
+      buildSignal(group, solid, mats);
+      break;
+    case "shelf":
+      buildShelf(group, solid, mats);
+      break;
+    case "log":
+      add(new THREE.Mesh(new THREE.CylinderGeometry(solid.hx, solid.hx * 0.92, solid.hy * 2, 10), mats.trunk));
+      break;
+    case "pallet": {
+      add(new THREE.Mesh(new THREE.BoxGeometry(solid.hx * 2, solid.hy * 0.35, solid.hz * 2), mats.paint(0x8a6a45)));
+      const load = add(new THREE.Mesh(new THREE.BoxGeometry(solid.hx * 1.7, solid.hy * 1.4, solid.hz * 1.6), mats.crate));
+      load.position.y = solid.hy * 0.35;
+      break;
+    }
     case "sign":
       if (solid.shape === "cylinder") {
         add(new THREE.Mesh(new THREE.CylinderGeometry(solid.hx, solid.hx, solid.hy * 2, 8), mats.steel));
@@ -541,12 +692,25 @@ function buildVisual(solid: Solid, mats: Materials): THREE.Object3D {
     case "fence":
     case "concrete":
     case "barrier":
+    case "foam":
     case "steel": {
-      const material = solid.look === "fence" ? mats.steel : solid.look === "barrier" ? mats.barrier : solid.look === "steel" ? mats.steel : mats.concrete;
+      const material =
+        solid.look === "fence" || solid.look === "steel"
+          ? mats.steel
+          : solid.look === "foam"
+            ? mats.paint(0xe24b2a)
+            : solid.look === "barrier"
+              ? mats.barrier
+              : mats.concrete;
       add(new THREE.Mesh(new THREE.BoxGeometry(solid.hx * 2, solid.hy * 2, solid.hz * 2), material));
-      if (solid.look === "barrier") {
-        const stripe = add(new THREE.Mesh(new THREE.BoxGeometry(solid.hx * 2.02, solid.hy * 0.28, solid.hz * 2.02), mats.caution));
-        stripe.position.y = solid.hy * 0.2;
+      if (solid.look === "barrier" || solid.look === "foam") {
+        const stripe = add(
+          new THREE.Mesh(
+            new THREE.BoxGeometry(solid.hx * 2.02, solid.hy * 0.22, solid.hz * 2.02),
+            solid.look === "foam" ? mats.paint(0xf7f4ee) : mats.caution,
+          ),
+        );
+        stripe.position.y = solid.hy * 0.15;
       }
       break;
     }
@@ -642,6 +806,49 @@ function buildBuilding(group: THREE.Group, solid: Solid, mats: Materials): void 
       const y = -solid.hy * 0.2 + row * 1.3;
       window.position.set(x, y, solid.hz + 0.02);
       group.add(window);
+    }
+  }
+}
+
+function buildSignal(group: THREE.Group, solid: Solid, mats: Materials): void {
+  if (solid.shape === "cylinder") {
+    group.add(new THREE.Mesh(new THREE.CylinderGeometry(solid.hx, solid.hx * 1.15, solid.hy * 2, 8), mats.steel));
+    return;
+  }
+  group.add(new THREE.Mesh(new THREE.BoxGeometry(solid.hx * 2, solid.hy * 2, solid.hz * 2), mats.paint(0x1c2126)));
+  const lensGeo = new THREE.BoxGeometry(solid.hx * 1.4, solid.hy * 0.42, solid.hz * 0.4);
+  const colors = [0x39c15f, 0xe3a23a, 0xd23b3b];
+  colors.forEach((color, index) => {
+    const lens = new THREE.Mesh(
+      lensGeo,
+      new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: index === 2 ? 0.9 : 0.25, roughness: 0.3 }),
+    );
+    lens.position.set(0, solid.hy * 0.55 - index * solid.hy * 0.55, solid.hz * 0.7);
+    group.add(lens);
+  });
+}
+
+function buildShelf(group: THREE.Group, solid: Solid, mats: Materials): void {
+  const w = solid.hx * 2;
+  const h = solid.hy * 2;
+  const d = solid.hz * 2;
+  const postGeo = new THREE.BoxGeometry(0.08, h, 0.08);
+  for (const x of [-solid.hx + 0.04, solid.hx - 0.04]) {
+    for (const z of [-solid.hz + 0.04, solid.hz - 0.04]) {
+      const post = new THREE.Mesh(postGeo, mats.steel);
+      post.position.set(x, 0, z);
+      group.add(post);
+    }
+  }
+  const levels = 4;
+  for (let i = 0; i < levels; i++) {
+    const board = new THREE.Mesh(new THREE.BoxGeometry(w, 0.06, d), mats.paint(0x6e5438));
+    board.position.y = -solid.hy + 0.08 + (i * (h - 0.2)) / (levels - 1);
+    group.add(board);
+    if (i < levels - 1) {
+      const cargo = new THREE.Mesh(new THREE.BoxGeometry(w * 0.7, h * 0.16, d * 0.55), mats.crate);
+      cargo.position.y = board.position.y + h * 0.12;
+      group.add(cargo);
     }
   }
 }

@@ -126,8 +126,24 @@ header {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-width: 180px;
   justify-content: flex-end;
+}
+
+.header-select {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.header-select select {
+  width: auto;
+  max-width: 148px;
+  padding: 5px 8px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
 }
 
 main {
@@ -287,7 +303,7 @@ body.splitter-drag iframe { pointer-events: none; }
   flex: 1;
 }
 
-select {
+.example-label select {
   flex: 1;
   background: var(--panel-2);
   border: 1px solid var(--line);
@@ -391,7 +407,9 @@ select {
 
 @media (max-width: 960px) {
   header { padding: 0 10px; gap: 8px; }
-  .subtitle, #camera-reset, .shortcut { display: none; }
+  .subtitle, #camera-reset, .shortcut, .header-select span { display: none; }
+  .header-select { font-size: 0; }
+  .header-select select { font-size: 13px; max-width: 112px; }
   #app.code-mode main {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: minmax(220px, 42vh) minmax(0, 1fr);

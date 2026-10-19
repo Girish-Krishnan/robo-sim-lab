@@ -17,23 +17,30 @@ export function asphaltTexture(): THREE.CanvasTexture {
   canvas.height = size;
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Canvas 2D is unavailable.");
-  ctx.fillStyle = "#3a4046";
+  ctx.fillStyle = "#2c3238";
   ctx.fillRect(0, 0, size, size);
   const image = ctx.getImageData(0, 0, size, size);
   for (let i = 0; i < image.data.length; i += 4) {
-    const n = (Math.random() - 0.5) * 22;
-    image.data[i] = clampByte((image.data[i] ?? 0) + n);
-    image.data[i + 1] = clampByte((image.data[i + 1] ?? 0) + n);
-    image.data[i + 2] = clampByte((image.data[i + 2] ?? 0) + n * 0.9);
+    const n = (Math.random() - 0.5) * 28;
+    const grit = Math.random() < 0.04 ? (Math.random() - 0.5) * 40 : 0;
+    image.data[i] = clampByte((image.data[i] ?? 0) + n + grit);
+    image.data[i + 1] = clampByte((image.data[i + 1] ?? 0) + n * 0.95 + grit);
+    image.data[i + 2] = clampByte((image.data[i + 2] ?? 0) + n * 0.85);
   }
   ctx.putImageData(image, 0, 0);
-  ctx.strokeStyle = "rgba(255,255,255,0.035)";
+  ctx.strokeStyle = "rgba(18, 18, 18, 0.35)";
   ctx.lineWidth = 2;
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 14; i++) {
     ctx.beginPath();
     ctx.moveTo(Math.random() * size, Math.random() * size);
     ctx.lineTo(Math.random() * size, Math.random() * size);
     ctx.stroke();
+  }
+  ctx.fillStyle = "rgba(90, 78, 62, 0.18)";
+  for (let i = 0; i < 6; i++) {
+    ctx.beginPath();
+    ctx.ellipse(Math.random() * size, Math.random() * size, 18 + Math.random() * 40, 8 + Math.random() * 16, Math.random(), 0, Math.PI * 2);
+    ctx.fill();
   }
   const texture = canvasTexture(canvas, true);
   texture.repeat.set(48, 48);
@@ -55,22 +62,9 @@ export function padTexture(): THREE.CanvasTexture {
     y: ((24 - z) / 48) * size,
   });
 
-  ctx.strokeStyle = "rgba(232, 236, 230, 0.55)";
-  ctx.lineWidth = 5;
-  const center = worldToPx(0, 0);
-  ctx.beginPath();
-  ctx.arc(center.x, center.y, (8 / 48) * size, 0, Math.PI * 2);
-  ctx.stroke();
-
-  ctx.strokeStyle = "rgba(232, 236, 230, 0.28)";
-  ctx.lineWidth = 3;
-  ctx.setLineDash([14, 16]);
-  ctx.beginPath();
-  ctx.arc(center.x, center.y, (5.4 / 48) * size, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.setLineDash([]);
-
   // Start chevron at the spawn point, pointing +Z (up the canvas).
+  // The old circle around the origin sat on the opposite side of a left-hand
+  // constant-radius turn, so it is not painted.
   const spawn = worldToPx(5.4, 0);
   ctx.strokeStyle = "rgba(227, 162, 58, 0.95)";
   ctx.lineWidth = 6;
@@ -163,6 +157,77 @@ export function rampTexture(): THREE.CanvasTexture {
     ctx.stroke();
   }
   return canvasTexture(canvas, true);
+}
+
+/** Tread sheet built without a canvas so the physics tests can construct the car. */
+export function tireTexture(): THREE.DataTexture {
+  const width = 128;
+  const height = 32;
+  const data = new Uint8Array(width * height * 4);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const groove = x % 16 < 4 || (y > 6 && y < 26 && (x + 8) % 16 < 2);
+      const shade = groove ? 16 : 34 + ((x * 5 + y * 3) % 11);
+      const index = (y * width + x) * 4;
+      data[index] = shade;
+      data[index + 1] = shade;
+      data[index + 2] = shade + 1;
+      data[index + 3] = 255;
+    }
+  }
+  const texture = new THREE.DataTexture(data, width, height);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  texture.repeat.set(5, 1);
+  texture.needsUpdate = true;
+  return texture;
+}
+
+export function dirtTexture(): THREE.CanvasTexture {
+  const size = 256;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas 2D is unavailable.");
+  ctx.fillStyle = "#5a4a34";
+  ctx.fillRect(0, 0, size, size);
+  const image = ctx.getImageData(0, 0, size, size);
+  for (let i = 0; i < image.data.length; i += 4) {
+    const n = (Math.random() - 0.5) * 36;
+    image.data[i] = clampByte((image.data[i] ?? 0) + n);
+    image.data[i + 1] = clampByte((image.data[i + 1] ?? 0) + n * 0.85);
+    image.data[i + 2] = clampByte((image.data[i + 2] ?? 0) + n * 0.55);
+  }
+  ctx.putImageData(image, 0, 0);
+  const texture = canvasTexture(canvas, true);
+  texture.repeat.set(12, 12);
+  return texture;
+}
+
+export function concreteTexture(): THREE.CanvasTexture {
+  const size = 256;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas 2D is unavailable.");
+  ctx.fillStyle = "#8d9196";
+  ctx.fillRect(0, 0, size, size);
+  const image = ctx.getImageData(0, 0, size, size);
+  for (let i = 0; i < image.data.length; i += 4) {
+    const n = (Math.random() - 0.5) * 18;
+    image.data[i] = clampByte((image.data[i] ?? 0) + n);
+    image.data[i + 1] = clampByte((image.data[i + 1] ?? 0) + n);
+    image.data[i + 2] = clampByte((image.data[i + 2] ?? 0) + n);
+  }
+  ctx.putImageData(image, 0, 0);
+  ctx.strokeStyle = "rgba(60,60,60,0.25)";
+  ctx.strokeRect(4, 4, 248, 248);
+  const texture = canvasTexture(canvas, true);
+  texture.repeat.set(8, 8);
+  return texture;
 }
 
 function clampByte(value: number): number {
