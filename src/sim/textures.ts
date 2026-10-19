@@ -230,6 +230,55 @@ export function concreteTexture(): THREE.CanvasTexture {
   return texture;
 }
 
+/** Canopy card. Corners stay transparent so the quad does not read as a slab. */
+export function foliageTexture(): THREE.CanvasTexture {
+  const size = 256;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas 2D is unavailable.");
+  ctx.clearRect(0, 0, size, size);
+  const cx = size / 2;
+  const cy = size / 2;
+  for (let i = 0; i < 42; i++) {
+    const ang = Math.random() * Math.PI * 2;
+    const rad = Math.pow(Math.random(), 0.35) * 78;
+    const x = cx + Math.cos(ang) * rad;
+    const y = cy + Math.sin(ang) * rad * 0.75;
+    const g = 110 + Math.random() * 80;
+    ctx.fillStyle = `rgba(${30 + Math.random() * 40}, ${g}, ${28 + Math.random() * 24}, 0.95)`;
+    ctx.beginPath();
+    ctx.ellipse(x, y, 7 + Math.random() * 11, 3 + Math.random() * 5, ang, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  const texture = canvasTexture(canvas, false);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+/** One grass blade, transparent outside the silhouette. */
+export function bladeTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = 64;
+  canvas.height = 128;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas 2D is unavailable.");
+  ctx.clearRect(0, 0, 64, 128);
+  ctx.fillStyle = "rgba(72, 130, 48, 1)";
+  ctx.beginPath();
+  ctx.moveTo(32, 6);
+  ctx.quadraticCurveTo(46, 50, 38, 122);
+  ctx.quadraticCurveTo(32, 126, 26, 122);
+  ctx.quadraticCurveTo(18, 50, 32, 6);
+  ctx.fill();
+  ctx.fillStyle = "rgba(150, 190, 80, 1)";
+  ctx.fillRect(31, 10, 2, 100);
+  const texture = canvasTexture(canvas, false);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
 function clampByte(value: number): number {
   return Math.max(0, Math.min(255, value));
 }

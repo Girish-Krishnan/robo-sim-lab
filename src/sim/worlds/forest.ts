@@ -2,8 +2,9 @@ import * as THREE from "three";
 import type RAPIER from "@dimforge/rapier3d-compat";
 import type { Solid } from "../course";
 import { mountSolids, type WorldMount } from "../course";
-import type { Atmosphere } from "../scene";
-import { dirtTexture } from "../textures";
+import type { Atmosphere, GraphicsQuality } from "../scene";
+import { forestGroundMaterial, loadPropKit, tileUvs } from "../surfaces";
+import { bladeTexture } from "../textures";
 import type { SpawnPose } from "../vehicle";
 import { ballSolid, cuboid, logSolid, pillar } from "./factory";
 
@@ -14,8 +15,8 @@ export const FOREST_SPAWN: SpawnPose = { x: 0, y: 0.84, z: -4, yaw: 0 };
 export const FOREST_ATMOSPHERE: Atmosphere = {
   background: "#9aada0",
   fog: "#c5d0c2",
-  fogNear: 14,
-  fogFar: 78,
+  fogNear: 36,
+  fogFar: 120,
   hemiSky: 0xc9d8c4,
   hemiGround: 0x3d4a32,
   hemiIntensity: 0.72,
@@ -69,51 +70,51 @@ export function buildForestSolids(): Solid[] {
   return solids;
 }
 
-export function mountForest(RAPIER: Rapier, world: InstanceType<Rapier["World"]>, scene: THREE.Scene): WorldMount {
+function forestHeight(x: number, z: number): number {
+  const trail = Math.exp(-((x - Math.sin(z * 0.09) * 1.2) ** 2) / 22);
+  const bank = Math.exp(-((Math.abs(x) - 8) ** 2) / 8) * Math.exp(-((z - 28) ** 2) / 18);
+  const bump = Math.sin(x * 0.7) * Math.cos(z * 0.45) * 0.18;
+  return 0.02 + (1 - trail) * (0.28 + Math.max(0, bump)) + bank * 0.15;
+}
+
+export async function mountForest(
+  RAPIER: Rapier,
+  world: InstanceType<Rapier["World"]>,
+  scene: THREE.Scene,
+  quality: GraphicsQuality,
+): Promise<WorldMount> {
+  const kit = await loadPropKit(quality).catch(() => null);
   const group = new THREE.Group();
   group.name = "world-forest";
   scene.add(group);
 
-  const geo = new THREE.PlaneGeometry(90, 110, 50, 60);
+  const geo = new THREE.PlaneGeometry(90, 110, 70, 80);
+  tileUvs(geo, 90 * 1.15, 110 * 1.15);
   geo.rotateX(-Math.PI / 2);
   const pos = geo.attributes.position;
   if (!pos) throw new Error("forest ground is missing positions");
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i);
     const z = pos.getZ(i);
-    const trail = Math.exp(-((x - Math.sin(z * 0.09) * 1.2) ** 2) / 22);
-    const bank = Math.exp(-((Math.abs(x) - 8) ** 2) / 8) * Math.exp(-((z - 28) ** 2) / 18);
-    const bump = Math.sin(x * 0.7) * Math.cos(z * 0.45) * 0.18;
-    const height = (1 - trail) * (0.28 + Math.max(0, bump)) + bank * 0.15;
-    pos.setY(i, 0.02 + height);
+    pos.setY(i, forestHeight(x, z));
   }
   geo.computeVertexNormals();
-  const dirt = dirtTexture();
-  const ground = new THREE.Mesh(
-    geo,
-    new THREE.MeshStandardMaterial({ map: dirt, roughness: 1, metalness: 0, color: 0xc4b090 }),
-  );
+  const groundMat = kit
+    ? await forestGroundMaterial(quality)
+    : new THREE.MeshStandardMaterial({ color: 0x6a553c, roughness: 1 });
+  const ground = new THREE.Mesh(geo, groundMat);
   ground.receiveShadow = true;
   group.add(ground);
 
-  const trailMat = new THREE.MeshStandardMaterial({ color: 0x6a553c, roughness: 1 });
-  for (const [z, length] of [
-    [6, 36],
-    [50, 36],
-  ] as const) {
-    const trail = new THREE.Mesh(new THREE.PlaneGeometry(6.2, length), trailMat);
-    trail.rotation.x = -Math.PI / 2;
-    trail.position.set(0, 0.03, z);
-    trail.receiveShadow = true;
-    group.add(trail);
-  }
+  if (quality === "high") scatterGroundCover(group);
 
-  const waterMat = new THREE.MeshStandardMaterial({
-    color: 0x2a8eab,
-    roughness: 0.12,
-    metalness: 0.35,
+  const waterMat = new THREE.MeshPhysicalMaterial({
+    color: 0x1f7f9c,
+    roughness: 0.06,
+    metalness: 0.55,
     transparent: true,
     opacity: 0.92,
+    envMapIntensity: 1.4,
   });
   for (const x of [-9.2, 9.2]) {
     const bank = new THREE.Mesh(new THREE.PlaneGeometry(8, 9), waterMat);
@@ -126,9 +127,11 @@ export function mountForest(RAPIER: Rapier, world: InstanceType<Rapier["World"]>
   under.position.set(0, 0.018, 28);
   group.add(under);
 
-  const plankMat = new THREE.MeshStandardMaterial({ color: 0x7a5a38, roughness: 0.85 });
+  const plankMat = kit?.planks ?? new THREE.MeshStandardMaterial({ color: 0x7a5a38, roughness: 0.85 });
   for (let z = 24.6; z <= 31.4; z += 0.55) {
-    const plank = new THREE.Mesh(new THREE.BoxGeometry(7.6, 0.06, 0.42), plankMat);
+    const plankGeo = new THREE.BoxGeometry(7.6, 0.06, 0.42);
+    tileUvs(plankGeo, 4, 1);
+    const plank = new THREE.Mesh(plankGeo, plankMat);
     plank.position.set(0, 0.05, z);
     plank.castShadow = true;
     plank.receiveShadow = true;
@@ -152,6 +155,82 @@ export function mountForest(RAPIER: Rapier, world: InstanceType<Rapier["World"]>
     group.add(shaft);
   }
 
-  const bodies = mountSolids(RAPIER, world, group, buildForestSolids());
+  const bodies = mountSolids(RAPIER, world, group, buildForestSolids(), kit);
   return { group, bodies };
+}
+
+function scatterGroundCover(group: THREE.Group): void {
+  const blade = new THREE.PlaneGeometry(0.09, 0.42);
+  blade.translate(0, 0.21, 0);
+  const grassMat = new THREE.MeshStandardMaterial({
+    map: bladeTexture(),
+    alphaTest: 0.6,
+    roughness: 0.85,
+    side: THREE.DoubleSide,
+    color: 0xffffff,
+  });
+  const count = 2600;
+  const grass = new THREE.InstancedMesh(blade, grassMat, count);
+  grass.castShadow = false;
+  grass.receiveShadow = false;
+  const dummy = new THREE.Object3D();
+  const color = new THREE.Color();
+  let n = 0;
+  for (let i = 0; i < count * 3 && n < count; i++) {
+    const x = (Math.random() - 0.5) * 70;
+    const z = (Math.random() - 0.5) * 90;
+    const along = x - Math.sin(z * 0.09) * 1.2;
+    if (Math.abs(along) < 2.4) continue;
+    if (Math.abs(z - 28) < 6 && Math.abs(x) < 6) continue;
+    dummy.position.set(x, forestHeight(x, z), z);
+    dummy.rotation.y = Math.random() * Math.PI;
+    const h = 0.55 + Math.random() * 0.7;
+    dummy.scale.set(1, h, 1);
+    dummy.updateMatrix();
+    grass.setMatrixAt(n, dummy.matrix);
+    color.setHex(Math.random() > 0.5 ? 0xd7e8b0 : 0xb7d48a);
+    grass.setColorAt(n, color);
+    n += 1;
+  }
+  grass.count = n;
+  grass.instanceMatrix.needsUpdate = true;
+  if (grass.instanceColor) grass.instanceColor.needsUpdate = true;
+  group.add(grass);
+
+  const leafMat = new THREE.MeshStandardMaterial({
+    map: bladeTexture(),
+    alphaTest: 0.55,
+    roughness: 0.9,
+    side: THREE.DoubleSide,
+    color: 0xc4a05a,
+  });
+  const leafGeo = new THREE.PlaneGeometry(0.16, 0.09);
+  const leaves = new THREE.InstancedMesh(leafGeo, leafMat, 220);
+  let leavesN = 0;
+  for (let i = 0; i < 220; i++) {
+    const x = (Math.random() - 0.5) * 60;
+    const z = (Math.random() - 0.5) * 80;
+    dummy.position.set(x, forestHeight(x, z) + 0.02, z);
+    dummy.rotation.set(-Math.PI / 2 + (Math.random() - 0.5) * 0.4, Math.random() * Math.PI, 0);
+    dummy.scale.setScalar(0.7 + Math.random());
+    dummy.updateMatrix();
+    leaves.setMatrixAt(leavesN, dummy.matrix);
+    leavesN += 1;
+  }
+  leaves.instanceMatrix.needsUpdate = true;
+  group.add(leaves);
+
+  const stone = new THREE.MeshStandardMaterial({ color: 0x8d8880, roughness: 0.95 });
+  for (let i = 0; i < 18; i++) {
+    const x = (Math.random() - 0.5) * 50;
+    const z = -10 + Math.random() * 70;
+    if (Math.abs(x - Math.sin(z * 0.09) * 1.2) < 2.2) continue;
+    const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.18 + Math.random() * 0.22, 0), stone);
+    rock.scale.set(1.2, 0.55, 1);
+    rock.position.set(x, forestHeight(x, z) + 0.05, z);
+    rock.rotation.y = Math.random() * Math.PI;
+    rock.castShadow = true;
+    rock.receiveShadow = true;
+    group.add(rock);
+  }
 }
