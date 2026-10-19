@@ -48,7 +48,7 @@ export function loadProp(file: string): Promise<PropTemplate> {
   const hit = cache.get(file);
   if (hit) return hit;
   if (!gltfLoader) throw new Error("Prop loader is not bound.");
-  const pending = gltfLoader.loadAsync(`${import.meta.env.BASE_URL}assets/models/${file}.glb`).then((gltf) => bake(gltf.scene));
+  const pending = gltfLoader.loadAsync(`${import.meta.env.BASE_URL}assets/models/${file}.glb`).then((gltf) => bakeObject(gltf.scene));
   cache.set(file, pending);
   return pending;
 }
@@ -58,13 +58,18 @@ export async function loadProps(files: readonly string[]): Promise<Record<string
   return Object.fromEntries(entries);
 }
 
-function bake(root: THREE.Object3D): PropTemplate {
+/** Bake one glTF into a ground-fitted template. Exported so tests can check the bounds. */
+export function bakeObject(root: THREE.Object3D): PropTemplate {
   root.updateMatrixWorld(true);
-  const parts: PropTemplate["parts"] = [];
+  let parts: PropTemplate["parts"] = [];
   const sources: THREE.BufferGeometry[] = [];
   root.traverse((obj) => {
     if (!(obj instanceof THREE.Mesh)) return;
     const geometry = obj.geometry.clone();
+    // Meshopt leaves positions as normalized int16. applyMatrix4 writes back
+    // through that normalization, and any coordinate outside [-1, 1] wraps.
+    // That turned every plant into a scrambled slab. Expand to float32 first.
+    expandQuantized(geometry);
     geometry.applyMatrix4(obj.matrixWorld);
     geometry.boundingBox = null;
     geometry.boundingSphere = null;
@@ -74,11 +79,20 @@ function bake(root: THREE.Object3D): PropTemplate {
   });
   for (const geometry of sources) geometry.dispose();
 
-  let box = new THREE.Box3();
-  for (const part of parts) box.expandByObject(new THREE.Mesh(part.geometry));
+  // Poly Haven ships ferns, grasses, pines, and shrubs as a row of plants.
+  // Keeping the row made one "tree" a wall. Attachments (crate lid, manhole
+  // cover) stay, because their centers sit inside the main piece.
+  const kept = keepHeroPlant(parts);
+  if (kept.length !== parts.length) {
+    const stay = new Set(kept);
+    for (const part of parts) if (!stay.has(part)) part.geometry.dispose();
+    parts = kept;
+  }
+
+  let box = boundsOf(parts);
   const size = box.getSize(new THREE.Vector3());
-  // Photogrammetry logs lie along X. Stand trees and barrels up; turn a long
-  // horizontal prop so its length follows local Z, which yaw then aims.
+  // Photogrammetry logs lie along X. Turn only a prop that is much longer
+  // than it is tall, so its length follows local Z and yaw can aim it.
   if (size.x > size.y * 2 && size.x > size.z * 2) {
     const turn = new THREE.Matrix4().makeRotationY(Math.PI / 2);
     for (const part of parts) {
@@ -86,14 +100,14 @@ function bake(root: THREE.Object3D): PropTemplate {
       part.geometry.boundingBox = null;
       part.geometry.boundingSphere = null;
     }
-    box = new THREE.Box3();
-    for (const part of parts) box.expandByObject(new THREE.Mesh(part.geometry));
+    box = boundsOf(parts);
   }
   const center = box.getCenter(new THREE.Vector3());
   for (const part of parts) {
     part.geometry.translate(-center.x, -box.min.y, -center.z);
     part.geometry.boundingBox = null;
     part.geometry.boundingSphere = null;
+    part.geometry.computeBoundingSphere();
     part.geometry.userData.keep = true;
   }
   const fitted = box.getSize(new THREE.Vector3());
@@ -102,6 +116,66 @@ function bake(root: THREE.Object3D): PropTemplate {
     height: Math.max(fitted.y, 0.01),
     radius: Math.max(fitted.x, fitted.z) * 0.5,
   };
+}
+
+function boundsOf(parts: PropTemplate["parts"]): THREE.Box3 {
+  const box = new THREE.Box3();
+  for (const part of parts) {
+    part.geometry.computeBoundingBox();
+    const local = part.geometry.boundingBox;
+    if (local) box.union(local);
+  }
+  return box;
+}
+
+function expandQuantized(geometry: THREE.BufferGeometry): void {
+  for (const name of ["position", "normal", "tangent"] as const) {
+    const attr = geometry.getAttribute(name);
+    if (!attr) continue;
+    // InterleavedBufferAttribute is not a BufferAttribute. Meshopt files use it,
+    // and skipping it left the normalized int16 positions in place.
+    const floatsAlready = attr.array instanceof Float32Array && !attr.normalized;
+    if (floatsAlready) continue;
+    const itemSize = attr.itemSize;
+    const floats = new Float32Array(attr.count * itemSize);
+    for (let i = 0; i < attr.count; i++) {
+      const offset = i * itemSize;
+      floats[offset] = attr.getX(i);
+      if (itemSize > 1) floats[offset + 1] = attr.getY(i);
+      if (itemSize > 2) floats[offset + 2] = attr.getZ(i);
+      if (itemSize > 3) floats[offset + 3] = attr.getW(i);
+    }
+    geometry.setAttribute(name, new THREE.BufferAttribute(floats, itemSize));
+  }
+}
+
+function keepHeroPlant(parts: PropTemplate["parts"]): PropTemplate["parts"] {
+  if (parts.length < 2) return parts;
+  const boxes = parts.map((part) => {
+    part.geometry.computeBoundingBox();
+    return part.geometry.boundingBox?.clone() ?? new THREE.Box3();
+  });
+  let hero = 0;
+  let heroHeight = -1;
+  boxes.forEach((box, index) => {
+    const height = box.max.y - box.min.y;
+    if (height > heroHeight) {
+      heroHeight = height;
+      hero = index;
+    }
+  });
+  const core = boxes[hero]!.clone();
+  const padX = Math.max(0.05, (core.max.x - core.min.x) * 0.08);
+  const padZ = Math.max(0.05, (core.max.z - core.min.z) * 0.08);
+  core.min.x -= padX;
+  core.max.x += padX;
+  core.min.z -= padZ;
+  core.max.z += padZ;
+  const kept = parts.filter((_, index) => {
+    const center = boxes[index]!.getCenter(new THREE.Vector3());
+    return center.x >= core.min.x && center.x <= core.max.x && center.z >= core.min.z && center.z <= core.max.z;
+  });
+  return kept.length > 0 ? kept : [parts[hero]!];
 }
 
 function prepareMaterial(material: THREE.Material): THREE.Material {

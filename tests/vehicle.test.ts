@@ -109,6 +109,43 @@ describe("ackermann buggy", () => {
     expect(frontWheelAimX(scene)).toBeGreaterThan(0.2);
   });
 
+  it("runs the wishbones from the rails out to the hubs", async () => {
+    const { world, scene, robot } = await makeRobot();
+    step(world, robot, 180);
+    const chassis = chassisOf(scene);
+    const bones: THREE.Object3D[] = [];
+    chassis.traverse((obj) => {
+      if (obj.name === "wishbone") bones.push(obj);
+    });
+    expect(bones.length).toBeGreaterThanOrEqual(12);
+    chassis.updateMatrixWorld(true);
+    const local = new THREE.Matrix4().copy(chassis.matrixWorld).invert();
+    const box = new THREE.Box3();
+    for (const bone of bones) {
+      const worldBox = new THREE.Box3().setFromObject(bone);
+      worldBox.applyMatrix4(local);
+      box.union(worldBox);
+    }
+    expect(box.max.x).toBeGreaterThan(0.55);
+    expect(box.min.x).toBeLessThan(-0.55);
+    expect(box.min.y).toBeLessThan(-0.5);
+    expect(box.max.y).toBeGreaterThan(-0.2);
+
+    const wheels = chassis.children.filter((child) => child.name === "wheel");
+    expect(wheels).toHaveLength(4);
+    for (const wheel of wheels) {
+      const center = new THREE.Vector3();
+      wheel.getWorldPosition(center);
+      let nearest = Infinity;
+      for (const bone of bones) {
+        const point = new THREE.Vector3();
+        bone.getWorldPosition(point);
+        nearest = Math.min(nearest, point.distanceTo(center));
+      }
+      expect(nearest).toBeLessThan(0.42);
+    }
+  });
+
   it("rests the tire centers about one radius off the ground", async () => {
     const { world, scene, robot } = await makeRobot();
     step(world, robot, 180);

@@ -310,9 +310,9 @@ function dressForest(
     if (Math.abs(z - 28) < 5 && Math.abs(x) < 5.5) continue;
     const y = forestHeight(x, z);
     const yaw = hashYaw(x, z);
-    if (i % 3 === 0) ferns.push({ x, y, z, yaw, scale: (0.7 + (i % 4) * 0.15) / props.fern!.height });
-    else if (i % 3 === 1) tufts.push({ x, y, z, yaw, scale: 0.9 + (i % 3) * 0.25 });
-    else shrubs.push({ x, y, z, yaw, scale: (1.1 + (i % 3) * 0.25) / props.shrub!.height });
+    if (i % 3 === 0) ferns.push({ x, y, z, yaw, scale: (0.55 + (i % 4) * 0.1) / props.fern!.height });
+    else if (i % 3 === 1) tufts.push({ x, y, z, yaw, scale: (0.32 + (i % 3) * 0.1) / props.grass!.height });
+    else shrubs.push({ x, y, z, yaw, scale: (0.9 + (i % 3) * 0.2) / props.shrub!.height });
   }
   for (let i = 0; i < 80; i++) {
     const x = (rand() - 0.5) * 64;
@@ -322,9 +322,9 @@ function dressForest(
     if (Math.abs(z - 28) < 5 && Math.abs(x) < 5.5) continue;
     const y = forestHeight(x, z);
     const yaw = rand() * Math.PI * 2;
-    if (i < 28) ferns.push({ x, y, z, yaw, scale: (0.55 + rand() * 0.5) / props.fern!.height });
-    else if (i < 48) shrubs.push({ x, y, z, yaw, scale: (0.9 + rand() * 0.7) / props.shrub!.height });
-    else tufts.push({ x, y, z, yaw, scale: 0.7 + rand() * 0.8 });
+    if (i < 28) ferns.push({ x, y, z, yaw, scale: (0.45 + rand() * 0.35) / props.fern!.height });
+    else if (i < 48) shrubs.push({ x, y, z, yaw, scale: (0.8 + rand() * 0.5) / props.shrub!.height });
+    else tufts.push({ x, y, z, yaw, scale: (0.28 + rand() * 0.28) / props.grass!.height });
   }
   scatter(group, props.fern!, ferns, { shadow: false, cast: false });
   scatter(group, props.shrub!, shrubs, { shadow: false });

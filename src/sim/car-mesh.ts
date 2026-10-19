@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { ACKERMANN_BUGGY } from "../api";
 import { LIDAR_LOCAL } from "./sensors";
 
 export interface WheelVisual {
@@ -75,7 +76,7 @@ export function createResearchCar(radius: number, width: number): CarVisual {
   const group = new THREE.Group();
   group.name = "chassis";
 
-  // Twin-rail chassis. The tires sit outside the rails, short-course style.
+  // Twin-rail chassis. The tires sit outside the rails; wishbones close the gap.
   for (const x of [-0.22, 0.22]) {
     const rail = solid(new THREE.BoxGeometry(0.08, 0.1, 1.9), aluminum);
     rail.position.set(x, -0.24, 0.02);
@@ -93,13 +94,14 @@ export function createResearchCar(radius: number, width: number): CarVisual {
     group.add(nerf);
   }
 
-  for (const z of [0.74, -0.8]) {
-    const tower = solid(new THREE.BoxGeometry(0.58, 0.24, 0.02), aluminum);
-    tower.position.set(0, -0.05, z);
-    const capPlate = solid(new THREE.BoxGeometry(0.64, 0.014, 0.05), dark);
-    capPlate.position.set(0, 0.07, z);
+  for (const z of [0.95, -0.95]) {
+    const tower = solid(new THREE.BoxGeometry(0.62, 0.28, 0.02), aluminum);
+    tower.position.set(0, -0.06, z);
+    const capPlate = solid(new THREE.BoxGeometry(0.66, 0.014, 0.05), dark);
+    capPlate.position.set(0, 0.08, z);
     group.add(tower, capPlate);
   }
+  addWishbones(group);
 
   const bumperBar = solid(new THREE.BoxGeometry(0.9, 0.045, 0.045), aluminum);
   bumperBar.position.set(0, -0.2, 1.04);
@@ -206,19 +208,14 @@ export function createResearchCar(radius: number, width: number): CarVisual {
   tailR.position.x = 0.28;
   group.add(tailL, tailR);
 
-  const posts = [
-    { x: -0.71, steered: true },
-    { x: 0.71, steered: true },
-    { x: -0.71, steered: false },
-    { x: 0.71, steered: false },
-  ];
-  const wheels = posts.map((post) => createWheel(radius, width, post.x, post.steered));
+  const posts = [-0.71, 0.71, -0.71, 0.71];
+  const wheels = posts.map((x) => createWheel(radius, width, x));
   for (const wheel of wheels) group.add(wheel.steer);
 
   return { group, wheels, headlight: headlightMat, brakeLight: brakeMat };
 }
 
-function createWheel(radius: number, width: number, sideX: number, steered: boolean): WheelVisual {
+function createWheel(radius: number, width: number, sideX: number): WheelVisual {
   const steer = new THREE.Group();
   steer.name = "wheel";
   const spin = new THREE.Group();
@@ -268,39 +265,52 @@ function createWheel(radius: number, width: number, sideX: number, steered: bool
   spin.add(disc);
 
   const outward = Math.sign(sideX) || 1;
-  const knuckle = solid(new THREE.BoxGeometry(0.07, 0.12, 0.08), aluminum);
-  knuckle.position.set(-outward * 0.02, 0, 0);
+  const knuckle = solid(new THREE.BoxGeometry(0.07, 0.14, 0.09), aluminum);
+  knuckle.position.set(-outward * width * 0.15, 0, 0);
   steer.add(knuckle);
-  const arm = solid(new THREE.BoxGeometry(0.32, 0.018, 0.028), carbon);
-  arm.position.set(-outward * 0.18, -0.03, 0);
-  steer.add(arm);
-  const upper = solid(new THREE.BoxGeometry(0.28, 0.014, 0.02), carbon);
-  upper.position.set(-outward * 0.16, 0.06, 0);
-  steer.add(upper);
-  if (steered) {
-    const link = solid(new THREE.CapsuleGeometry(0.01, 0.16, 2, 6), steel);
-    link.rotation.x = Math.PI / 2;
-    link.position.set(-outward * 0.05, -0.02, -0.12);
-    steer.add(link);
-  }
-  const shock = new THREE.Group();
-  shock.position.set(-outward * 0.1, 0.02, 0);
-  shock.rotation.z = outward * 0.35;
-  const body = solid(new THREE.CylinderGeometry(0.018, 0.018, 0.12, 10), aluminum);
-  body.position.y = 0.08;
-  shock.add(body);
-  const shaft = solid(new THREE.CylinderGeometry(0.008, 0.008, 0.1, 8), steel);
-  shaft.position.y = 0.16;
-  shock.add(shaft);
-  for (let i = 0; i < 7; i++) {
-    const coil = new THREE.Mesh(new THREE.TorusGeometry(0.026, 0.0035, 6, 10), dark);
-    coil.position.y = 0.04 + i * 0.016;
-    coil.castShadow = false;
-    shock.add(coil);
-  }
-  steer.add(shock);
 
   return { steer, spin };
+}
+
+/**
+ * Rest pose of a physics wheel: connection y minus the rest suspension length.
+ * The arms are parented to the chassis so they stay bolted to the rails while
+ * the hub, which lives on the steer group, meets them when the car is settled.
+ */
+function addWishbones(group: THREE.Group): void {
+  const halfTrack = ACKERMANN_BUGGY.trackWidth / 2;
+  const halfBase = ACKERMANN_BUGGY.wheelbase / 2;
+  const rideY = -0.56;
+  for (const x of [-halfTrack, halfTrack]) {
+    for (const z of [halfBase, -halfBase]) {
+      const sign = Math.sign(x) || 1;
+      const inner = sign * 0.3;
+      const hub = sign * (halfTrack - 0.12);
+      wishbone(group, new THREE.Vector3(inner, -0.3, z), new THREE.Vector3(hub, rideY, z), 0.028, aluminum);
+      wishbone(group, new THREE.Vector3(inner, -0.04, z), new THREE.Vector3(hub, rideY + 0.1, z), 0.02, carbon);
+      wishbone(group, new THREE.Vector3(sign * 0.24, 0.04, z), new THREE.Vector3(hub, rideY + 0.06, z), 0.016, steel);
+      const hanger = solid(new THREE.BoxGeometry(0.04, 0.16, 0.04), aluminum);
+      hanger.name = "wishbone";
+      hanger.position.set(inner, -0.22, z);
+      group.add(hanger);
+    }
+  }
+}
+
+function wishbone(
+  group: THREE.Group,
+  from: THREE.Vector3,
+  to: THREE.Vector3,
+  thickness: number,
+  material: THREE.Material,
+): void {
+  const dir = new THREE.Vector3().subVectors(to, from);
+  const length = Math.max(dir.length(), 0.01);
+  const mesh = solid(new THREE.BoxGeometry(thickness, thickness, length), material);
+  mesh.name = "wishbone";
+  mesh.position.copy(from).add(to).multiplyScalar(0.5);
+  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir.normalize());
+  group.add(mesh);
 }
 
 function tireGeometry(radius: number, width: number): THREE.BufferGeometry {
