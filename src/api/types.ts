@@ -3,8 +3,8 @@
  *
  * These are the only runtime values a user program is allowed to see.
  * World pose, body velocity, and the physics handles are not part of this
- * module. A later Python (Pyodide) worker or another robot should consume
- * the same `SensorFrame` and return the same `ControlCommand`.
+ * module. The Python worker turns a SensorFrame into attribute-style objects
+ * and must return the same ControlCommand.
  *
  * Robot frame: x forward, y left, z up. Yaw is counterclockwise viewed
  * from above. Angles are radians.

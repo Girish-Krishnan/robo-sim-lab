@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="Robo Sim Lab — drive an Ackermann car in the browser, or write code against simulated lidar, odometry, and IMU."
+      content="Robotics Sandbox — drive a car in the browser, or write Python against simulated lidar, odometry, and IMU."
     />
-    <title>Robo Sim Lab</title>
+    <title>Robotics Sandbox</title>
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
   </head>
   <body>
@@ -22,8 +22,8 @@
             <path d="M12 14.2h8l-.6-1.6H12.6L12 14.2Z" fill="#d7fbff" />
           </svg>
           <div>
-            <div class="title">Robo Sim Lab</div>
-            <div class="subtitle">Ackermann sandbox</div>
+            <div class="title">Robotics Sandbox</div>
+            <div class="subtitle">In-browser robot lab</div>
           </div>
         </div>
 
@@ -33,7 +33,7 @@
         </div>
 
         <div class="header-actions">
-          <button id="lidar-toggle" type="button" aria-pressed="true">Lidar</button>
+          <button id="lidar-toggle" type="button" class="is-on" aria-pressed="true">Lidar on</button>
           <button id="camera-reset" type="button">Reset camera</button>
           <span id="iso-badge" class="badge" title="Cross-origin isolation">…</span>
         </div>
@@ -49,6 +49,14 @@
           <div id="hud" aria-live="off"></div>
         </div>
 
+        <div
+          id="splitter"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize code panel"
+          tabindex="0"
+        ></div>
+
         <aside id="code-panel" hidden>
           <div class="panel-bar">
             <label class="example-label">
@@ -58,10 +66,14 @@
             <span id="run-state" data-state="idle">Idle</span>
           </div>
           <p class="api-hint">
-            <code>update(sensors)</code> at 20&nbsp;Hz returns
-            <code>{ steering, throttle }</code>. Steering is radians, positive left.
-            Throttle is −1…1. Only sensor fields cross into the worker.
+            <code>control(sensors)</code> at 20&nbsp;Hz returns
+            <code>(steering, throttle)</code>. Steering is radians, positive left.
+            Throttle is −1…1. Python sees sensors only, not the true pose.
           </p>
+          <div id="python-status" hidden>
+            <div class="spinner" aria-hidden="true"></div>
+            <span>Loading Python and NumPy…</span>
+          </div>
           <div id="editor"></div>
           <div class="run-bar">
             <button id="run" type="button" class="primary">Run</button>

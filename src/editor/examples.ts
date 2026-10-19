@@ -15,111 +15,115 @@ const maxRange = ACKERMANN_BUGGY.sensors.lidar.maxRange;
  * Open-loop circle. Constant steer and throttle.
  * Turning radius is about wheelbase / tan(steering).
  */
-const circle = `// Circle drive
-//
-// update(sensors) runs at 20 Hz in a Web Worker. The object you receive
-// has only simulated sensors — try Object.keys(sensors). World pose and
-// velocity are not included.
-//
-//   sensors.lidar      { angles, ranges, maxRange }   ${beams} planar beams
-//   sensors.odometry   { speed, steeringAngle, pose } wheel odometry (pose drifts)
-//   sensors.imu        { yawRate, accel }             specific force, m/s^2
-//   sensors.camera     { available: false }           not wired up yet
-//   sensors.time, sensors.dt
-//
-// Return { steering, throttle }:
-//   steering  radians, positive = left, clamped to ±${maxSteer}
-//   throttle  -1 … 1, positive = forward
-//
-// Robot frame: x forward, y left, z up. Yaw is counterclockwise from above.
-// Code above update() runs once. Variables there persist across ticks.
-// Wheelbase is ${wheelbase} m, so this steer is a circle of roughly
-// ${wheelbase} / tan(0.34) metres.
+const circle = `# Circle drive
+#
+# control(sensors) runs at 20 Hz in a Python sandbox. The object you
+# receive has only simulated sensors. World pose and velocity are not included.
+#
+#   sensors.lidar.ranges           NumPy array, ${beams} beams, metres
+#   sensors.lidar.angles           NumPy array, radians. 0 is forward, positive is left
+#   sensors.lidar.max_range        ${maxRange} m means no return
+#   sensors.odometry.speed         noisy wheel speed, m/s
+#   sensors.odometry.steering_angle
+#   sensors.odometry.pose          .x .y .yaw, integrated from those noisy readings
+#   sensors.imu.yaw_rate           rad/s
+#   sensors.imu.accel              .x .y .z specific force, m/s^2
+#   sensors.time, sensors.dt
+#
+# Return (steering, throttle), or a dict with those keys:
+#   steering  radians, positive = left, clamped to ±${maxSteer}
+#   throttle  -1 … 1, positive = forward
+#
+# Code above control() runs once per Run. Names there persist across ticks.
+# Wheelbase is ${wheelbase} m, so this steer is a circle of roughly
+# ${wheelbase} / tan(0.34) metres.
 
-let ticks = 0;
+import numpy as np
 
-function update(sensors) {
-  ticks += 1;
-  if (ticks === 1) {
-    console.log("channels:", Object.keys(sensors).join(", "));
-    console.log("odometry:", Object.keys(sensors.odometry).join(", "));
-  }
-  if (ticks % 20 === 0) {
-    const nearest = Math.min(...sensors.lidar.ranges);
-    console.log(
-      "t=" + sensors.time.toFixed(1),
-      "odom", sensors.odometry.speed.toFixed(2), "m/s",
-      "steer", sensors.odometry.steeringAngle.toFixed(2),
-      "yawRate", sensors.imu.yawRate.toFixed(2),
-      "az", sensors.imu.accel.z.toFixed(2),
-      "nearest", nearest.toFixed(2), "m",
-    );
-  }
+ticks = 0
 
-  return { steering: 0.34, throttle: 0.5 };
-}
+def control(sensors):
+    global ticks
+    ticks += 1
+    if ticks == 1:
+        print("lidar beams", int(sensors.lidar.ranges.shape[0]))
+        print("odometry fields: speed, steering_angle, pose")
+    if ticks % 20 == 0:
+        nearest = float(np.min(sensors.lidar.ranges))
+        print(
+            f"t={sensors.time:.1f}",
+            f"odom {sensors.odometry.speed:.2f} m/s",
+            f"steer {sensors.odometry.steering_angle:.2f}",
+            f"yaw_rate {sensors.imu.yaw_rate:.2f}",
+            f"az {sensors.imu.accel.z:.2f}",
+            f"nearest {nearest:.2f} m",
+        )
+    return 0.34, 0.5
 `;
 
 /**
  * Reactive avoidance: steer away from the nearest return in the forward
  * half-plane, and ease off the throttle as it gets close.
  */
-const avoid = `// Lidar avoid
-//
-// Reads the planar lidar only (angles: 0 is forward, positive is left,
-// ranges in metres, ${maxRange} m means no return) and steers away from
-// the closest obstacle in front. Odometry and IMU are logged so you can
-// see them, but this controller does not use them.
-//
-// This is a teaching sketch, not a planner. It will get stuck in some
-// corners — try changing the distances.
+const avoid = `# Lidar avoid
+#
+# Reads the planar lidar only. angles: 0 is forward, positive is left.
+# A range of ${maxRange} m means no return. This steers away from the
+# closest obstacle in front. Odometry is printed so you can see it, but
+# the controller does not use it.
+#
+# This is a teaching sketch, not a planner. It will get stuck in some
+# corners — try changing the distances.
 
-let ticks = 0;
+import numpy as np
 
-function update(sensors) {
-  const { ranges, angles, maxRange } = sensors.lidar;
-  let nearest = maxRange;
-  let nearestAngle = 0;
-  let leftClear = 0;
-  let rightClear = 0;
+ticks = 0
 
-  for (let i = 0; i < ranges.length; i++) {
-    const angle = angles[i];
-    const range = ranges[i];
-    if (angle > 0.05 && angle < Math.PI / 2) leftClear += range;
-    if (angle < -0.05 && angle > -Math.PI / 2) rightClear += range;
-    if (Math.abs(angle) < Math.PI / 2 && range < nearest) {
-      nearest = range;
-      nearestAngle = angle;
-    }
-  }
+def control(sensors):
+    global ticks
+    ranges = sensors.lidar.ranges
+    angles = sensors.lidar.angles
+    max_range = sensors.lidar.max_range
+    nearest = max_range
+    nearest_angle = 0.0
+    left_clear = 0.0
+    right_clear = 0.0
 
-  let steering = 0;
-  if (nearest < 8) {
-    // Obstacle on the left (positive angle) → steer right, and vice versa.
-    const away = nearestAngle > 0 ? -1 : 1;
-    const urgency = (8 - nearest) / 8;
-    steering = away * (0.12 + 0.42 * urgency);
-  }
-  const bias = (leftClear - rightClear) / (leftClear + rightClear + 1);
-  steering = Math.max(-0.5, Math.min(0.5, steering + bias * 0.2));
+    for i in range(int(ranges.shape[0])):
+        angle = float(angles[i])
+        dist = float(ranges[i])
+        if 0.05 < angle < np.pi / 2:
+            left_clear += dist
+        if -np.pi / 2 < angle < -0.05:
+            right_clear += dist
+        if abs(angle) < np.pi / 2 and dist < nearest:
+            nearest = dist
+            nearest_angle = angle
 
-  let throttle = 0.48;
-  if (nearest < 5) throttle = 0.28;
-  if (nearest < 2.4) throttle = 0.08;
+    steering = 0.0
+    if nearest < 8:
+        # Obstacle on the left (positive angle) → steer right, and the reverse.
+        away = -1.0 if nearest_angle > 0 else 1.0
+        urgency = (8 - nearest) / 8
+        steering = away * (0.12 + 0.42 * urgency)
+    bias = (left_clear - right_clear) / (left_clear + right_clear + 1)
+    steering = float(np.clip(steering + bias * 0.2, -0.5, 0.5))
 
-  ticks += 1;
-  if (ticks % 20 === 0) {
-    console.log(
-      "nearest", nearest.toFixed(2), "m at",
-      nearestAngle.toFixed(2), "rad",
-      "steer", steering.toFixed(2),
-      "odom", sensors.odometry.pose.x.toFixed(1), sensors.odometry.pose.y.toFixed(1),
-    );
-  }
+    throttle = 0.48
+    if nearest < 5:
+        throttle = 0.28
+    if nearest < 2.4:
+        throttle = 0.08
 
-  return { steering, throttle };
-}
+    ticks += 1
+    if ticks % 20 == 0:
+        pose = sensors.odometry.pose
+        print(
+            f"nearest {nearest:.2f} m at {nearest_angle:.2f} rad",
+            f"steer {steering:.2f}",
+            f"odom {pose.x:.1f} {pose.y:.1f}",
+        )
+    return steering, throttle
 `;
 
 export const EXAMPLES: CodeExample[] = [

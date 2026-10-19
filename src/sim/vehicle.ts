@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import type RAPIER from "@dimforge/rapier3d-compat";
 import { ACKERMANN_BUGGY, ackermannAngles, clamp, yawFromQuaternion, type ControlCommand } from "../api";
+import { quatConjugate, quatRotate } from "../api/math";
 import type { ChassisFocus, SimRobot, VehicleTelemetry } from "../robots/types";
 import { forwardSpeed, SensorSuite } from "./sensors";
 
@@ -13,16 +14,33 @@ const WHEEL_WIDTH = 0.2;
 const CONNECTION_Y = -0.28;
 const SUSPENSION_REST = 0.28;
 
-const FULL_THROTTLE_FORCE = 560;
-const HOLD_BRAKE = 12;
-const MAX_SPEED = 11;
-const REVERSE_SPEED = 5;
-const STEER_RATE = 1.5;
+const CHASSIS_MASS = 110;
+/** Below the geometric center, so a hard turn slides before it rolls. */
+const CENTER_OF_MASS = { x: 0, y: -0.34, z: 0.03 };
+const INERTIA = { x: 40, y: 52, z: 26 };
+
+const FULL_THROTTLE_FORCE = 420;
+/** Small drag when the throttle is closed, so letting go of the keys coasts. */
+const HOLD_BRAKE = 0.35;
+const MAX_SPEED = 8;
+const REVERSE_SPEED = 3.5;
+const STEER_RATE = 1.15;
+/** Kinematic lateral accel (v²·tanδ / L) above which the governor eases off. */
+const LATERAL_ACCEL_LIMIT = 6.5;
 
 /**
- * Rapier's raycast vehicle treats positive steer as a right turn when the
- * axle is −X and forward is +Z. The student API is the opposite (positive
- * is left), so wheel angles are negated at this boundary.
+ * Brake is a per-wheel impulse cap inside Rapier, not a force in newtons.
+ * Values around 40 lock the tires in one step and, with the wheels still
+ * steered, flip the chassis. These stay in the range that slows the car
+ * without pitching it over.
+ */
+export const SERVICE_BRAKE = 3.5;
+export const STOP_BRAKE = 2;
+
+/**
+ * With the axle along −X and forward along +Z, a negative Rapier steer
+ * yaws the nose toward −X (the driver's left). The student API is positive
+ * left, so wheel angles are negated here.
  */
 const RAPIER_STEER_SIGN = -1;
 
@@ -53,15 +71,22 @@ export class AckermannBuggy implements SimRobot {
         .setTranslation(SPAWN.x, SPAWN.y, SPAWN.z)
         .setCanSleep(false)
         .setCcdEnabled(true)
-        .setLinearDamping(0.14)
-        .setAngularDamping(0.85),
+        .setLinearDamping(0.12)
+        .setAngularDamping(0.4),
     );
     world.createCollider(
       RAPIER.ColliderDesc.cuboid(HALF.x, HALF.y, HALF.z)
-        .setDensity(42)
-        .setFriction(0.35)
+        .setDensity(0)
+        .setFriction(0.4)
         .setRestitution(0.02),
       this.body,
+    );
+    this.body.setAdditionalMassProperties(
+      CHASSIS_MASS,
+      CENTER_OF_MASS,
+      INERTIA,
+      { x: 0, y: 0, z: 0, w: 1 },
+      true,
     );
 
     this.vehicle = world.createVehicleController(this.body);
@@ -88,13 +113,13 @@ export class AckermannBuggy implements SimRobot {
       );
     }
     for (let i = 0; i < 4; i++) {
-      this.vehicle.setWheelSuspensionStiffness(i, 34);
-      this.vehicle.setWheelSuspensionCompression(i, 2.6);
-      this.vehicle.setWheelSuspensionRelaxation(i, 4.4);
-      this.vehicle.setWheelFrictionSlip(i, 16);
-      this.vehicle.setWheelSideFrictionStiffness(i, 1.5);
-      this.vehicle.setWheelMaxSuspensionTravel(i, 0.2);
-      this.vehicle.setWheelMaxSuspensionForce(i, 16000);
+      this.vehicle.setWheelSuspensionStiffness(i, 30);
+      this.vehicle.setWheelSuspensionCompression(i, 2.8);
+      this.vehicle.setWheelSuspensionRelaxation(i, 4.2);
+      this.vehicle.setWheelFrictionSlip(i, 1.35);
+      this.vehicle.setWheelSideFrictionStiffness(i, 1);
+      this.vehicle.setWheelMaxSuspensionTravel(i, 0.22);
+      this.vehicle.setWheelMaxSuspensionForce(i, 18000);
     }
 
     this.chassis = createChassisMesh();
@@ -143,6 +168,12 @@ export class AckermannBuggy implements SimRobot {
 
     const speed = forwardSpeed(this.body);
     let throttle = this.command.throttle;
+    let brake = this.brake > 0 ? this.brake : 0;
+    const lateral = (speed * speed * Math.abs(Math.tan(this.steer))) / ACKERMANN_BUGGY.wheelbase;
+    if (lateral > LATERAL_ACCEL_LIMIT && Math.abs(speed) > 1) {
+      if (throttle * speed > 0) throttle = 0;
+      brake = Math.max(brake, 1.6);
+    }
     if (speed > MAX_SPEED && throttle > 0) throttle = 0;
     if (speed < -REVERSE_SPEED && throttle < 0) throttle = 0;
 
@@ -152,7 +183,6 @@ export class AckermannBuggy implements SimRobot {
     this.vehicle.setWheelEngineForce(2, force * 0.34);
     this.vehicle.setWheelEngineForce(3, force * 0.34);
 
-    let brake = this.brake > 0 ? this.brake : 0;
     if (Math.abs(throttle) < 0.02) brake = Math.max(brake, HOLD_BRAKE);
     for (let i = 0; i < 4; i++) this.vehicle.setWheelBrake(i, brake);
 
@@ -164,6 +194,27 @@ export class AckermannBuggy implements SimRobot {
       (collider) => collider.parent()?.handle !== chassis,
     );
     if (throttle !== 0 || Math.abs(this.steer) > 0.01) this.body.wakeUp();
+    this.dampRoll(dt);
+  }
+
+  /**
+   * Soft roll damping. It stays out of the way in ordinary driving and only
+   * pushes back once the body is clearly leaning, so a stop or a sudden
+   * steer change settles instead of tripping over the outside wheels.
+   */
+  private dampRoll(dt: number): void {
+    const rotation = this.body.rotation();
+    const q = { x: rotation.x, y: rotation.y, z: rotation.z, w: rotation.w };
+    const up = quatRotate(q, { x: 0, y: 1, z: 0 });
+    if (up.y < 0.35) return;
+    const right = quatRotate(q, { x: 1, y: 0, z: 0 });
+    const roll = Math.atan2(right.y, up.y);
+    const angvel = this.body.angvel();
+    const localRate = quatRotate(quatConjugate(q), { x: angvel.x, y: angvel.y, z: angvel.z });
+    const excess = Math.max(0, Math.abs(roll) - 0.18);
+    const spring = excess === 0 ? 0 : -420 * Math.sign(roll) * excess;
+    const torque = quatRotate(q, { x: 0, y: 0, z: spring - 140 * localRate.z });
+    this.body.applyTorqueImpulse({ x: torque.x * dt, y: torque.y * dt, z: torque.z * dt }, true);
   }
 
   syncVisuals(): void {

@@ -25,18 +25,29 @@ export function addCourse(RAPIER: Rapier, world: World, scene: THREE.Scene): voi
   const steel = new THREE.MeshStandardMaterial({ color: 0x4d5966, roughness: 0.45, metalness: 0.55 });
   const caution = new THREE.MeshStandardMaterial({ color: 0xe3a23a, roughness: 0.5, metalness: 0.1 });
 
-  const box = (x: number, y: number, z: number, sx: number, sy: number, sz: number, material: THREE.Material, yaw = 0) => {
+  // `bottom` is the underside of the box in metres. Fixed bodies do not fall,
+  // so a center height that is larger than half the size leaves the prop in the air.
+  const box = (
+    x: number,
+    z: number,
+    sx: number,
+    sy: number,
+    sz: number,
+    material: THREE.Material,
+    yaw = 0,
+    bottom = 0,
+  ) => {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), material);
-    mesh.position.set(x, y, z);
+    mesh.position.set(x, bottom + sy / 2, z);
     mesh.rotation.y = yaw;
     addFixedBox(RAPIER, world, scene, mesh, sx / 2, sy / 2, sz / 2);
   };
 
-  // Gate on the straight-ahead path.
-  box(3.9, 0.9, 13, 0.5, 1.8, 0.5, concrete);
-  box(7.0, 0.9, 13, 0.5, 1.8, 0.5, concrete);
-  box(5.45, 1.95, 13, 3.7, 0.28, 0.46, steel);
-  box(5.45, 1.78, 13, 3.7, 0.08, 0.5, caution);
+  // Gate on the straight-ahead path. The crossbar is the only piece that is meant to be up in the air.
+  box(3.9, 13, 0.5, 1.8, 0.5, concrete);
+  box(7.0, 13, 0.5, 1.8, 0.5, concrete);
+  box(5.45, 13, 3.7, 0.28, 0.46, steel, 0, 1.81);
+  box(5.45, 13, 3.7, 0.08, 0.5, caution, 0, 1.74);
 
   // Bollard slalom further down the yard.
   for (const [x, z] of [
@@ -49,26 +60,26 @@ export function addCourse(RAPIER: Rapier, world: World, scene: THREE.Scene): voi
     addCylinder(RAPIER, world, scene, x, z, 0.28, 1.45, bollardMat);
   }
 
-  // Crate yard to the east.
-  box(17, 0.55, 6, 1.3, 1.1, 1.2, crateMat, 0.2);
-  box(19.2, 0.7, 8.4, 1.5, 1.4, 1.3, crateMat, -0.15);
-  box(16.2, 1.15, 9.2, 1.1, 1.0, 1.1, crateMat, 0.4);
-  box(18.4, 0.45, 4.2, 1.6, 0.9, 1.2, crateMat);
+  // Crate yard to the east. Every crate sits on the ground.
+  box(17, 6, 1.3, 1.1, 1.2, crateMat, 0.2);
+  box(19.2, 8.4, 1.5, 1.4, 1.3, crateMat, -0.15);
+  box(16.2, 9.2, 1.1, 1.0, 1.1, crateMat, 0.4);
+  box(18.4, 4.2, 1.6, 0.9, 1.2, crateMat);
 
   // Corridor on the west side.
-  box(-16, 0.75, 4, 0.4, 1.5, 10, concrete);
-  box(-20.5, 0.75, 4, 0.4, 1.5, 10, concrete);
-  box(-18.2, 0.55, 10.2, 4.2, 1.1, 0.4, concrete);
+  box(-16, 4, 0.4, 1.5, 10, concrete);
+  box(-20.5, 4, 0.4, 1.5, 10, concrete);
+  box(-18.2, 10.2, 4.2, 1.1, 0.4, concrete);
 
   // Lab building and a couple of columns.
-  box(-16, 1.5, -15, 6.5, 3, 4.2, buildingMat, 0.15);
+  box(-16, -15, 6.5, 3, 4.2, buildingMat, 0.15);
   addCylinder(RAPIER, world, scene, -8, 20, 0.45, 2.4, concrete);
   addCylinder(RAPIER, world, scene, -11, 24, 0.4, 2.1, concrete);
 
   // Jersey barriers.
-  box(12, 0.65, -18, 3.2, 1.3, 0.55, barrier, 0.4);
-  box(-2, 0.65, 28, 3.2, 1.3, 0.55, barrier, -0.3);
-  box(22, 0.65, 16, 2.6, 1.3, 0.55, barrier, 1.1);
+  box(12, -18, 3.2, 1.3, 0.55, barrier, 0.4);
+  box(-2, 28, 3.2, 1.3, 0.55, barrier, -0.3);
+  box(22, 16, 2.6, 1.3, 0.55, barrier, 1.1);
 
   addRamp(RAPIER, world, scene, rampMat, caution);
 
@@ -81,13 +92,13 @@ export function addCourse(RAPIER: Rapier, world: World, scene: THREE.Scene): voi
   ];
   for (const [x, z, length, depth] of walls) {
     const alongZ = Math.abs(z) > 30 && Math.abs(x) < 20;
-    if (alongZ) box(x, 0.7, z, length, 1.4, depth, concrete);
-    else box(z === 0 ? x : x, 0.7, z, depth, 1.4, length, concrete);
+    if (alongZ) box(x, z, length, 1.4, depth, concrete);
+    else box(x, z, depth, 1.4, length, concrete);
   }
-  box(36, 0.7, -12, 0.5, 1.4, 16, concrete);
-  box(36, 0.7, 12, 0.5, 1.4, 16, concrete);
-  box(-36, 0.7, -12, 0.5, 1.4, 16, concrete);
-  box(-36, 0.7, 12, 0.5, 1.4, 16, concrete);
+  box(36, -12, 0.5, 1.4, 16, concrete);
+  box(36, 12, 0.5, 1.4, 16, concrete);
+  box(-36, -12, 0.5, 1.4, 16, concrete);
+  box(-36, 12, 0.5, 1.4, 16, concrete);
 
   addTrees(RAPIER, world, scene);
 }

@@ -119,7 +119,16 @@ describe("sandbox source", () => {
     expect(worker.includes("../robots")).toBe(false);
     expect(worker.includes("groundTruth")).toBe(false);
     expect(worker.includes("linvel")).toBe(false);
+    expect(worker.includes("loadPyodide")).toBe(true);
+    expect(worker.includes("new Function")).toBe(false);
     expect(controller.includes("publishSensorFrame")).toBe(true);
     expect(controller.includes("assertNoBannedKeys")).toBe(true);
+    expect(controller.includes("terminate")).toBe(true);
+  });
+
+  it("ships Python examples that define control(sensors)", () => {
+    const examples = readFileSync("src/editor/examples.ts", "utf8");
+    expect(examples.includes("function update")).toBe(false);
+    expect(examples.match(/def control\(sensors\)/g)?.length).toBe(2);
   });
 });

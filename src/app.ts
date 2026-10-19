@@ -6,10 +6,11 @@ import { ChaseCamera } from "./sim/camera";
 import { addCourse } from "./sim/course";
 import { LidarView } from "./sim/lidar-view";
 import { addGround, SimView } from "./sim/scene";
-import { AckermannBuggy } from "./sim/vehicle";
+import { AckermannBuggy, SERVICE_BRAKE, STOP_BRAKE } from "./sim/vehicle";
 import { CodeSandbox, type SandboxState } from "./sandbox/controller";
 import { ConsolePanel } from "./ui/console-panel";
 import { Hud, type AppMode } from "./ui/hud";
+import { mountSplitter } from "./ui/splitter";
 
 const PHYSICS_DT = 1 / 60;
 
@@ -20,6 +21,7 @@ export async function mountApp(): Promise<void> {
   const hint = mustGet<HTMLElement>("hint");
   const codePanel = mustGet<HTMLElement>("code-panel");
   const runState = mustGet<HTMLElement>("run-state");
+  const pythonStatus = mustGet<HTMLElement>("python-status");
   const exampleSelect = mustGet<HTMLSelectElement>("example");
   const isoBadge = mustGet<HTMLElement>("iso-badge");
 
@@ -37,7 +39,16 @@ export async function mountApp(): Promise<void> {
   const setRunState = (state: SandboxState) => {
     runState.dataset.state = state;
     runState.textContent =
-      state === "running" ? "Running" : state === "error" ? "Error" : state === "stopped" ? "Stopped" : "Idle";
+      state === "running"
+        ? "Running"
+        : state === "loading"
+          ? "Loading"
+          : state === "error"
+            ? "Error"
+            : state === "stopped"
+              ? "Stopped"
+              : "Idle";
+    pythonStatus.hidden = state !== "loading";
   };
 
   try {
@@ -50,7 +61,7 @@ export async function mountApp(): Promise<void> {
     addGround(RAPIER, world, view.scene);
     addCourse(RAPIER, world, view.scene);
     const robot = new AckermannBuggy(RAPIER, world, view.scene);
-    const lidar = new LidarView(view.scene);
+    const lidar = new LidarView(view.scene, viewport);
     const camera = new ChaseCamera(view.camera, viewport);
 
     const resize = () => view.resize(viewport.clientWidth, viewport.clientHeight);
@@ -63,7 +74,12 @@ export async function mountApp(): Promise<void> {
         if (mode === "code" && code.current === "running") robot.setCommand(command, 0);
       },
       onLog: (line, level) => consolePanel.log(line, level),
-      onState: setRunState,
+      onState: (state) => {
+        setRunState(state);
+        if (state === "error") {
+          robot.setCommand(clampCommand({ steering: 0, throttle: 0 }, ACKERMANN_BUGGY.limits), STOP_BRAKE);
+        }
+      },
     });
     const code = sandbox;
 
@@ -77,14 +93,18 @@ export async function mountApp(): Promise<void> {
     }
 
     const applyDrive = () => {
-      const forward = keys.has("w") || keys.has("arrowup");
-      const back = keys.has("s") || keys.has("arrowdown");
-      const left = keys.has("a") || keys.has("arrowleft");
-      const right = keys.has("d") || keys.has("arrowright");
-      const braking = keys.has(" ");
+      const forward = keys.has("KeyW") || keys.has("ArrowUp");
+      const back = keys.has("KeyS") || keys.has("ArrowDown");
+      const left = keys.has("KeyA") || keys.has("ArrowLeft");
+      const right = keys.has("KeyD") || keys.has("ArrowRight");
+      const braking = keys.has("Space");
       const throttle = braking ? 0 : forward ? 1 : back ? -0.65 : 0;
+      // Positive steering is a left turn in the driver's frame (nose toward -X at yaw 0).
       const steering = ((left ? 1 : 0) - (right ? 1 : 0)) * ACKERMANN_BUGGY.limits.maxSteering;
-      robot.setCommand(clampCommand({ steering, throttle }, ACKERMANN_BUGGY.limits), braking ? 80 : 0);
+      robot.setCommand(
+        clampCommand({ steering, throttle }, ACKERMANN_BUGGY.limits),
+        braking ? SERVICE_BRAKE : 0,
+      );
     };
 
     const resetWorld = () => {
@@ -93,13 +113,14 @@ export async function mountApp(): Promise<void> {
     };
 
     const runProgram = () => {
+      if (mode !== "code") return;
       consolePanel.log("— running —", "log");
       code.run(codeEditor.getValue());
     };
 
     const stopProgram = () => {
       code.stop();
-      robot.setCommand(clampCommand({ steering: 0, throttle: 0 }, ACKERMANN_BUGGY.limits), 40);
+      robot.setCommand(clampCommand({ steering: 0, throttle: 0 }, ACKERMANN_BUGGY.limits), STOP_BRAKE);
     };
 
     const setMode = (next: AppMode) => {
@@ -111,12 +132,13 @@ export async function mountApp(): Promise<void> {
       hint.textContent =
         next === "drive"
           ? "WASD or arrows to drive · Space brakes · Drag to look · Scroll to zoom · R resets"
-          : "Program runs at 20 Hz on sensor data only · Drag to look around";
+          : "Ctrl/⌘ Enter runs Python · sensors only, at 20 Hz · Drag to look around";
       if (next === "drive") {
         stopProgram();
         applyDrive();
       } else {
-        robot.setCommand(clampCommand({ steering: 0, throttle: 0 }, ACKERMANN_BUGGY.limits), 40);
+        robot.setCommand(clampCommand({ steering: 0, throttle: 0 }, ACKERMANN_BUGGY.limits), STOP_BRAKE);
+        code.warmup();
         requestAnimationFrame(() => codeEditor.relayout());
       }
     };
@@ -129,11 +151,17 @@ export async function mountApp(): Promise<void> {
     mustGet("clear-console").addEventListener("click", () => consolePanel.clear());
     mustGet("camera-reset").addEventListener("click", () => camera.reset());
     const lidarButton = mustGet<HTMLButtonElement>("lidar-toggle");
-    lidarButton.addEventListener("click", () => {
-      const enabled = !lidar.isEnabled;
+    const setLidarButton = (enabled: boolean) => {
       lidar.setEnabled(enabled);
       lidarButton.setAttribute("aria-pressed", String(enabled));
-      lidarButton.classList.toggle("off", !enabled);
+      lidarButton.classList.toggle("is-on", enabled);
+      lidarButton.textContent = enabled ? "Lidar on" : "Lidar off";
+    };
+    setLidarButton(true);
+    lidarButton.addEventListener("click", () => setLidarButton(!lidar.isEnabled));
+    mountSplitter(mustGet("splitter"), () => {
+      view.resize(viewport.clientWidth, viewport.clientHeight);
+      codeEditor.relayout();
     });
     exampleSelect.addEventListener("change", () => {
       const example = EXAMPLES.find((item) => item.id === exampleSelect.value);
@@ -142,16 +170,31 @@ export async function mountApp(): Promise<void> {
       codeEditor.setValue(example.source);
     });
 
-    window.addEventListener("keydown", (event) => {
-      if (isTypingTarget(event.target)) return;
-      const key = event.key.toLowerCase();
-      if (mode === "drive" && (key === "r" || event.code === "KeyR") && !event.repeat) resetWorld();
-      if (mode !== "drive") return;
-      if (event.key.startsWith("Arrow") || event.key === " ") event.preventDefault();
-      keys.add(key);
-    });
+    window.addEventListener(
+      "keydown",
+      (event) => {
+        if (
+          mode === "code" &&
+          event.key === "Enter" &&
+          (event.ctrlKey || event.metaKey) &&
+          !event.shiftKey &&
+          !event.altKey
+        ) {
+          event.preventDefault();
+          event.stopPropagation();
+          runProgram();
+          return;
+        }
+        if (isTypingTarget(event.target)) return;
+        if (mode === "drive" && event.code === "KeyR" && !event.repeat) resetWorld();
+        if (mode !== "drive") return;
+        if (event.code.startsWith("Arrow") || event.code === "Space") event.preventDefault();
+        keys.add(event.code);
+      },
+      true,
+    );
     window.addEventListener("keyup", (event) => {
-      keys.delete(event.key.toLowerCase());
+      keys.delete(event.code);
     });
     window.addEventListener("blur", () => keys.clear());
 
@@ -185,7 +228,7 @@ export async function mountApp(): Promise<void> {
             const sensors = robot.sampleSensors(sampleDt);
             sensors.time = simTime;
             if (mode === "code") code.offer(sensors);
-            lidar.update(robot.lidarDebug());
+            lidar.update(robot.lidarDebug(), sensors.lidar);
           }
         }
         robot.syncVisuals();

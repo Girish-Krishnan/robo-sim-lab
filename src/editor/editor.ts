@@ -1,5 +1,5 @@
-import { javascript } from "@codemirror/lang-javascript";
-import { EditorState } from "@codemirror/state";
+import { python } from "@codemirror/lang-python";
+import { EditorState, Prec } from "@codemirror/state";
 import { oneDark } from "@codemirror/theme-one-dark";
 import { EditorView, keymap } from "@codemirror/view";
 import { basicSetup } from "codemirror";
@@ -12,23 +12,25 @@ export interface CodeEditor {
 }
 
 export function createEditor(parent: HTMLElement, source: string, onRun: () => void): CodeEditor {
+  const run = () => {
+    onRun();
+    return true;
+  };
   const view = new EditorView({
     parent,
     state: EditorState.create({
       doc: source,
       extensions: [
         basicSetup,
-        javascript(),
+        python(),
         oneDark,
-        keymap.of([
-          {
-            key: "Mod-Enter",
-            run: () => {
-              onRun();
-              return true;
-            },
-          },
-        ]),
+        Prec.high(
+          keymap.of([
+            { key: "Mod-Enter", run },
+            { key: "Ctrl-Enter", run },
+            { key: "Meta-Enter", run },
+          ]),
+        ),
         EditorView.theme(
           {
             "&": { height: "100%", fontSize: "13px", backgroundColor: "#101418" },

@@ -18,6 +18,11 @@ export interface LidarDebugPoint {
   hit: boolean;
 }
 
+export interface LidarDebug {
+  origin: { x: number; y: number; z: number };
+  points: readonly LidarDebugPoint[];
+}
+
 export interface ChassisFocus {
   x: number;
   y: number;
@@ -38,7 +43,7 @@ export interface SimRobot {
   preStep(dt: number): void;
   syncVisuals(): void;
   sampleSensors(dt: number): SensorFrame;
-  lidarDebug(): readonly LidarDebugPoint[];
+  lidarDebug(): LidarDebug;
   telemetry(): VehicleTelemetry;
   focus(): ChassisFocus;
   dispose(): void;

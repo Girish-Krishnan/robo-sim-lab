@@ -50,6 +50,12 @@ export default defineConfig({
   preview: {
     headers: isolationHeaders,
   },
+  optimizeDeps: {
+    exclude: ["pyodide"],
+  },
+  worker: {
+    format: "es",
+  },
   build: {
     target: "es2022",
     sourcemap: true,

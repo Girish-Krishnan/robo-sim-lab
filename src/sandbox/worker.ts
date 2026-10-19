@@ -2,115 +2,208 @@ import { clampCommand, type RobotLimits, type SensorFrame } from "../api";
 import type { HostToWorker, WorkerToHost } from "./messages";
 
 /**
- * User-code sandbox. This module must not import the simulator.
- * It only receives an already-sanitized SensorFrame and returns a command.
+ * Python sandbox. This module must not import the simulator.
+ * It receives an already-sanitized sensor frame and returns a command.
+ * Pyodide runs in this worker; a hung control() is stopped by terminating
+ * the worker from the main thread.
  */
 
-interface ConsoleLike {
-  log: (...args: unknown[]) => void;
-  info: (...args: unknown[]) => void;
-  warn: (...args: unknown[]) => void;
-  error: (...args: unknown[]) => void;
+interface PyodideLike {
+  loadPackage: (name: string) => Promise<unknown>;
+  runPython: (code: string, options?: { globals?: PyProxy; filename?: string }) => unknown;
+  globals: { get: (name: string) => unknown; set: (name: string, value: unknown) => void };
+  setStdout: (options: { batched: (text: string) => void }) => void;
+  setStderr: (options: { batched: (text: string) => void }) => void;
+  toPy: (value: Record<string, unknown>) => PyProxy;
 }
 
-let runner: ((sensors: SensorFrame) => unknown) | null = null;
+interface PyProxy {
+  destroy?: () => void;
+  get?: (key: number | string) => unknown;
+}
+
+let pyodide: PyodideLike | null = null;
+let student: PyProxy | null = null;
 let limits: RobotLimits = { maxSteering: 0.55, minThrottle: -1, maxThrottle: 1 };
+let bucket: string[] = [];
 
 const ctx = self as unknown as {
   postMessage: (message: WorkerToHost) => void;
   onmessage: ((event: MessageEvent<HostToWorker>) => void) | null;
-  console: Console;
+  location: Location;
 };
+
+const PRELUDE = `
+import json
+from types import SimpleNamespace
+import numpy as np
+
+def _robo_frame(raw):
+    lidar = raw["lidar"]
+    odom = raw["odometry"]
+    pose = odom["pose"]
+    imu = raw["imu"]
+    accel = imu["accel"]
+    return SimpleNamespace(
+        time=float(raw["time"]),
+        dt=float(raw["dt"]),
+        lidar=SimpleNamespace(
+            ranges=np.asarray(lidar["ranges"], dtype=float),
+            angles=np.asarray(lidar["angles"], dtype=float),
+            max_range=float(lidar["maxRange"]),
+        ),
+        odometry=SimpleNamespace(
+            speed=float(odom["speed"]),
+            steering_angle=float(odom["steeringAngle"]),
+            pose=SimpleNamespace(
+                x=float(pose["x"]),
+                y=float(pose["y"]),
+                yaw=float(pose["yaw"]),
+            ),
+        ),
+        imu=SimpleNamespace(
+            yaw_rate=float(imu["yawRate"]),
+            accel=SimpleNamespace(
+                x=float(accel["x"]),
+                y=float(accel["y"]),
+                z=float(accel["z"]),
+            ),
+        ),
+        camera=SimpleNamespace(available=False),
+    )
+
+def _robo_call(raw_json):
+    frame = _robo_frame(json.loads(raw_json))
+    result = _robo_ns["control"](frame)
+    if isinstance(result, dict):
+        steering = result.get("steering", 0.0)
+        throttle = result.get("throttle", 0.0)
+    elif isinstance(result, (tuple, list)):
+        if len(result) < 2:
+            raise ValueError("control(sensors) must return (steering, throttle)")
+        steering, throttle = result[0], result[1]
+    else:
+        raise TypeError(
+            "control(sensors) must return (steering, throttle) or a dict with those keys"
+        )
+    return (float(steering), float(throttle))
+`;
 
 function post(message: WorkerToHost): void {
   ctx.postMessage(message);
 }
 
 function errorText(error: unknown): string {
-  if (error instanceof Error) return error.stack || error.message;
-  return String(error);
+  if (error && typeof error === "object" && "message" in error) {
+    const message = String((error as { message: unknown }).message);
+    if (message.includes("Traceback") || message.includes("Error")) return message.slice(0, 4000);
+  }
+  if (error instanceof Error) return (error.message || error.stack || "Error").slice(0, 4000);
+  return String(error).slice(0, 4000);
 }
 
-function formatArg(value: unknown): string {
-  if (typeof value === "string") return value.slice(0, 500);
-  if (typeof value === "number") {
-    if (!Number.isFinite(value)) return String(value);
-    return String(Math.round(value * 1000) / 1000);
-  }
-  if (typeof value === "boolean" || value == null) return String(value);
+function capture(text: string): void {
+  const line = text.replace(/\s+$/u, "");
+  if (!line || bucket.length >= 24) return;
+  bucket.push(line.slice(0, 500));
+}
+
+function runtimeIndex(): string {
+  const url = new URL(`${import.meta.env.BASE_URL}pyodide/`, ctx.location.origin);
+  return url.href.endsWith("/") ? url.href : `${url.href}/`;
+}
+
+async function boot(): Promise<void> {
   try {
-    const text = JSON.stringify(value);
-    return text.length > 500 ? `${text.slice(0, 500)}…` : text;
-  } catch {
-    return String(value).slice(0, 500);
+    const indexURL = runtimeIndex();
+    // Load the self-hosted build. Bundling pyodide.mjs pulls in Node builtins
+    // and breaks the worker output, and a CDN would have to satisfy COEP.
+    const runtime = (await import(
+      /* @vite-ignore */ new URL("pyodide.mjs", indexURL).href
+    )) as {
+      loadPyodide: (options: { indexURL: string }) => Promise<PyodideLike>;
+    };
+    pyodide = await runtime.loadPyodide({ indexURL });
+    await pyodide.loadPackage("numpy");
+    pyodide.setStdout({ batched: capture });
+    pyodide.setStderr({ batched: capture });
+    bucket = [];
+    pyodide.runPython(PRELUDE);
+    bucket = [];
+    post({ type: "runtime", logs: ["Python runtime ready (NumPy loaded)."] });
+  } catch (error) {
+    pyodide = null;
+    post({ type: "error", message: errorText(error), logs: bucket });
   }
 }
 
-function makeConsole(logs: string[]): ConsoleLike {
-  const push = (prefix: string, args: unknown[]) => {
-    if (logs.length >= 24) return;
-    const text = args.map(formatArg).join(" ");
-    logs.push((prefix ? `${prefix} ${text}` : text).slice(0, 500));
-  };
-  const consoleLike: ConsoleLike = {
-    log: (...args) => push("", args),
-    info: (...args) => push("", args),
-    warn: (...args) => push("warn:", args),
-    error: (...args) => push("error:", args),
-  };
-  ctx.console = consoleLike as unknown as Console;
-  return consoleLike;
+function loadProgram(code: string, nextLimits: RobotLimits): void {
+  if (!pyodide) {
+    post({ type: "error", message: "Python runtime is not ready.", logs: [] });
+    return;
+  }
+  bucket = [];
+  student?.destroy?.();
+  student = null;
+  try {
+    if (code.length > 200_000) throw new Error("Program is too long (200k character limit).");
+    limits = nextLimits;
+    // A fresh dict each Run, so top-level names from the previous program do not linger.
+    // Statements above control() run once and persist for later ticks.
+    pyodide.runPython(
+      "import builtins, numpy\n_student = {'__builtins__': builtins, 'numpy': numpy, 'np': numpy}\n",
+    );
+    const globals = pyodide.globals.get("_student");
+    if (!globals || typeof globals !== "object") {
+      throw new Error("Could not create a Python namespace.");
+    }
+    student = globals as PyProxy;
+    pyodide.globals.set("_robo_ns", student);
+    pyodide.runPython(code, { globals: student, filename: "student.py" });
+    const defined = pyodide.runPython("callable(_robo_ns.get('control'))");
+    if (defined !== true) {
+      throw new Error("Define control(sensors) that returns (steering, throttle).");
+    }
+    post({ type: "ready", logs: bucket });
+  } catch (error) {
+    student = null;
+    post({ type: "error", message: errorText(error), logs: bucket });
+  }
+}
+
+function tick(id: number, sensors: SensorFrame): void {
+  bucket = [];
+  if (!pyodide || !student) {
+    post({ type: "error", message: "No program is loaded.", logs: [] });
+    return;
+  }
+  try {
+    pyodide.globals.set("_robo_raw", JSON.stringify(sensors));
+    const output = pyodide.runPython("_robo_call(_robo_raw)") as PyProxy;
+    const steering = Number(output.get?.(0));
+    const throttle = Number(output.get?.(1));
+    output.destroy?.();
+    const command = clampCommand({ steering, throttle }, limits);
+    post({ type: "result", id, command, logs: bucket });
+  } catch (error) {
+    post({ type: "error", message: errorText(error), logs: bucket });
+  }
 }
 
 ctx.onmessage = (event: MessageEvent<HostToWorker>) => {
   const message = event.data;
+  if (message.type === "boot") {
+    void boot();
+    return;
+  }
   if (message.type === "stop") {
-    runner = null;
+    student?.destroy?.();
+    student = null;
     return;
   }
-
   if (message.type === "load") {
-    const logs: string[] = [];
-    try {
-      if (message.code.length > 200_000) throw new Error("Program is too long (200k character limit).");
-      limits = message.limits;
-      // Top-level statements run once, when the program is loaded. `update`
-      // is called on each tick and closes over that state. Re-running the
-      // whole script every tick would wipe student variables such as `ticks`.
-      const initLogs: string[] = [];
-      makeConsole(initLogs);
-      const update = new Function(
-        `"use strict";\n${message.code}\nif (typeof update !== "function") throw new Error("Define function update(sensors) that returns { steering, throttle }.");\nreturn update;`,
-      )() as (sensors: SensorFrame) => unknown;
-      if (typeof update !== "function") {
-        throw new Error("Define function update(sensors) that returns { steering, throttle }.");
-      }
-      runner = update;
-      post({ type: "ready", logs: initLogs });
-    } catch (error) {
-      runner = null;
-      post({ type: "error", message: errorText(error), logs });
-    }
+    loadProgram(message.code, message.limits);
     return;
   }
-
-  const logs: string[] = [];
-  makeConsole(logs);
-  if (!runner) {
-    post({ type: "error", message: "No program is loaded.", logs });
-    return;
-  }
-  try {
-    const output = runner(message.sensors);
-    if (output && typeof (output as Promise<unknown>).then === "function") {
-      throw new Error("update() must return synchronously. Promises are not awaited.");
-    }
-    if (!output || typeof output !== "object") {
-      throw new Error("update() must return { steering, throttle }.");
-    }
-    const command = clampCommand(output as { steering?: number; throttle?: number }, limits);
-    post({ type: "result", id: message.id, command, logs });
-  } catch (error) {
-    post({ type: "error", message: errorText(error), logs });
-  }
+  tick(message.id, message.sensors);
 };

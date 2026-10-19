@@ -9,7 +9,7 @@ import {
   type Quat,
   type Vec3,
 } from "../api/math";
-import type { LidarDebugPoint } from "../robots/types";
+import type { LidarDebug, LidarDebugPoint } from "../robots/types";
 
 type Rapier = typeof RAPIER;
 type RigidBody = InstanceType<typeof RAPIER.RigidBody>;
@@ -33,6 +33,7 @@ export class SensorSuite {
   private smoothAccel: Vec3 = { x: 0, y: 0, z: 9.81 };
   private bias = { yaw: 0, ax: 0, ay: 0, az: 0 };
   private debugPoints: LidarDebugPoint[] = [];
+  private debugOrigin = { x: 0, y: 0, z: 0 };
   private lastOdomSpeed = 0;
 
   constructor(
@@ -53,6 +54,7 @@ export class SensorSuite {
     this.smoothAccel = { x: 0, y: 0, z: 9.81 };
     this.lastOdomSpeed = 0;
     this.debugPoints = [];
+    this.debugOrigin = { x: 0, y: 0, z: 0 };
     this.resampleBias();
   }
 
@@ -60,8 +62,8 @@ export class SensorSuite {
     return this.lastOdomSpeed;
   }
 
-  lidarDebug(): readonly LidarDebugPoint[] {
-    return this.debugPoints;
+  lidarDebug(): LidarDebug {
+    return { origin: this.debugOrigin, points: this.debugPoints };
   }
 
   sample(dt: number, actuatorSteering: number): SensorFrame {
@@ -145,6 +147,7 @@ export class SensorSuite {
   private castLidar(q: Quat): SensorFrame["lidar"] {
     const { beams, maxRange, rangeStdDev } = this.spec.lidar;
     const origin = this.lidarOrigin(q);
+    this.debugOrigin = origin;
     const angles: number[] = [];
     const ranges: number[] = [];
     const debug: LidarDebugPoint[] = [];

@@ -44,6 +44,7 @@ function row(root: HTMLElement, labelText: string): HTMLElement {
 
 function label(state: SandboxState): string {
   if (state === "running") return "running";
+  if (state === "loading") return "loading";
   if (state === "error") return "error";
   if (state === "stopped") return "stopped";
   return "idle";
