@@ -1,0 +1,5 @@
+# Cloudflare Pages headers. GitHub Pages cannot set these; that deploy
+# uses coi-serviceworker.js instead (see vite.config.ts and the README).
+/*
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp
