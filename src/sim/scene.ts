@@ -1,7 +1,9 @@
 import * as THREE from "three";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { RGBELoader } from "three/addons/loaders/RGBELoader.js";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { GTAOPass } from "three/addons/postprocessing/GTAOPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import type RAPIER from "@dimforge/rapier3d-compat";
@@ -22,6 +24,8 @@ export interface Atmosphere {
   zenith: string;
   horizon: string;
   skyGround: string;
+  /** High quality uses the HDRI as the visible sky. Warehouse keeps the interior gradient. */
+  hdriBackground?: boolean;
 }
 
 export const CITY_ATMOSPHERE: Atmosphere = {
@@ -57,8 +61,13 @@ export class SimView {
   private readonly hemi: THREE.HemisphereLight;
   private readonly sunTarget = new THREE.Object3D();
   private readonly sky: THREE.ShaderMaterial;
+  private readonly skyMesh: THREE.Mesh;
+  private readonly roomEnvironment: THREE.Texture;
   private composer: EffectComposer | null = null;
+  private gtao: GTAOPass | null = null;
+  private hdriEnvironment: THREE.Texture | null = null;
   private quality: GraphicsQuality = "high";
+  private atmosphere: Atmosphere = CITY_ATMOSPHERE;
   private viewportWidth = 1;
   private viewportHeight = 1;
 
@@ -67,7 +76,7 @@ export class SimView {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMapping = THREE.AgXToneMapping;
     this.renderer.toneMappingExposure = CITY_ATMOSPHERE.exposure;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.domElement.tabIndex = 0;
@@ -78,7 +87,9 @@ export class SimView {
     this.scene.fog = new THREE.Fog(CITY_ATMOSPHERE.fog, CITY_ATMOSPHERE.fogNear, CITY_ATMOSPHERE.fogFar);
 
     const pmrem = new THREE.PMREMGenerator(this.renderer);
-    this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0).texture;
+    this.roomEnvironment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    this.scene.environment = this.roomEnvironment;
+    this.scene.environmentIntensity = 1;
     pmrem.dispose();
 
     this.hemi = new THREE.HemisphereLight(CITY_ATMOSPHERE.hemiSky, CITY_ATMOSPHERE.hemiGround, CITY_ATMOSPHERE.hemiIntensity);
@@ -97,15 +108,27 @@ export class SimView {
     this.sun.shadow.camera.top = 24;
     this.sun.shadow.camera.bottom = -24;
     this.sun.shadow.bias = -0.00025;
-    this.sun.shadow.normalBias = 0.04;
+    this.sun.shadow.normalBias = 0.035;
+    this.sun.shadow.radius = 3;
     this.scene.add(this.sun);
     this.scene.add(this.sunTarget);
     this.sun.target = this.sunTarget;
 
     this.sky = createSky(CITY_ATMOSPHERE);
-    const sky = new THREE.Mesh(new THREE.SphereGeometry(420, 28, 16), this.sky);
-    sky.frustumCulled = false;
-    this.scene.add(sky);
+    this.skyMesh = new THREE.Mesh(new THREE.SphereGeometry(420, 28, 16), this.sky);
+    this.skyMesh.frustumCulled = false;
+    this.scene.add(this.skyMesh);
+  }
+
+  /** Image-based lighting from a CC0 Poly Haven sky. Safe to call before the first frame. */
+  loadHdri(): Promise<void> {
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    return new RGBELoader().loadAsync(`${import.meta.env.BASE_URL}assets/hdri/kloofendal_1k.hdr`).then((hdr) => {
+      this.hdriEnvironment = pmrem.fromEquirectangular(hdr).texture;
+      hdr.dispose();
+      pmrem.dispose();
+      this.applyEnvironment();
+    });
   }
 
   setQuality(quality: GraphicsQuality): void {
@@ -116,12 +139,14 @@ export class SimView {
     this.sun.shadow.mapSize.set(size, size);
     this.sun.shadow.map?.dispose();
     this.sun.shadow.map = null;
+    this.sun.shadow.radius = quality === "high" ? 3 : 1;
     if (quality === "high") this.ensureComposer();
+    this.applyEnvironment();
     this.resize(this.viewportWidth, this.viewportHeight);
   }
 
   setAtmosphere(atmosphere: Atmosphere): void {
-    this.scene.background = new THREE.Color(atmosphere.background);
+    this.atmosphere = atmosphere;
     this.scene.fog = new THREE.Fog(atmosphere.fog, atmosphere.fogNear, atmosphere.fogFar);
     this.hemi.color.set(atmosphere.hemiSky);
     this.hemi.groundColor.set(atmosphere.hemiGround);
@@ -132,6 +157,21 @@ export class SimView {
     this.sky.uniforms.zenith!.value.set(atmosphere.zenith);
     this.sky.uniforms.horizon!.value.set(atmosphere.horizon);
     this.sky.uniforms.below!.value.set(atmosphere.skyGround);
+    this.applyEnvironment();
+  }
+
+  private applyEnvironment(): void {
+    const hdri = this.quality === "high" && this.hdriEnvironment;
+    this.scene.environment = hdri ? this.hdriEnvironment : this.roomEnvironment;
+    this.scene.environmentIntensity = hdri ? 1.05 : 0.85;
+    const showSky = Boolean(hdri) && this.atmosphere.hdriBackground !== false;
+    if (showSky && this.hdriEnvironment) {
+      this.scene.background = this.hdriEnvironment;
+      this.skyMesh.visible = false;
+    } else {
+      this.scene.background = new THREE.Color(this.atmosphere.background);
+      this.skyMesh.visible = true;
+    }
   }
 
   resize(width: number, height: number): void {
@@ -143,6 +183,7 @@ export class SimView {
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h, false);
     this.composer?.setSize(w, h);
+    this.gtao?.setSize(Math.max(1, Math.floor(w / 2)), Math.max(1, Math.floor(h / 2)));
   }
 
   followSun(x: number, z: number): void {
@@ -160,7 +201,12 @@ export class SimView {
     if (this.composer) return;
     const composer = new EffectComposer(this.renderer);
     composer.addPass(new RenderPass(this.scene, this.camera));
-    const bloom = new UnrealBloomPass(new THREE.Vector2(this.viewportWidth, this.viewportHeight), 0.22, 0.35, 0.86);
+    const gtao = new GTAOPass(this.scene, this.camera, this.viewportWidth, this.viewportHeight);
+    gtao.output = GTAOPass.OUTPUT.Default;
+    gtao.blendIntensity = 0.42;
+    composer.addPass(gtao);
+    this.gtao = gtao;
+    const bloom = new UnrealBloomPass(new THREE.Vector2(this.viewportWidth, this.viewportHeight), 0.1, 0.32, 0.92);
     composer.addPass(bloom);
     composer.addPass(new OutputPass());
     composer.setSize(this.viewportWidth, this.viewportHeight);

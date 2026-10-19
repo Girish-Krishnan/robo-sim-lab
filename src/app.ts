@@ -5,6 +5,7 @@ import { createEditor, type CodeEditor } from "./editor/editor";
 import { ChaseCamera } from "./sim/camera";
 import { LidarView } from "./sim/lidar-view";
 import { addPhysicsGround, SimView, type GraphicsQuality } from "./sim/scene";
+import { bindTextureLoader } from "./sim/surfaces";
 import { AckermannBuggy, SERVICE_BRAKE, STOP_BRAKE } from "./sim/vehicle";
 import {
   QUALITY_STORAGE_KEY,
@@ -64,13 +65,15 @@ export async function mountApp(): Promise<void> {
     world.timestep = PHYSICS_DT;
 
     const view = new SimView(viewport);
+    bindTextureLoader(view.renderer);
+    void view.loadHdri().catch((error: unknown) => console.warn("[robo-sim] HDRI unavailable", error));
     const savedQuality = localStorage.getItem(QUALITY_STORAGE_KEY);
-    const quality: GraphicsQuality = savedQuality === "low" ? "low" : "high";
-    view.setQuality(quality);
+    let graphics: GraphicsQuality = savedQuality === "low" ? "low" : "high";
+    view.setQuality(graphics);
     addPhysicsGround(RAPIER, world);
     const savedWorld = localStorage.getItem(WORLD_STORAGE_KEY);
     const initialWorld: WorldId = isWorldId(savedWorld) ? savedWorld : "city";
-    let yard: SimWorld = await mountWorld(initialWorld, RAPIER, world, view.scene);
+    let yard: SimWorld = await mountWorld(initialWorld, RAPIER, world, view.scene, graphics);
     view.setAtmosphere(yard.atmosphere);
     const robot = new AckermannBuggy(RAPIER, world, view.scene);
     robot.reset(yard.spawn);
@@ -174,14 +177,14 @@ export async function mountApp(): Promise<void> {
     }
     worldSelect.value = yard.id;
     let switchingWorld = false;
-    const switchWorld = async (id: WorldId) => {
-      if (switchingWorld || id === yard.id) return;
+    const switchWorld = async (id: WorldId, force = false) => {
+      if (switchingWorld || (!force && id === yard.id)) return;
       switchingWorld = true;
       worldSelect.disabled = true;
       try {
         if (mode === "code") stopProgram();
         disposeWorld(world, yard);
-        yard = await mountWorld(id, RAPIER, world, view.scene);
+        yard = await mountWorld(id, RAPIER, world, view.scene, graphics);
         view.setAtmosphere(yard.atmosphere);
         robot.reset(yard.spawn);
         camera.reset();
@@ -197,12 +200,18 @@ export async function mountApp(): Promise<void> {
       void switchWorld(worldSelect.value);
     });
     const qualitySelect = mustGet<HTMLSelectElement>("quality");
-    qualitySelect.value = quality;
+    qualitySelect.value = graphics;
     qualitySelect.addEventListener("change", () => {
       const next: GraphicsQuality = qualitySelect.value === "low" ? "low" : "high";
+      if (next === graphics || switchingWorld) {
+        qualitySelect.value = graphics;
+        return;
+      }
+      graphics = next;
       view.setQuality(next);
       view.resize(viewport.clientWidth, viewport.clientHeight);
       localStorage.setItem(QUALITY_STORAGE_KEY, next);
+      void switchWorld(yard.id, true);
     });
     const lidarButton = mustGet<HTMLButtonElement>("lidar-toggle");
     const setLidarButton = (enabled: boolean) => {
