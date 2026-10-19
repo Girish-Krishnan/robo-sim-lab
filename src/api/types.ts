@@ -1,0 +1,109 @@
+/**
+ * Student-facing sensor and command types.
+ *
+ * These are the only runtime values a user program is allowed to see.
+ * World pose, body velocity, and the physics handles are not part of this
+ * module. A later Python (Pyodide) worker or another robot should consume
+ * the same `SensorFrame` and return the same `ControlCommand`.
+ *
+ * Robot frame: x forward, y left, z up. Yaw is counterclockwise viewed
+ * from above. Angles are radians.
+ */
+
+export interface LidarScan {
+  /** Beam angle in the robot frame. 0 is forward, positive is left, range (−π, π]. */
+  angles: number[];
+  /** Metres. A value equal to `maxRange` means no return. */
+  ranges: number[];
+  maxRange: number;
+}
+
+export interface OdometryPose {
+  /** Dead-reckoned metres. This is not the world position. */
+  x: number;
+  y: number;
+  /** Dead-reckoned yaw, radians, counterclockwise from above. */
+  yaw: number;
+}
+
+export interface WheelOdometry {
+  /** Forward speed from the rear wheels, m/s, with noise. */
+  speed: number;
+  /** Measured front steering angle, radians, positive left, with noise. */
+  steeringAngle: number;
+  /**
+   * Pose integrated from the noisy speed and steering with a bicycle model.
+   * It starts at the origin on reset and drifts. It is not ground truth.
+   */
+  pose: OdometryPose;
+}
+
+export interface ImuSample {
+  /** Yaw rate about body +z, rad/s, with bias and noise. */
+  yawRate: number;
+  /**
+   * Specific force in the robot frame, m/s².
+   * At rest on level ground, z is about +9.81 (the accelerometer feels the normal force).
+   */
+  accel: { x: number; y: number; z: number };
+}
+
+/** Placeholder so a real camera can be added without changing the call shape. */
+export interface CameraStub {
+  available: false;
+  width: number;
+  height: number;
+}
+
+export interface SensorFrame {
+  /** Seconds since the physics world started, not a pose. */
+  time: number;
+  /** Seconds since the previous control tick. */
+  dt: number;
+  lidar: LidarScan;
+  odometry: WheelOdometry;
+  imu: ImuSample;
+  camera: CameraStub;
+}
+
+export interface ControlCommand {
+  /** Radians. Positive steers left. Clamped to the robot limit. */
+  steering: number;
+  /** −1 full reverse … +1 full forward. */
+  throttle: number;
+}
+
+export interface RobotLimits {
+  /** Maximum |steering| in radians. */
+  maxSteering: number;
+  minThrottle: number;
+  maxThrottle: number;
+}
+
+export interface LidarSpec {
+  beams: number;
+  maxRange: number;
+  rangeStdDev: number;
+}
+
+export interface RobotDescriptor {
+  id: string;
+  name: string;
+  kinematics: "ackermann";
+  /** Metres between front and rear axles. Used by the bicycle-model odometry. */
+  wheelbase: number;
+  /** Metres between the left and right wheels. */
+  trackWidth: number;
+  limits: RobotLimits;
+  sensors: {
+    lidar: LidarSpec;
+    odometry: { speedStdDev: number; steeringStdDev: number };
+    imu: {
+      yawRateStdDev: number;
+      yawRateBiasStdDev: number;
+      accelStdDev: number;
+      accelBiasStdDev: number;
+    };
+    camera: { available: false };
+  };
+}

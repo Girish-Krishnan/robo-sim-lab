@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Robo Sim Lab — drive an Ackermann car in the browser, or write code against simulated lidar, odometry, and IMU."
+    />
+    <title>Robo Sim Lab</title>
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+  </head>
+  <body>
+    <div id="app">
+      <header>
+        <div class="brand">
+          <svg class="mark" viewBox="0 0 32 32" aria-hidden="true">
+            <rect width="32" height="32" rx="8" fill="#128f86" />
+            <path d="M6 20.5h20l-1.2-4.2a3 3 0 0 0-2.9-2.3H10.1a3 3 0 0 0-2.9 2.3L6 20.5Z" fill="#f4f7f4" />
+            <circle cx="10.5" cy="21" r="2.1" fill="#1a1e22" />
+            <circle cx="21.5" cy="21" r="2.1" fill="#1a1e22" />
+            <path d="M12 14.2h8l-.6-1.6H12.6L12 14.2Z" fill="#d7fbff" />
+          </svg>
+          <div>
+            <div class="title">Robo Sim Lab</div>
+            <div class="subtitle">Ackermann sandbox</div>
+          </div>
+        </div>
+
+        <div class="mode-switch" role="tablist" aria-label="Control mode">
+          <button id="mode-drive" type="button" role="tab" aria-selected="true">Drive</button>
+          <button id="mode-code" type="button" role="tab" aria-selected="false">Code</button>
+        </div>
+
+        <div class="header-actions">
+          <button id="lidar-toggle" type="button" aria-pressed="true">Lidar</button>
+          <button id="camera-reset" type="button">Reset camera</button>
+          <span id="iso-badge" class="badge" title="Cross-origin isolation">…</span>
+        </div>
+      </header>
+
+      <main>
+        <div id="viewport">
+          <div id="loading">
+            <div class="spinner" aria-hidden="true"></div>
+            <p id="loading-text">Starting physics…</p>
+          </div>
+          <div id="hint"></div>
+          <div id="hud" aria-live="off"></div>
+        </div>
+
+        <aside id="code-panel" hidden>
+          <div class="panel-bar">
+            <label class="example-label">
+              Example
+              <select id="example"></select>
+            </label>
+            <span id="run-state" data-state="idle">Idle</span>
+          </div>
+          <p class="api-hint">
+            <code>update(sensors)</code> at 20&nbsp;Hz returns
+            <code>{ steering, throttle }</code>. Steering is radians, positive left.
+            Throttle is −1…1. Only sensor fields cross into the worker.
+          </p>
+          <div id="editor"></div>
+          <div class="run-bar">
+            <button id="run" type="button" class="primary">Run</button>
+            <button id="stop" type="button">Stop</button>
+            <button id="reset" type="button">Reset world</button>
+            <span class="shortcut">Ctrl/⌘ Enter</span>
+          </div>
+          <div class="console-wrap">
+            <div class="console-bar">
+              <span>Console</span>
+              <button id="clear-console" type="button">Clear</button>
+            </div>
+            <div id="console" role="log"></div>
+          </div>
+        </aside>
+      </main>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
