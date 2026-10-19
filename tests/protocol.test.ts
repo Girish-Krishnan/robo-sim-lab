@@ -101,10 +101,15 @@ describe("body frame", () => {
     expect(forward.z).toBeCloseTo(1);
     expect(forward.x).toBeCloseTo(0);
     const left = beamDirection(q, Math.PI / 2);
-    expect(left.x).toBeCloseTo(-1);
+    // Driver's left is local +X, which is world +X when the nose points +Z.
+    expect(left.x).toBeCloseTo(1);
+    expect(left.z).toBeCloseTo(0);
     const body = worldToBody(q, { x: 0, y: 0, z: 4 });
     expect(body.x).toBeCloseTo(4);
+    expect(body.y).toBeCloseTo(0);
     expect(body.z).toBeCloseTo(0);
+    const leftward = worldToBody(q, { x: 3, y: 0, z: 0 });
+    expect(leftward.y).toBeCloseTo(3);
     const rotated = quatRotate({ x: 0, y: -Math.SQRT1_2, z: 0, w: Math.SQRT1_2 }, { x: 0, y: 0, z: 1 });
     expect(rotated.x).toBeCloseTo(-1);
     expect(yawFromQuaternion({ x: 0, y: -Math.SQRT1_2, z: 0, w: Math.SQRT1_2 })).toBeCloseTo(Math.PI / 2);

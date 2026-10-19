@@ -25,20 +25,20 @@ export class SimView {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.05;
+    this.renderer.toneMappingExposure = 1.12;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.domElement.tabIndex = 0;
     viewport.prepend(this.renderer.domElement);
 
     this.camera = new THREE.PerspectiveCamera(48, 1, 0.1, 600);
-    this.scene.background = new THREE.Color("#9eb0c4");
-    this.scene.fog = new THREE.Fog("#c6c0b4", 36, 130);
+    this.scene.background = new THREE.Color("#8eabc8");
+    this.scene.fog = new THREE.Fog("#b9c6d4", 60, 200);
 
     const pmrem = new THREE.PMREMGenerator(this.renderer);
     this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0).texture;
     pmrem.dispose();
 
-    this.scene.add(new THREE.HemisphereLight(0xd5e2f2, 0x6a5846, 0.72));
+    this.scene.add(new THREE.HemisphereLight(0xc5daf0, 0x6d8a52, 0.85));
     const fill = new THREE.DirectionalLight(0xc9d7ea, 0.35);
     fill.position.set(-12, 8, -8);
     this.scene.add(fill);

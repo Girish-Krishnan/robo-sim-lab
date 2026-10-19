@@ -32,8 +32,13 @@ export function quatRotate(q: Quat, v: Vec3): Vec3 {
 }
 
 /**
- * Yaw of a Y-up, +Z-forward body, counterclockwise from above.
- * Identity rotation (nose along +Z) is yaw 0. Positive yaw turns toward −X.
+ * Heading of a Y-up, +Z-forward body, used to keep the chase camera behind it.
+ * Identity (nose along +Z) is 0. Positive is a right-hand rotation about +Y,
+ * which swings the nose toward world −X.
+ *
+ * That geometric sign is not the driver's steering sign. A left turn, as the
+ * driver sees it, swings the nose toward world +X (the left side of the screen
+ * when the chase camera sits behind the car) and decreases this heading.
  */
 export function yawFromQuaternion(q: Quat): number {
   const siny = 2 * (q.w * q.y + q.x * q.z);
@@ -43,17 +48,21 @@ export function yawFromQuaternion(q: Quat): number {
 
 /**
  * World vector → robot frame.
- * Three.js local axes are x right, y up, z forward.
+ * The chassis faces local +Z. Local +X is the driver's left (world +X at
+ * yaw 0, and the left side of the screen from the chase camera).
  * Robot axes are x forward, y left, z up.
  */
 export function worldToBody(q: Quat, world: Vec3): Vec3 {
   const local = quatRotate(quatConjugate(q), world);
-  return { x: local.z, y: -local.x, z: local.y };
+  return { x: local.z, y: local.x, z: local.y };
 }
 
-/** Unit direction of a lidar beam. `angle` 0 is forward, positive is left. */
+/**
+ * Unit direction of a lidar beam.
+ * `angle` 0 is forward (+Z). Positive is the driver's left (+X at yaw 0).
+ */
 export function beamDirection(q: Quat, angle: number): Vec3 {
-  return quatRotate(q, { x: -Math.sin(angle), y: 0, z: Math.cos(angle) });
+  return quatRotate(q, { x: Math.sin(angle), y: 0, z: Math.cos(angle) });
 }
 
 export function dot(a: Vec3, b: Vec3): number {

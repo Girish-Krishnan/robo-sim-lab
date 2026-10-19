@@ -137,9 +137,9 @@ async function boot(): Promise<void> {
   }
 }
 
-function loadProgram(code: string, nextLimits: RobotLimits): void {
+function loadProgram(id: number, code: string, nextLimits: RobotLimits): void {
   if (!pyodide) {
-    post({ type: "error", message: "Python runtime is not ready.", logs: [] });
+    post({ type: "error", id, message: "Python runtime is not ready.", logs: [] });
     return;
   }
   bucket = [];
@@ -164,17 +164,17 @@ function loadProgram(code: string, nextLimits: RobotLimits): void {
     if (defined !== true) {
       throw new Error("Define control(sensors) that returns (steering, throttle).");
     }
-    post({ type: "ready", logs: bucket });
+    post({ type: "ready", id, logs: bucket });
   } catch (error) {
     student = null;
-    post({ type: "error", message: errorText(error), logs: bucket });
+    post({ type: "error", id, message: errorText(error), logs: bucket });
   }
 }
 
 function tick(id: number, sensors: SensorFrame): void {
   bucket = [];
   if (!pyodide || !student) {
-    post({ type: "error", message: "No program is loaded.", logs: [] });
+    post({ type: "error", id, message: "No program is loaded.", logs: [] });
     return;
   }
   try {
@@ -186,7 +186,7 @@ function tick(id: number, sensors: SensorFrame): void {
     const command = clampCommand({ steering, throttle }, limits);
     post({ type: "result", id, command, logs: bucket });
   } catch (error) {
-    post({ type: "error", message: errorText(error), logs: bucket });
+    post({ type: "error", id, message: errorText(error), logs: bucket });
   }
 }
 
@@ -202,7 +202,7 @@ ctx.onmessage = (event: MessageEvent<HostToWorker>) => {
     return;
   }
   if (message.type === "load") {
-    loadProgram(message.code, message.limits);
+    loadProgram(message.id, message.code, message.limits);
     return;
   }
   tick(message.id, message.sensors);

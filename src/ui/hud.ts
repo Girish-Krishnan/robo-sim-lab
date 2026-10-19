@@ -15,7 +15,7 @@ export class Hud {
     root.replaceChildren();
     this.speed = row(root, "Speed");
     this.odom = row(root, "Odom");
-    this.steerCmd = row(root, "Steer cmd");
+    this.steerCmd = row(root, "Steer +left");
     this.steerAct = row(root, "Steer act");
     this.throttle = row(root, "Throttle");
     this.mode = row(root, "Mode");

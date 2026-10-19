@@ -16,7 +16,9 @@ type RigidBody = InstanceType<typeof RAPIER.RigidBody>;
 type World = InstanceType<typeof RAPIER.World>;
 type Vehicle = InstanceType<typeof RAPIER.DynamicRayCastVehicleController>;
 
-const LIDAR_LOCAL = { x: 0, y: 0.62, z: -0.06 };
+// Hood-mounted puck. Body center settles near y = 0.78, so the scan plane
+// is about a metre off the ground and cuts cones, barrels, and car bodies.
+const LIDAR_LOCAL = { x: 0, y: 0.28, z: 0.46 };
 
 /**
  * Samples sensors from the live physics state and returns only a SensorFrame.

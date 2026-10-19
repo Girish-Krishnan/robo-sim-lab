@@ -2,19 +2,50 @@ import * as THREE from "three";
 import { clamp } from "../api";
 import type { ChassisFocus } from "../robots/types";
 
+/** Default orbit: behind the car and a little to its right, looking forward. */
+export const CHASE_ORBIT_YAW = 0.55;
+export const CHASE_ORBIT_PITCH = 0.42;
+export const CHASE_DISTANCE = 9.2;
+
+/**
+ * Place a camera on the chase rig, fully caught up (no smoothing).
+ * `orbitYaw` 0 sits directly behind the nose. The rig rotates with the car,
+ * so the driver's left stays on the left of the screen.
+ */
+export function placeChaseCamera(
+  camera: THREE.PerspectiveCamera,
+  target: ChassisFocus,
+  orbitYaw = CHASE_ORBIT_YAW,
+  orbitPitch = CHASE_ORBIT_PITCH,
+  distance = CHASE_DISTANCE,
+): void {
+  const horiz = distance * Math.cos(orbitPitch);
+  const offset = new THREE.Vector3(
+    Math.sin(orbitYaw) * horiz,
+    distance * Math.sin(orbitPitch) + 0.4,
+    -Math.cos(orbitYaw) * horiz,
+  );
+  // focus().yaw is the opposite of Three.js rotation.y. See yawFromQuaternion.
+  offset.applyQuaternion(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -target.yaw));
+  const focus = new THREE.Vector3(target.x, target.y + 0.7, target.z);
+  camera.position.copy(focus).add(offset);
+  camera.lookAt(focus);
+  camera.updateMatrixWorld(true);
+  camera.updateProjectionMatrix();
+}
+
 /** Chase camera. Drag orbits around the car; the car stays in frame. */
 export class ChaseCamera {
-  private orbitYaw = 0.55;
-  private orbitPitch = 0.42;
-  private distance = 9.2;
+  private orbitYaw = CHASE_ORBIT_YAW;
+  private orbitPitch = CHASE_ORBIT_PITCH;
+  private distance = CHASE_DISTANCE;
   private dragging = false;
   private lastX = 0;
   private lastY = 0;
   private readonly desired = new THREE.Vector3();
   private readonly focus = new THREE.Vector3();
   private readonly look = new THREE.Vector3();
-  private readonly offset = new THREE.Vector3();
-  private readonly yawQuat = new THREE.Quaternion();
+  private readonly held = new THREE.Vector3();
 
   constructor(
     private readonly camera: THREE.PerspectiveCamera,
@@ -28,25 +59,18 @@ export class ChaseCamera {
   }
 
   reset(): void {
-    this.orbitYaw = 0.55;
-    this.orbitPitch = 0.42;
-    this.distance = 9.2;
+    this.orbitYaw = CHASE_ORBIT_YAW;
+    this.orbitPitch = CHASE_ORBIT_PITCH;
+    this.distance = CHASE_DISTANCE;
   }
 
   update(dt: number, target: ChassisFocus): void {
-    const horiz = this.distance * Math.cos(this.orbitPitch);
-    this.offset.set(
-      Math.sin(this.orbitYaw) * horiz,
-      this.distance * Math.sin(this.orbitPitch) + 0.4,
-      -Math.cos(this.orbitYaw) * horiz,
-    );
-    // Car yaw is CCW about world up; Three.js rotation.y is the opposite sign.
-    this.yawQuat.setFromAxisAngle(new THREE.Vector3(0, 1, 0), -target.yaw);
-    this.offset.applyQuaternion(this.yawQuat);
+    this.held.copy(this.camera.position);
+    placeChaseCamera(this.camera, target, this.orbitYaw, this.orbitPitch, this.distance);
+    this.desired.copy(this.camera.position);
     this.focus.set(target.x, target.y + 0.7, target.z);
-    this.desired.copy(this.focus).add(this.offset);
     const blend = 1 - Math.exp(-dt * 5);
-    this.camera.position.lerp(this.desired, blend);
+    this.camera.position.copy(this.held).lerp(this.desired, blend);
     this.look.lerp(this.focus, blend);
     this.camera.lookAt(this.look);
   }

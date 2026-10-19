@@ -130,21 +130,6 @@ header {
   justify-content: flex-end;
 }
 
-.badge {
-  font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.02em;
-  color: var(--muted);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 4px 8px;
-}
-
-.badge.ok {
-  color: var(--accent);
-  border-color: rgba(47, 191, 168, 0.45);
-}
-
 main {
   display: grid;
   grid-template-columns: minmax(0, 1fr);

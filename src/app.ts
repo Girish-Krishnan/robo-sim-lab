@@ -23,10 +23,7 @@ export async function mountApp(): Promise<void> {
   const runState = mustGet<HTMLElement>("run-state");
   const pythonStatus = mustGet<HTMLElement>("python-status");
   const exampleSelect = mustGet<HTMLSelectElement>("example");
-  const isoBadge = mustGet<HTMLElement>("iso-badge");
-
-  isoBadge.textContent = crossOriginIsolated ? "Isolated" : "Not isolated";
-  isoBadge.classList.toggle("ok", crossOriginIsolated);
+  console.info(`[robo-sim] crossOriginIsolated: ${crossOriginIsolated}`);
 
   let mode: AppMode = "drive";
   const keys = new Set<string>();
@@ -76,6 +73,7 @@ export async function mountApp(): Promise<void> {
       onLog: (line, level) => consolePanel.log(line, level),
       onState: (state) => {
         setRunState(state);
+        pythonStatus.hidden = state !== "loading" || (sandbox?.runtimeIsReady ?? false);
         if (state === "error") {
           robot.setCommand(clampCommand({ steering: 0, throttle: 0 }, ACKERMANN_BUGGY.limits), STOP_BRAKE);
         }
@@ -99,7 +97,7 @@ export async function mountApp(): Promise<void> {
       const right = keys.has("KeyD") || keys.has("ArrowRight");
       const braking = keys.has("Space");
       const throttle = braking ? 0 : forward ? 1 : back ? -0.65 : 0;
-      // Positive steering is a left turn in the driver's frame (nose toward -X at yaw 0).
+      // Positive steering is a left turn from the driver's seat (nose toward +X at yaw 0).
       const steering = ((left ? 1 : 0) - (right ? 1 : 0)) * ACKERMANN_BUGGY.limits.maxSteering;
       robot.setCommand(
         clampCommand({ steering, throttle }, ACKERMANN_BUGGY.limits),
@@ -108,6 +106,7 @@ export async function mountApp(): Promise<void> {
     };
 
     const resetWorld = () => {
+      if (mode === "code") stopProgram();
       robot.reset();
       if (mode === "drive") applyDrive();
     };

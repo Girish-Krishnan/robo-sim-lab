@@ -1,5 +1,5 @@
 import { ACKERMANN_BUGGY, assertNoBannedKeys, publishSensorFrame, type ControlCommand, type SensorFrame } from "../api";
-import type { WorkerToHost } from "./messages";
+import type { HostToWorker, WorkerToHost } from "./messages";
 
 export type SandboxState = "idle" | "loading" | "running" | "stopped" | "error";
 
@@ -13,15 +13,34 @@ export interface SandboxCallbacks {
   onState: (state: SandboxState) => void;
 }
 
+/** Enough of a Worker for the host, and for tests that fake one. */
+export interface SandboxWorker {
+  postMessage(message: HostToWorker): void;
+  terminate(): void;
+  onmessage: ((event: MessageEvent<WorkerToHost>) => void) | null;
+  onerror: ((event: ErrorEvent) => void) | null;
+}
+
+export interface SandboxOptions {
+  workerFactory?: () => SandboxWorker;
+  tickTimeoutMs?: number;
+  loadTimeoutMs?: number;
+  bootTimeoutMs?: number;
+}
+
 /**
  * Host side of the Python sandbox. Sensor frames are copied through
  * `publishSensorFrame` immediately before postMessage, and rejected if a
  * banned key is present. The worker stays alive across Run and Stop so
  * Pyodide is not downloaded again. It is terminated only when a tick or a
  * load does not return (a hung control() cannot be unwound).
+ *
+ * Run is safe to repeat. Stop, Reset, a new example, and a timeout all leave
+ * the host ready for another Run: a fresh load id is armed, and replies from
+ * the previous attempt are ignored.
  */
 export class CodeSandbox {
-  private worker: Worker | null = null;
+  private worker: SandboxWorker | null = null;
   private generation = 0;
   private state: SandboxState = "idle";
   private runtimeReady = false;
@@ -31,11 +50,28 @@ export class CodeSandbox {
   private waiting: { id: number; sentAt: number; kind: "boot" | "load" | "tick" } | null = null;
   private tickId = 0;
   private timer = 0;
+  private readonly workerFactory: () => SandboxWorker;
+  private readonly tickTimeoutMs: number;
+  private readonly loadTimeoutMs: number;
+  private readonly bootTimeoutMs: number;
 
-  constructor(private readonly callbacks: SandboxCallbacks) {}
+  constructor(
+    private readonly callbacks: SandboxCallbacks,
+    options: SandboxOptions = {},
+  ) {
+    this.workerFactory = options.workerFactory ?? (() => new Worker(new URL("./worker.ts", import.meta.url), { type: "module" }));
+    this.tickTimeoutMs = options.tickTimeoutMs ?? TICK_TIMEOUT_MS;
+    this.loadTimeoutMs = options.loadTimeoutMs ?? LOAD_TIMEOUT_MS;
+    this.bootTimeoutMs = options.bootTimeoutMs ?? BOOT_TIMEOUT_MS;
+  }
 
   get current(): SandboxState {
     return this.state;
+  }
+
+  /** False while Pyodide is still downloading. Program loads after that stay warm. */
+  get runtimeIsReady(): boolean {
+    return this.runtimeReady;
   }
 
   /** Start Pyodide the first time Code mode is opened. */
@@ -58,12 +94,14 @@ export class CodeSandbox {
   stop(): void {
     this.pendingCode = null;
     this.ignoreCommands = true;
-    const hungRisk = this.waiting?.kind === "tick" || this.waiting?.kind === "load";
-    if (!hungRisk) {
+    const inFlight = this.waiting?.kind === "tick" || this.waiting?.kind === "load";
+    if (!inFlight) {
       this.waiting = null;
       this.clearTimer();
-      this.worker?.postMessage({ type: "stop" });
     }
+    // Drop the loaded program once the worker finishes whatever it is in.
+    // A reply that belongs to the old id is ignored. The runtime stays warm.
+    this.worker?.postMessage({ type: "stop" });
     this.setState("stopped");
   }
 
@@ -73,7 +111,7 @@ export class CodeSandbox {
     const sensors = publishSensorFrame(frame);
     assertNoBannedKeys(sensors);
     const id = ++this.tickId;
-    this.arm(id, "tick", TICK_TIMEOUT_MS);
+    this.arm(id, "tick", this.tickTimeoutMs);
     this.worker.postMessage({ type: "tick", id, sensors });
   }
 
@@ -89,16 +127,21 @@ export class CodeSandbox {
     this.runtimeReady = false;
     this.booting = true;
     this.setState("loading");
-    this.arm(0, "boot", BOOT_TIMEOUT_MS);
+    this.arm(0, "boot", this.bootTimeoutMs);
     worker.postMessage({ type: "boot" });
   }
 
   private postLoad(code: string): void {
     if (!this.worker) return;
     this.pendingCode = null;
-    this.arm(++this.tickId, "load", LOAD_TIMEOUT_MS);
+    // Leave "stopped" before the worker replies. A ready that arrives for
+    // this load must not be discarded as a leftover from Stop.
+    this.setState("loading");
+    const id = ++this.tickId;
+    this.arm(id, "load", this.loadTimeoutMs);
     this.worker.postMessage({
       type: "load",
+      id,
       code,
       limits: {
         maxSteering: ACKERMANN_BUGGY.limits.maxSteering,
@@ -108,7 +151,7 @@ export class CodeSandbox {
     });
   }
 
-  private replaceWorker(): Worker {
+  private replaceWorker(): SandboxWorker {
     this.generation += 1;
     const generation = this.generation;
     this.clearTimer();
@@ -116,7 +159,7 @@ export class CodeSandbox {
     this.waiting = null;
     this.runtimeReady = false;
     this.booting = false;
-    const worker = new Worker(new URL("./worker.ts", import.meta.url), { type: "module" });
+    const worker = this.workerFactory();
     this.worker = worker;
     worker.onmessage = (event: MessageEvent<WorkerToHost>) => {
       if (generation !== this.generation) return;
@@ -131,6 +174,11 @@ export class CodeSandbox {
   }
 
   private onWorker(message: WorkerToHost): void {
+    if (message.type === "ready" || message.type === "result") {
+      if (message.id !== this.waiting?.id) return;
+    }
+    if (message.type === "error" && message.id !== undefined && message.id !== this.waiting?.id) return;
+
     this.flushLogs(message.logs);
     if (message.type === "runtime") {
       this.booting = false;
@@ -145,9 +193,6 @@ export class CodeSandbox {
       return;
     }
     if (message.type === "ready") {
-      if (this.waiting?.kind !== "load" && this.waiting?.kind !== "tick") {
-        // A late ready after stop is ignored below if state is stopped.
-      }
       this.waiting = null;
       this.clearTimer();
       if (this.state === "stopped") return;
@@ -156,7 +201,6 @@ export class CodeSandbox {
       return;
     }
     if (message.type === "result") {
-      if (message.id !== this.waiting?.id) return;
       this.waiting = null;
       this.clearTimer();
       if (this.ignoreCommands || this.state !== "running") return;
@@ -176,13 +220,13 @@ export class CodeSandbox {
   private arm(id: number, kind: "boot" | "load" | "tick", timeout: number): void {
     this.waiting = { id, sentAt: performance.now(), kind };
     this.clearTimer();
-    this.timer = window.setTimeout(() => this.checkDeadline(), timeout + 30);
+    this.timer = globalThis.setTimeout(() => this.checkDeadline(), timeout + 30);
   }
 
   private checkDeadline(): void {
     const waiting = this.waiting;
     if (!waiting) return;
-    const limit = waiting.kind === "boot" ? BOOT_TIMEOUT_MS : waiting.kind === "load" ? LOAD_TIMEOUT_MS : TICK_TIMEOUT_MS;
+    const limit = waiting.kind === "boot" ? this.bootTimeoutMs : waiting.kind === "load" ? this.loadTimeoutMs : this.tickTimeoutMs;
     if (performance.now() - waiting.sentAt < limit) return;
     const why =
       waiting.kind === "boot"
@@ -218,7 +262,7 @@ export class CodeSandbox {
   }
 
   private clearTimer(): void {
-    if (this.timer) window.clearTimeout(this.timer);
+    if (this.timer) globalThis.clearTimeout(this.timer);
     this.timer = 0;
   }
 

@@ -11,13 +11,13 @@ npm install
 npm run dev
 ```
 
-Then open the printed local URL. The first `dev` or `build` copies the Pyodide runtime into `public/pyodide/` and downloads the NumPy wheel (see below). `npm run build` writes the static site to `dist/`. `npm test` checks the sensor protocol, the bicycle-model odometry, Ackermann geometry, and that a positive steer command turns the car left without rolling it on a stop.
+Then open the printed local URL. The first `dev` or `build` copies the Pyodide runtime into `public/pyodide/` and downloads the NumPy wheel (see below). `npm run build` writes the static site to `dist/`. `npm test` checks the sensor protocol, the bicycle-model odometry, Ackermann geometry, that a positive steer command turns the car to the driver's left (screen-left from the chase camera), that Run can be repeated after Stop or a timeout, and that the lidar-avoid policy makes it up the avenue.
 
-Drive with WASD or the arrow keys. Left and A steer left from the driver's seat. Space brakes. Drag the view to orbit the car, scroll to zoom, and press `R` to reset. **Code** opens the editor. Drag the divider to resize it. **Lidar on** draws the scan in the world and in the corner inset.
+Drive with WASD or the arrow keys. Left and A steer left from the driver's seat: the nose swings toward the left side of the screen while the chase camera stays behind the car, and the same positive command is what `control()` returns. Space brakes. Drag the view to orbit the car, scroll to zoom, and press `R` to reset. **Code** opens the editor. Drag the divider to resize it. **Lidar on** draws the scan in the world and in the corner inset. Run can be pressed again after Stop, Reset, an edit, or a timeout; Pyodide stays loaded.
 
 ## What you are looking at
 
-The buggy is a Rapier `DynamicRayCastVehicleController`: four suspension rays, front wheels steered with Ackermann geometry, and drive torque split across the axles. The center of mass sits below the body, tire grip is limited so a hard corner slides instead of tripping, and a speed governor eases off when the kinematic lateral acceleration gets large. Braking is a small per-wheel impulse, so Stop settles the car instead of flipping it. The rendered world is Three.js (WebGL2) — ground plane, painted pad, gate, bollards, crates, a corridor, a ramp, perimeter walls, and trees. Fixed obstacles are placed by their underside, so the mesh and the collider share the ground. The chase camera follows the chassis. **Lidar on** draws the planar scan as rays plus a top-down inset.
+The buggy is a Rapier `DynamicRayCastVehicleController`: four suspension rays, front wheels steered with Ackermann geometry, and drive torque split across the axles. The center of mass sits below the body, tire grip is limited so a hard corner slides instead of tripping, and a speed governor eases off when the kinematic lateral acceleration gets large. Braking is a small per-wheel impulse, so Stop settles the car instead of flipping it. Positive steering is a left turn as the driver sees it. At rest the nose points along +Z and the driver's left is +X, which is the left side of the screen with the chase camera behind the car. The wheel meshes use the same angle as the physics, so the tires point the way the car turns. The rendered world is Three.js (WebGL2): an avenue with a cross street and a roundabout, parked cars, cones, barrels, buildings, trees, benches, streetlights, fences, rocks, and a ramp. Fixed obstacles are placed by their underside, so the mesh and the collider share the ground, and the props are tall enough for the hood-mounted lidar plane. The chase camera follows the chassis. **Lidar on** draws the planar scan as rays plus a top-down inset.
 
 Physics steps at 60 Hz. Student code runs at 20 Hz.
 
@@ -43,7 +43,7 @@ flowchart LR
 
 Ground-truth pose and velocity stay on the main thread. They are used to integrate physics, to aim the camera, and to draw the HUD. The worker never imports the simulator. Before every `postMessage`, the host copies the sample through `publishSensorFrame`, which keeps a fixed set of fields and drops anything else, then `assertNoBannedKeys` rejects names such as `groundTruth`, `translation`, `linvel`, or `position`.
 
-Pyodide stays loaded across Run and Stop. The worker is terminated and created again only if a tick or the program load does not return (an infinite loop cannot be unwound from inside Python). `print()` and Python tracebacks show up in the console panel. Top-level statements run once per **Run**; `control` is called on each tick and can use that state. Ctrl or ⌘ Enter runs the buffer, including when focus is in the editor.
+Pyodide stays loaded across Run and Stop. Each Run loads the editor buffer under a new id, so Stop, Reset, switching examples, or editing and running again all start the program over. Replies from the previous attempt are ignored. The worker is terminated and created again only if a tick or the program load does not return (an infinite loop cannot be unwound from inside Python); the next Run boots a fresh interpreter. `print()` and Python tracebacks show up in the console panel. Top-level statements run once per **Run**; `control` is called on each tick and can use that state. Ctrl or ⌘ Enter runs the buffer, including when focus is in the editor.
 
 | Path | Role |
 | --- | --- |
@@ -67,7 +67,7 @@ Cross-origin isolation (COOP/COEP) is turned on because Pyodide can use `SharedA
 
 `control(sensors)` runs at 20 Hz. Return `(steering, throttle)` or `{"steering": ..., "throttle": ...}`.
 
-- `steering` — radians, positive left, clamped to ±0.55.
+- `steering` — radians, positive is a left turn from the driver's seat (and the left side of the chase view), clamped to ±0.55. The keyboard uses that same sign.
 - `throttle` — −1 … 1, positive forward, clamped to that range.
 
 The robot frame is x forward, y left, z up. Yaw is counterclockwise from above. The wheelbase is 1.9 m (`src/api/descriptor.ts`). Sensors are attribute-style objects. Lidar ranges and angles are NumPy arrays.
@@ -99,7 +99,7 @@ All of these are noisy. None of them is the body's true pose.
 
 The HUD shows true forward speed next to odometry speed, and commanded steering next to the slewed actuator angle. True speed is for the person watching. It is not sent to the program.
 
-The two editor examples are **Circle drive** (open-loop steer and throttle) and **Lidar avoid** (steer away from the nearest forward return). Ctrl or ⌘ Enter runs the buffer from anywhere on the page, including inside the editor.
+The two editor examples are **Circle drive** (open-loop steer and throttle, turning left) and **Lidar avoid** (aim at the most open forward beam, same sign as the driver). Ctrl or ⌘ Enter runs the buffer from anywhere on the page, including inside the editor.
 
 ## Adding a robot or a lesson
 

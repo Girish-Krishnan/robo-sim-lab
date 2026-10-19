@@ -62,64 +62,64 @@ def control(sensors):
 `;
 
 /**
- * Reactive avoidance: steer away from the nearest return in the forward
- * half-plane, and ease off the throttle as it gets close.
+ * Gap follower for the yard: steer toward the most open forward beam.
+ * Positive angle and positive steering are both the driver's left.
  */
 const avoid = `# Lidar avoid
 #
-# Reads the planar lidar only. angles: 0 is forward, positive is left.
-# A range of ${maxRange} m means no return. This steers away from the
-# closest obstacle in front. Odometry is printed so you can see it, but
-# the controller does not use it.
+# angles: 0 is straight ahead, positive is the driver's left.
+# steering uses the same sign, so a positive number also turns left.
+# A range of ${maxRange} m means no return.
 #
-# This is a teaching sketch, not a planner. It will get stuck in some
-# corners — try changing the distances.
+# Each tick, aim at the most open beam in front of the car and slow down
+# when that gap gets close. If something is near, commit to whichever
+# half of the scan is clearer. This is still a teaching sketch — tight
+# corners can trap it — but it will weave the avenue and go around the
+# roundabout.
 
 import numpy as np
 
+aim = 0.0
 ticks = 0
 
 def control(sensors):
-    global ticks
-    ranges = sensors.lidar.ranges
-    angles = sensors.lidar.angles
-    max_range = sensors.lidar.max_range
-    nearest = max_range
-    nearest_angle = 0.0
-    left_clear = 0.0
-    right_clear = 0.0
+    global aim, ticks
+    ranges = np.asarray(sensors.lidar.ranges, dtype=float)
+    angles = np.asarray(sensors.lidar.angles, dtype=float)
 
-    for i in range(int(ranges.shape[0])):
-        angle = float(angles[i])
-        dist = float(ranges[i])
-        if 0.05 < angle < np.pi / 2:
-            left_clear += dist
-        if -np.pi / 2 < angle < -0.05:
-            right_clear += dist
-        if abs(angle) < np.pi / 2 and dist < nearest:
-            nearest = dist
-            nearest_angle = angle
+    forward = np.abs(angles) < 1.2
+    # Prefer open space, with a gentle pull back toward straight ahead.
+    score = ranges * (1.0 - 0.28 * np.abs(angles))
+    score = np.where(forward, score, -1.0)
+    index = int(np.argmax(score))
+    gap_angle = float(angles[index])
+    gap_range = float(ranges[index])
+    aim = 0.72 * aim + 0.28 * gap_angle
 
-    steering = 0.0
-    if nearest < 8:
-        # Obstacle on the left (positive angle) → steer right, and the reverse.
-        away = -1.0 if nearest_angle > 0 else 1.0
-        urgency = (8 - nearest) / 8
-        steering = away * (0.12 + 0.42 * urgency)
-    bias = (left_clear - right_clear) / (left_clear + right_clear + 1)
-    steering = float(np.clip(steering + bias * 0.2, -0.5, 0.5))
+    left = (angles > 0.12) & (angles < 1.5)
+    right = (angles < -0.12) & (angles > -1.5)
+    left_clear = float(np.mean(ranges[left])) if np.any(left) else 0.0
+    right_clear = float(np.mean(ranges[right])) if np.any(right) else 0.0
 
-    throttle = 0.48
-    if nearest < 5:
-        throttle = 0.28
-    if nearest < 2.4:
-        throttle = 0.08
+    steering = float(np.clip(aim * 0.95, -0.48, 0.48))
+    if gap_range < 7.0:
+        prefer = 0.42 if left_clear >= right_clear else -0.42
+        blend = float(np.clip((7.0 - gap_range) / 7.0, 0.0, 1.0))
+        steering = float(np.clip((1.0 - blend) * steering + blend * prefer, -0.5, 0.5))
+
+    throttle = 0.52
+    if gap_range < 9.0:
+        throttle = 0.36
+    if gap_range < 5.0:
+        throttle = 0.2
+    if gap_range < 2.4:
+        throttle = 0.0
 
     ticks += 1
     if ticks % 20 == 0:
         pose = sensors.odometry.pose
         print(
-            f"nearest {nearest:.2f} m at {nearest_angle:.2f} rad",
+            f"gap {gap_range:.1f} m at {gap_angle:.2f} rad",
             f"steer {steering:.2f}",
             f"odom {pose.x:.1f} {pose.y:.1f}",
         )

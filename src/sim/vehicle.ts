@@ -38,11 +38,19 @@ export const SERVICE_BRAKE = 3.5;
 export const STOP_BRAKE = 2;
 
 /**
- * With the axle along −X and forward along +Z, a negative Rapier steer
- * yaws the nose toward −X (the driver's left). The student API is positive
- * left, so wheel angles are negated here.
+ * Positive steering is a left turn as the driver sees it.
+ *
+ * At yaw 0 the nose is +Z and the driver's left is local +X. With the chase
+ * camera behind the car, that is the left side of the screen, whether the
+ * car is driving away from the camera or has turned around and is driving
+ * back toward where the camera used to be (the camera stays behind).
+ *
+ * Rapier's wheel steer, axle (−1, 0, 0) and forward +Z, uses a positive
+ * angle to rotate the wheel's forward vector toward +X. The visual meshes
+ * use that same angle as a rotation about +Y, so the tires and the physics
+ * point the same way. No extra negation.
  */
-const RAPIER_STEER_SIGN = -1;
+const RAPIER_STEER_SIGN = 1;
 
 export class AckermannBuggy implements SimRobot {
   readonly descriptor = ACKERMANN_BUGGY;
@@ -161,8 +169,10 @@ export class AckermannBuggy implements SimRobot {
     this.steer += clamp(this.command.steering - this.steer, -maxStep, maxStep);
 
     const angles = ackermannAngles(this.steer, ACKERMANN_BUGGY.wheelbase, ACKERMANN_BUGGY.trackWidth);
-    this.vehicle.setWheelSteering(0, RAPIER_STEER_SIGN * angles.left);
-    this.vehicle.setWheelSteering(1, RAPIER_STEER_SIGN * angles.right);
+    // Wheel 0 sits at local −X (driver's right). Wheel 1 sits at local +X (driver's left).
+    // The inner wheel takes the larger angle.
+    this.vehicle.setWheelSteering(0, RAPIER_STEER_SIGN * angles.right);
+    this.vehicle.setWheelSteering(1, RAPIER_STEER_SIGN * angles.left);
     this.vehicle.setWheelSteering(2, 0);
     this.vehicle.setWheelSteering(3, 0);
 
@@ -330,9 +340,9 @@ function createChassisMesh(): THREE.Group {
   tailR.position.x = 0.38;
 
   const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 0.16, 12), dark);
-  mast.position.set(0, 0.52, -0.06);
+  mast.position.set(0, 0.2, 0.46);
   const puck = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.055, 28), dark);
-  puck.position.set(0, 0.62, -0.06);
+  puck.position.set(0, 0.28, 0.46);
   const ring = new THREE.Mesh(
     new THREE.TorusGeometry(0.145, 0.012, 8, 28),
     new THREE.MeshStandardMaterial({
