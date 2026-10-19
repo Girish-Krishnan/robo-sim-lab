@@ -28,7 +28,7 @@ export class LidarView {
       new THREE.LineBasicMaterial({
         vertexColors: true,
         transparent: true,
-        opacity: 0.38,
+        opacity: 0.95,
         depthWrite: false,
         blending: THREE.AdditiveBlending,
       }),
@@ -43,7 +43,7 @@ export class LidarView {
     this.points = new THREE.Points(
       pointGeometry,
       new THREE.PointsMaterial({
-        size: 0.08,
+        size: 0.22,
         vertexColors: true,
         transparent: true,
         opacity: 1,
@@ -112,7 +112,7 @@ export class LidarView {
       const r = point.hit ? 1 - near * 0.75 : 0.35;
       const g = point.hit ? 0.55 + near * 0.35 : 0.55;
       const b = point.hit ? 0.2 + near * 0.7 : 0.7;
-      const alpha = point.hit ? 0.55 : 0.16;
+      const alpha = point.hit ? 1 : 0.28;
       for (const end of [0, 3]) {
         this.colors[base + end] = r * alpha;
         this.colors[base + end + 1] = g * alpha;

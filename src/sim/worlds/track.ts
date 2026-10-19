@@ -2,8 +2,7 @@ import * as THREE from "three";
 import type RAPIER from "@dimforge/rapier3d-compat";
 import type { Solid } from "../course";
 import { mountSolids, type WorldMount } from "../course";
-import type { Atmosphere, GraphicsQuality } from "../scene";
-import { loadPropKit, tileUvs, TILES_PER_METER } from "../surfaces";
+import type { Atmosphere } from "../scene";
 import type { SpawnPose } from "../vehicle";
 import { coneSolid, cuboid } from "./factory";
 
@@ -72,46 +71,22 @@ export function buildTrackSolids(): Solid[] {
   return solids;
 }
 
-export async function mountTrack(
-  RAPIER: Rapier,
-  world: InstanceType<Rapier["World"]>,
-  scene: THREE.Scene,
-  quality: GraphicsQuality,
-): Promise<WorldMount> {
-  const kit = await loadPropKit(quality).catch(() => null);
+export function mountTrack(RAPIER: Rapier, world: InstanceType<Rapier["World"]>, scene: THREE.Scene): WorldMount {
   const group = new THREE.Group();
   group.name = "world-track";
   scene.add(group);
 
-  const grassMat = kit?.grass ?? new THREE.MeshStandardMaterial({ color: 0x3f6b45, roughness: 1 });
-  const asphaltMat = kit?.asphalt ?? new THREE.MeshStandardMaterial({ color: 0x3a4148, roughness: 0.92, metalness: 0.04 });
-  const yard = new THREE.PlaneGeometry(130, 150);
-  tileUvs(yard, 130 * TILES_PER_METER, 150 * TILES_PER_METER);
-  const floor = new THREE.Mesh(yard, grassMat);
+  const asphalt = new THREE.MeshStandardMaterial({ color: 0x3a4148, roughness: 0.92, metalness: 0.04 });
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(120, 140), asphalt);
   floor.rotation.x = -Math.PI / 2;
-  floor.position.y = 0.008;
+  floor.position.y = 0.01;
   floor.receiveShadow = true;
   group.add(floor);
 
-  const band = (x: number, z: number, w: number, d: number, y: number) => {
-    const geo = new THREE.PlaneGeometry(w, d);
-    tileUvs(geo, w * TILES_PER_METER, d * TILES_PER_METER);
-    const mesh = new THREE.Mesh(geo, asphaltMat);
-    mesh.rotation.x = -Math.PI / 2;
-    mesh.position.set(x, y, z);
-    mesh.receiveShadow = true;
-    group.add(mesh);
-  };
-  const lane = OUTER - INNER + 1.6;
-  band((INNER + OUTER) / 2, 0, lane, Z_OUT * 2 + 2, 0.012);
-  band(-(INNER + OUTER) / 2, 0, lane, Z_OUT * 2 + 2, 0.012);
-  const cap = Z_OUT - Z_IN + 2.4;
-  band(0, (Z_IN + Z_OUT) / 2, OUTER * 2 + 2, cap, 0.013);
-  band(0, -(Z_IN + Z_OUT) / 2, OUTER * 2 + 2, cap, 0.013);
-
-  const infieldGeo = new THREE.PlaneGeometry(INNER * 2 - 1.4, Z_IN * 2 - 1.4);
-  tileUvs(infieldGeo, (INNER * 2) * TILES_PER_METER, (Z_IN * 2) * TILES_PER_METER);
-  const infield = new THREE.Mesh(infieldGeo, grassMat);
+  const infield = new THREE.Mesh(
+    new THREE.PlaneGeometry(INNER * 2 - 1.2, Z_IN * 2 - 1.2),
+    new THREE.MeshStandardMaterial({ color: 0x3f6b45, roughness: 1 }),
+  );
   infield.rotation.x = -Math.PI / 2;
   infield.position.y = 0.02;
   infield.receiveShadow = true;
@@ -136,6 +111,6 @@ export async function mountTrack(
     group.add(band);
   }
 
-  const bodies = mountSolids(RAPIER, world, group, buildTrackSolids(), kit);
+  const bodies = mountSolids(RAPIER, world, group, buildTrackSolids());
   return { group, bodies };
 }

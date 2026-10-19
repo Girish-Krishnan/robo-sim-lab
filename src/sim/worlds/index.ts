@@ -1,7 +1,7 @@
 import type { Scene } from "three";
 import type RAPIER from "@dimforge/rapier3d-compat";
 import { mountCity, releaseMount, type WorldMount } from "../course";
-import { CITY_ATMOSPHERE, type Atmosphere, type GraphicsQuality } from "../scene";
+import { CITY_ATMOSPHERE, type Atmosphere } from "../scene";
 import { DEFAULT_SPAWN, type SpawnPose } from "../vehicle";
 
 type Rapier = typeof RAPIER;
@@ -30,37 +30,21 @@ export function isWorldId(value: string | null): value is WorldId {
 }
 
 /** City is in the main bundle. The other yards load the first time they are selected. */
-export async function mountWorld(
-  id: WorldId,
-  RAPIER: Rapier,
-  world: World,
-  scene: Scene,
-  quality: GraphicsQuality,
-): Promise<SimWorld> {
+export async function mountWorld(id: WorldId, RAPIER: Rapier, world: World, scene: Scene): Promise<SimWorld> {
   if (id === "city") {
-    return { ...(await mountCity(RAPIER, world, scene, quality)), id, spawn: DEFAULT_SPAWN, atmosphere: CITY_ATMOSPHERE };
+    return { ...mountCity(RAPIER, world, scene), id, spawn: DEFAULT_SPAWN, atmosphere: CITY_ATMOSPHERE };
   }
   if (id === "track") {
     const mod = await import("./track");
-    return {
-      ...(await mod.mountTrack(RAPIER, world, scene, quality)),
-      id,
-      spawn: mod.TRACK_SPAWN,
-      atmosphere: mod.TRACK_ATMOSPHERE,
-    };
+    return { ...mod.mountTrack(RAPIER, world, scene), id, spawn: mod.TRACK_SPAWN, atmosphere: mod.TRACK_ATMOSPHERE };
   }
   if (id === "forest") {
     const mod = await import("./forest");
-    return {
-      ...(await mod.mountForest(RAPIER, world, scene, quality)),
-      id,
-      spawn: mod.FOREST_SPAWN,
-      atmosphere: mod.FOREST_ATMOSPHERE,
-    };
+    return { ...mod.mountForest(RAPIER, world, scene), id, spawn: mod.FOREST_SPAWN, atmosphere: mod.FOREST_ATMOSPHERE };
   }
   const mod = await import("./warehouse");
   return {
-    ...(await mod.mountWarehouse(RAPIER, world, scene, quality)),
+    ...mod.mountWarehouse(RAPIER, world, scene),
     id,
     spawn: mod.WAREHOUSE_SPAWN,
     atmosphere: mod.WAREHOUSE_ATMOSPHERE,

@@ -230,33 +230,6 @@ export function concreteTexture(): THREE.CanvasTexture {
   return texture;
 }
 
-/** Soft alpha cluster used on crossed foliage cards. */
-export function foliageTexture(): THREE.CanvasTexture {
-  const size = 256;
-  const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("Canvas 2D is unavailable.");
-  ctx.clearRect(0, 0, size, size);
-  const cx = size / 2;
-  const cy = size / 2;
-  for (let i = 0; i < 48; i++) {
-    const ang = Math.random() * Math.PI * 2;
-    const rad = Math.pow(Math.random(), 0.55) * 92;
-    const x = cx + Math.cos(ang) * rad;
-    const y = cy + Math.sin(ang) * rad * 0.82;
-    const g = 70 + Math.random() * 100;
-    ctx.fillStyle = `rgba(${16 + Math.random() * 40}, ${g}, ${22 + Math.random() * 30}, 0.92)`;
-    ctx.beginPath();
-    ctx.ellipse(x, y, 10 + Math.random() * 18, 5 + Math.random() * 9, ang, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  const texture = canvasTexture(canvas, false);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  return texture;
-}
-
 function clampByte(value: number): number {
   return Math.max(0, Math.min(255, value));
 }

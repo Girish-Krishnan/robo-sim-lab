@@ -1,9 +1,7 @@
 import * as THREE from "three";
 import type RAPIER from "@dimforge/rapier3d-compat";
 import { quatRotate } from "../api/math";
-import type { GraphicsQuality } from "./scene";
-import { isKept, loadPropKit, tileBox, tileUvs, TILES_PER_METER, type PropKit } from "./surfaces";
-import { asphaltTexture, bollardTexture, buildingTexture, crateTexture, foliageTexture, padTexture, rampTexture } from "./textures";
+import { asphaltTexture, bollardTexture, buildingTexture, crateTexture, padTexture, rampTexture } from "./textures";
 
 type Rapier = typeof RAPIER;
 type World = InstanceType<Rapier["World"]>;
@@ -309,14 +307,8 @@ export interface WorldMount {
   bodies: InstanceType<Rapier["RigidBody"]>[];
 }
 
-export function mountSolids(
-  RAPIER: Rapier,
-  world: World,
-  parent: THREE.Object3D,
-  solids: readonly Solid[],
-  kit: PropKit | null = null,
-): WorldMount["bodies"] {
-  const mats = createMaterials(kit);
+export function mountSolids(RAPIER: Rapier, world: World, parent: THREE.Object3D, solids: readonly Solid[]): WorldMount["bodies"] {
+  const mats = createMaterials();
   const bodies: WorldMount["bodies"] = [];
   for (const solid of solids) {
     const visual = buildVisual(solid, mats);
@@ -364,9 +356,8 @@ export function releaseMount(world: World, mount: WorldMount): void {
     obj.geometry.dispose();
     const materials = Array.isArray(obj.material) ? obj.material : [obj.material];
     for (const material of materials) {
-      if (isKept(material)) continue;
       for (const value of Object.values(material)) {
-        if (value instanceof THREE.Texture && !isKept(value)) textures.add(value);
+        if (value instanceof THREE.Texture) textures.add(value);
       }
       material.dispose();
     }
@@ -375,33 +366,24 @@ export function releaseMount(world: World, mount: WorldMount): void {
   mount.group.removeFromParent();
 }
 
-export async function mountCity(
-  RAPIER: Rapier,
-  world: World,
-  scene: THREE.Scene,
-  quality: GraphicsQuality,
-): Promise<WorldMount> {
-  const kit = await loadPropKit(quality).catch((error: unknown) => {
-    console.warn("[robo-sim] surface textures unavailable", error);
-    return null;
-  });
+export function mountCity(RAPIER: Rapier, world: World, scene: THREE.Scene): WorldMount {
   const group = new THREE.Group();
   group.name = "world-city";
   scene.add(group);
-  addCityGround(group, kit);
-  addGroundDressing(group, kit);
-  const bodies = mountSolids(RAPIER, world, group, buildCourseSolids(), kit);
+  addCityGround(group);
+  addGroundDressing(group);
+  const bodies = mountSolids(RAPIER, world, group, buildCourseSolids());
   return { group, bodies };
 }
 
-function addCityGround(parent: THREE.Object3D, kit: PropKit | null): void {
-  const ground = kit
-    ? paved(220, 220, kit.grass, 0.004)
-    : new THREE.Mesh(
-        new THREE.BoxGeometry(220, 1, 220),
-        new THREE.MeshStandardMaterial({ map: asphaltTexture(), roughness: 0.94, metalness: 0.02 }),
-      );
-  if (!kit) ground.position.y = -0.5;
+function addCityGround(parent: THREE.Object3D): void {
+  const asphalt = asphaltTexture();
+  asphalt.anisotropy = 8;
+  const ground = new THREE.Mesh(
+    new THREE.BoxGeometry(220, 1, 220),
+    new THREE.MeshStandardMaterial({ map: asphalt, roughness: 0.94, metalness: 0.02, color: 0xffffff }),
+  );
+  ground.position.y = -0.5;
   ground.receiveShadow = true;
   parent.add(ground);
 
@@ -424,36 +406,33 @@ function addCityGround(parent: THREE.Object3D, kit: PropKit | null): void {
   parent.add(pad);
 }
 
-function paved(w: number, d: number, material: THREE.Material, y: number): THREE.Mesh {
-  const geo = new THREE.PlaneGeometry(w, d);
-  tileUvs(geo, w * TILES_PER_METER, d * TILES_PER_METER);
-  const mesh = new THREE.Mesh(geo, material);
-  mesh.rotation.x = -Math.PI / 2;
-  mesh.position.y = y;
-  mesh.receiveShadow = true;
-  return mesh;
-}
+function addGroundDressing(parent: THREE.Object3D): void {
+  const grass = new THREE.MeshStandardMaterial({ color: 0x4a7c49, roughness: 1, metalness: 0 });
+  const lawn = (x: number, z: number, w: number, d: number) => {
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, d), grass);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.set(x, 0.012, z);
+    mesh.receiveShadow = true;
+    parent.add(mesh);
+  };
+  lawn(-20, 8, 36, 70);
+  lawn(28, 10, 34, 80);
+  lawn(6, -24, 40, 28);
+  lawn(8, 70, 50, 18);
 
-function addGroundDressing(parent: THREE.Object3D, kit: PropKit | null): void {
-  const roadMat = kit?.asphalt ?? new THREE.MeshStandardMaterial({ color: 0x4a525a, roughness: 0.9, metalness: 0.05 });
+  const roadMat = new THREE.MeshStandardMaterial({ color: 0x4a525a, roughness: 0.9, metalness: 0.05 });
   const road = (x: number, z: number, w: number, d: number) => {
-    const mesh = kit ? paved(w, d, roadMat, 0.02) : new THREE.Mesh(new THREE.PlaneGeometry(w, d), roadMat);
-    if (!kit) {
-      mesh.rotation.x = -Math.PI / 2;
-      mesh.position.y = 0.02;
-      mesh.receiveShadow = true;
-    }
-    mesh.position.x = x;
-    mesh.position.z = z;
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, d), roadMat);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.set(x, 0.02, z);
+    mesh.receiveShadow = true;
     parent.add(mesh);
   };
   // Gap around z = 0 so the painted start pad stays visible.
   road(5.5, 37, 9.2, 66);
   road(5.5, -14, 9.2, 16);
   road(8, 27.2, 52, 9);
-  const plazaGeo = new THREE.CircleGeometry(9.2, 48);
-  tileUvs(plazaGeo, 8, 8);
-  const plaza = new THREE.Mesh(plazaGeo, roadMat);
+  const plaza = new THREE.Mesh(new THREE.CircleGeometry(9.2, 40), roadMat);
   plaza.rotation.x = -Math.PI / 2;
   plaza.position.set(5.5, 0.025, 58);
   plaza.receiveShadow = true;
@@ -487,15 +466,13 @@ function addGroundDressing(parent: THREE.Object3D, kit: PropKit | null): void {
   ring.position.set(5.5, 0.035, 58);
   parent.add(ring);
 
-  const walk = kit?.concrete ?? new THREE.MeshStandardMaterial({ color: 0xd2cdc4, roughness: 0.92, metalness: 0.02 });
-  const curbMat = kit?.concrete ?? new THREE.MeshStandardMaterial({ color: 0x9a9ea2, roughness: 0.8 });
+  const walk = new THREE.MeshStandardMaterial({ color: 0xd2cdc4, roughness: 0.92, metalness: 0.02 });
+  const curbMat = new THREE.MeshStandardMaterial({ color: 0x9a9ea2, roughness: 0.8 });
   const sidewalk = (x: number, z: number, w: number, d: number) => {
-    const mesh = kit ? paved(w, d, walk, 0.028) : new THREE.Mesh(new THREE.PlaneGeometry(w, d), walk);
-    if (!kit) {
-      mesh.rotation.x = -Math.PI / 2;
-      mesh.receiveShadow = true;
-    }
-    mesh.position.set(x, kit ? 0.028 : 0.028, z);
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, d), walk);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.set(x, 0.028, z);
+    mesh.receiveShadow = true;
     parent.add(mesh);
   };
   sidewalk(-0.8, 36, 1.7, 64);
@@ -504,9 +481,7 @@ function addGroundDressing(parent: THREE.Object3D, kit: PropKit | null): void {
   sidewalk(8, 33, 50, 1.5);
 
   const curb = (x: number, z: number, w: number, d: number) => {
-    const geo = new THREE.BoxGeometry(w, 0.12, d);
-    if (kit) tileBox(geo, w, 0.12, d, TILES_PER_METER);
-    const mesh = new THREE.Mesh(geo, curbMat);
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, 0.12, d), curbMat);
     mesh.position.set(x, 0.06, z);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
@@ -556,66 +531,35 @@ interface Materials {
   trunk: THREE.MeshStandardMaterial;
   rubber: THREE.MeshStandardMaterial;
   lamp: THREE.MeshStandardMaterial;
-  metal: THREE.MeshStandardMaterial;
-  stone: THREE.MeshStandardMaterial;
-  foam: THREE.MeshStandardMaterial;
-  foamBand: THREE.MeshStandardMaterial;
-  foliage: THREE.MeshStandardMaterial;
   paint: (color: number) => THREE.MeshStandardMaterial;
 }
 
-function createMaterials(kit: PropKit | null): Materials {
+function createMaterials(): Materials {
   const paintCache = new Map<number, THREE.MeshStandardMaterial>();
-  const flatSteel = new THREE.MeshStandardMaterial({ color: 0x4d5966, roughness: 0.45, metalness: 0.55 });
-  const foliageMap = foliageTexture();
   return {
-    concrete: kit?.concrete ?? new THREE.MeshStandardMaterial({ color: 0x8e949b, roughness: 0.9, metalness: 0.04 }),
-    barrier: kit?.concrete ?? new THREE.MeshStandardMaterial({ color: 0xb7b1a6, roughness: 0.86, metalness: 0.05 }),
-    steel: kit?.metal ?? flatSteel,
+    concrete: new THREE.MeshStandardMaterial({ color: 0x8e949b, roughness: 0.9, metalness: 0.04 }),
+    barrier: new THREE.MeshStandardMaterial({ color: 0xb7b1a6, roughness: 0.86, metalness: 0.05 }),
+    steel: new THREE.MeshStandardMaterial({ color: 0x4d5966, roughness: 0.45, metalness: 0.55 }),
     caution: new THREE.MeshStandardMaterial({ color: 0xe3a23a, roughness: 0.5, metalness: 0.1 }),
-    crate: kit?.planks ?? new THREE.MeshStandardMaterial({ map: crateTexture(), roughness: 0.82, metalness: 0.02 }),
+    crate: new THREE.MeshStandardMaterial({ map: crateTexture(), roughness: 0.82, metalness: 0.02 }),
     bollard: new THREE.MeshStandardMaterial({ map: bollardTexture(), roughness: 0.55, metalness: 0.04 }),
-    building: kit?.brick ?? new THREE.MeshStandardMaterial({ map: buildingTexture(), roughness: 0.78, metalness: 0.06 }),
-    glass: new THREE.MeshPhysicalMaterial({
-      color: 0xb7d4de,
-      roughness: 0.05,
-      metalness: 0.7,
+    building: new THREE.MeshStandardMaterial({ map: buildingTexture(), roughness: 0.78, metalness: 0.06 }),
+    glass: new THREE.MeshStandardMaterial({
+      color: 0x9fd8e2,
+      roughness: 0.08,
+      metalness: 0.15,
       transparent: true,
-      opacity: 0.62,
-      envMapIntensity: 1.55,
+      opacity: 0.55,
     }),
     leaf: new THREE.MeshStandardMaterial({ color: 0x2f6b4a, roughness: 0.85 }),
     leafDark: new THREE.MeshStandardMaterial({ color: 0x234e38, roughness: 0.9 }),
-    trunk: kit?.bark ?? new THREE.MeshStandardMaterial({ color: 0x6d4c34, roughness: 0.9 }),
+    trunk: new THREE.MeshStandardMaterial({ color: 0x6d4c34, roughness: 0.9 }),
     rubber: new THREE.MeshStandardMaterial({ color: 0x1b1d20, roughness: 0.92 }),
     lamp: new THREE.MeshStandardMaterial({
       color: 0xfff1c4,
       emissive: 0xffc56b,
       emissiveIntensity: 0.8,
       roughness: 0.35,
-    }),
-    metal: kit?.metal ?? flatSteel,
-    stone: kit?.stone ?? new THREE.MeshStandardMaterial({ color: 0x7a7e82, roughness: 0.95 }),
-    foam: new THREE.MeshPhysicalMaterial({
-      color: 0xe24b2a,
-      roughness: 0.42,
-      metalness: 0.02,
-      clearcoat: 0.35,
-      clearcoatRoughness: 0.4,
-    }),
-    foamBand: new THREE.MeshPhysicalMaterial({
-      color: 0xf4f1ea,
-      roughness: 0.38,
-      metalness: 0.02,
-      clearcoat: 0.35,
-      clearcoatRoughness: 0.4,
-    }),
-    foliage: new THREE.MeshStandardMaterial({
-      map: foliageMap,
-      alphaTest: 0.35,
-      side: THREE.DoubleSide,
-      roughness: 0.85,
-      color: 0xd5e6c8,
     }),
     paint: (color: number) => {
       let material = paintCache.get(color);
@@ -659,14 +603,16 @@ function buildVisual(solid: Solid, mats: Materials): THREE.Object3D {
       buildTree(group, solid, mats);
       break;
     case "bush":
-      addFoliage(group, solid.hx * 2.2, solid.hx * 1.6, 0, mats.foliage, 2);
+      add(new THREE.Mesh(new THREE.IcosahedronGeometry(solid.hx, 1), mats.leaf));
+      add(new THREE.Mesh(new THREE.IcosahedronGeometry(solid.hx * 0.72, 0), mats.leafDark)).position.set(
+        solid.hx * 0.35,
+        solid.hx * 0.2,
+        solid.hx * 0.1,
+      );
       break;
-    case "rock": {
-      const geo = new THREE.DodecahedronGeometry(solid.hx, 0);
-      tileUvs(geo, 2.2, 2.2);
-      add(new THREE.Mesh(geo, mats.stone)).scale.set(1.15, 0.7, 1.05);
+    case "rock":
+      add(new THREE.Mesh(new THREE.DodecahedronGeometry(solid.hx, 0), mats.paint(solid.color))).scale.set(1, 0.72, 1.05);
       break;
-    }
     case "light":
       buildLight(group, solid, mats);
       break;
@@ -712,20 +658,13 @@ function buildVisual(solid: Solid, mats: Materials): THREE.Object3D {
     case "shelf":
       buildShelf(group, solid, mats);
       break;
-    case "log": {
-      const geo = new THREE.CylinderGeometry(solid.hx, solid.hx * 0.92, solid.hy * 2, 14);
-      tileUvs(geo, Math.max(2, solid.hx * 8), solid.hy * 2 * TILES_PER_METER);
-      add(new THREE.Mesh(geo, mats.trunk));
+    case "log":
+      add(new THREE.Mesh(new THREE.CylinderGeometry(solid.hx, solid.hx * 0.92, solid.hy * 2, 10), mats.trunk));
       break;
-    }
     case "pallet": {
-      const deck = new THREE.BoxGeometry(solid.hx * 2, solid.hy * 0.28, solid.hz * 2);
-      tileBox(deck, solid.hx * 2, solid.hy * 0.28, solid.hz * 2, 0.8);
-      add(new THREE.Mesh(deck, mats.crate));
-      const box = new THREE.BoxGeometry(solid.hx * 1.55, solid.hy * 1.15, solid.hz * 1.35);
-      tileBox(box, solid.hx * 1.55, solid.hy * 1.15, solid.hz * 1.35, 0.7);
-      const load = add(new THREE.Mesh(box, mats.crate));
-      load.position.y = solid.hy * 0.45;
+      add(new THREE.Mesh(new THREE.BoxGeometry(solid.hx * 2, solid.hy * 0.35, solid.hz * 2), mats.paint(0x8a6a45)));
+      const load = add(new THREE.Mesh(new THREE.BoxGeometry(solid.hx * 1.7, solid.hy * 1.4, solid.hz * 1.6), mats.crate));
+      load.position.y = solid.hy * 0.35;
       break;
     }
     case "sign":
@@ -744,33 +683,33 @@ function buildVisual(solid: Solid, mats: Materials): THREE.Object3D {
       );
       break;
     }
-    case "crate": {
-      const geo = new THREE.BoxGeometry(solid.hx * 2, solid.hy * 2, solid.hz * 2);
-      tileBox(geo, solid.hx * 2, solid.hy * 2, solid.hz * 2, 0.65);
-      add(new THREE.Mesh(geo, solid.hy < 0.2 ? mats.paint(0x8a6a45) : mats.crate));
+    case "crate":
+      add(new THREE.Mesh(new THREE.BoxGeometry(solid.hx * 2, solid.hy * 2, solid.hz * 2), solid.hy < 0.2 ? mats.paint(0x8a6a45) : mats.crate));
       break;
-    }
     case "bollard":
       add(new THREE.Mesh(new THREE.CylinderGeometry(solid.hx, solid.hx, solid.hy * 2, 16), mats.bollard));
-      break;
-    case "foam":
-      addFoamTubes(group, solid, mats);
       break;
     case "fence":
     case "concrete":
     case "barrier":
+    case "foam":
     case "steel": {
       const material =
         solid.look === "fence" || solid.look === "steel"
           ? mats.steel
-          : solid.look === "barrier"
-            ? mats.barrier
-            : mats.concrete;
-      const geo = new THREE.BoxGeometry(solid.hx * 2, solid.hy * 2, solid.hz * 2);
-      if (solid.look === "concrete" || solid.look === "barrier") tileBox(geo, solid.hx * 2, solid.hy * 2, solid.hz * 2);
-      add(new THREE.Mesh(geo, material));
-      if (solid.look === "barrier") {
-        const stripe = add(new THREE.Mesh(new THREE.BoxGeometry(solid.hx * 2.02, solid.hy * 0.22, solid.hz * 2.02), mats.caution));
+          : solid.look === "foam"
+            ? mats.paint(0xe24b2a)
+            : solid.look === "barrier"
+              ? mats.barrier
+              : mats.concrete;
+      add(new THREE.Mesh(new THREE.BoxGeometry(solid.hx * 2, solid.hy * 2, solid.hz * 2), material));
+      if (solid.look === "barrier" || solid.look === "foam") {
+        const stripe = add(
+          new THREE.Mesh(
+            new THREE.BoxGeometry(solid.hx * 2.02, solid.hy * 0.22, solid.hz * 2.02),
+            solid.look === "foam" ? mats.paint(0xf7f4ee) : mats.caution,
+          ),
+        );
         stripe.position.y = solid.hy * 0.15;
       }
       break;
@@ -783,66 +722,45 @@ function buildVisual(solid: Solid, mats: Materials): THREE.Object3D {
 
 function buildCar(group: THREE.Group, solid: Solid, mats: Materials): void {
   const paint = mats.paint(solid.color);
-  const body = new THREE.Mesh(new THREE.SphereGeometry(1, 22, 16), paint);
-  body.scale.set(solid.hx * 0.95, solid.hy * 0.36, solid.hz * 0.98);
-  body.position.y = -solid.hy * 0.32;
-  group.add(body);
-  const cabin = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 14), mats.glass);
-  cabin.scale.set(solid.hx * 0.72, solid.hy * 0.3, solid.hz * 0.36);
-  cabin.position.set(0, -solid.hy * 0.02, -solid.hz * 0.06);
-  group.add(cabin);
-  const hood = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2), paint);
-  hood.scale.set(solid.hx * 0.9, solid.hy * 0.16, solid.hz * 0.34);
-  hood.position.set(0, -solid.hy * 0.12, solid.hz * 0.42);
-  group.add(hood);
-  const bumper = new THREE.Mesh(new THREE.BoxGeometry(solid.hx * 1.7, solid.hy * 0.1, 0.08), mats.paint(0x1a1e22));
-  bumper.position.set(0, -solid.hy * 0.42, solid.hz * 0.9);
-  group.add(bumper);
-  for (const side of [-1, 1]) {
-    const lamp = new THREE.Mesh(new THREE.SphereGeometry(solid.hx * 0.12, 10, 8), mats.lamp);
-    lamp.scale.set(1.5, 0.7, 0.55);
-    lamp.position.set(side * solid.hx * 0.55, -solid.hy * 0.18, solid.hz * 0.78);
-    group.add(lamp);
-  }
-  const wheelGeo = new THREE.CylinderGeometry(0.3, 0.3, 0.2, 16);
-  const rimGeo = new THREE.CylinderGeometry(0.16, 0.16, 0.21, 12);
+  const body = new THREE.Mesh(new THREE.BoxGeometry(solid.hx * 1.85, solid.hy * 0.7, solid.hz * 1.9), paint);
+  body.position.y = -solid.hy * 0.15;
+  const cabin = new THREE.Mesh(new THREE.BoxGeometry(solid.hx * 1.6, solid.hy * 0.55, solid.hz * 0.85), mats.glass);
+  cabin.position.set(0, solid.hy * 0.28, -solid.hz * 0.05);
+  group.add(body, cabin);
+  const wheelGeo = new THREE.CylinderGeometry(0.32, 0.32, 0.22, 12);
   for (const [x, z] of [
-    [-solid.hx * 0.78, solid.hz * 0.58],
-    [solid.hx * 0.78, solid.hz * 0.58],
-    [-solid.hx * 0.78, -solid.hz * 0.58],
-    [solid.hx * 0.78, -solid.hz * 0.58],
+    [-solid.hx * 0.78, solid.hz * 0.62],
+    [solid.hx * 0.78, solid.hz * 0.62],
+    [-solid.hx * 0.78, -solid.hz * 0.62],
+    [solid.hx * 0.78, -solid.hz * 0.62],
   ] as const) {
     const wheel = new THREE.Mesh(wheelGeo, mats.rubber);
     wheel.rotation.z = Math.PI / 2;
-    wheel.position.set(x, -solid.hy + 0.3, z);
-    const rim = new THREE.Mesh(rimGeo, mats.metal);
-    rim.rotation.z = Math.PI / 2;
-    rim.position.copy(wheel.position);
-    group.add(wheel, rim);
+    wheel.position.set(x, -solid.hy + 0.32, z);
+    group.add(wheel);
   }
 }
 
 function buildTree(group: THREE.Group, solid: Solid, mats: Materials): void {
-  const height = solid.hy * 1.55;
-  const trunkGeo = new THREE.CylinderGeometry(solid.hx * 0.28, solid.hx * 0.55, height, 12);
-  tileUvs(trunkGeo, 2.4, height * 0.8);
-  const trunk = new THREE.Mesh(trunkGeo, mats.trunk);
-  trunk.position.y = -solid.hy + height / 2;
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(solid.hx * 0.45, solid.hx * 0.7, solid.hy * 2, 7), mats.trunk);
   group.add(trunk);
-  const flareGeo = new THREE.CylinderGeometry(solid.hx * 0.55, solid.hx * 0.9, solid.hy * 0.28, 10);
-  tileUvs(flareGeo, 2, 1);
-  const flare = new THREE.Mesh(flareGeo, mats.trunk);
-  flare.position.y = -solid.hy + solid.hy * 0.14;
-  group.add(flare);
   if (solid.look === "pine") {
-    for (let layer = 0; layer < 4; layer++) {
-      const y = -solid.hy * 0.15 + layer * solid.hy * 0.42;
-      addFoliage(group, solid.hx * (2.6 - layer * 0.45), solid.hy * 0.7, y, mats.foliage, 3);
+    for (const [scale, y] of [
+      [2.4, solid.hy * 0.15],
+      [1.7, solid.hy * 0.7],
+      [1.05, solid.hy * 1.15],
+    ] as const) {
+      const tier = new THREE.Mesh(new THREE.ConeGeometry(solid.hx * scale, solid.hy * 0.9, 8), mats.leafDark);
+      tier.position.y = y;
+      group.add(tier);
     }
     return;
   }
-  addFoliage(group, solid.hx * 3.1, solid.hy * 1.15, solid.hy * 0.35, mats.foliage, 3);
-  addFoliage(group, solid.hx * 2.2, solid.hy * 0.85, solid.hy * 0.85, mats.foliage, 3);
+  const crown = new THREE.Mesh(new THREE.IcosahedronGeometry(solid.hx * 2.4, 1), mats.leaf);
+  crown.position.y = solid.hy * 0.85;
+  const crown2 = new THREE.Mesh(new THREE.IcosahedronGeometry(solid.hx * 1.6, 0), mats.leafDark);
+  crown2.position.set(solid.hx * 0.8, solid.hy * 1.15, solid.hx * 0.3);
+  group.add(crown, crown2);
 }
 
 function buildLight(group: THREE.Group, solid: Solid, mats: Materials): void {
@@ -869,45 +787,25 @@ function buildBench(group: THREE.Group, solid: Solid, mats: Materials): void {
 }
 
 function buildBuilding(group: THREE.Group, solid: Solid, mats: Materials): void {
-  const width = solid.hx * 2;
-  const height = solid.hy * 2;
-  const depth = solid.hz * 2;
-  const geo = new THREE.BoxGeometry(width, height, depth);
-  tileBox(geo, width, height, depth, 0.45);
-  const body = new THREE.Mesh(geo, mats.building);
-  const lipGeo = new THREE.BoxGeometry(width + 0.35, 0.18, depth + 0.35);
-  tileBox(lipGeo, width + 0.35, 0.18, depth + 0.35, 0.4);
-  const lip = new THREE.Mesh(lipGeo, mats.concrete);
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(solid.hx * 2, solid.hy * 2, solid.hz * 2),
+    solid.color === 0xc4b6a2 ? mats.building : mats.paint(solid.color),
+  );
+  const lip = new THREE.Mesh(new THREE.BoxGeometry(solid.hx * 2 + 0.4, 0.16, solid.hz * 2 + 0.4), mats.concrete);
   lip.position.y = solid.hy - 0.02;
   group.add(body, lip);
-  const door = new THREE.Mesh(new THREE.BoxGeometry(1.15, 2.15, 0.08), mats.paint(0x2a3036));
-  door.position.set(0, -solid.hy + 1.08, solid.hz + 0.02);
+  const door = new THREE.Mesh(new THREE.BoxGeometry(1.1, 2.1, 0.08), mats.paint(0x3a4048));
+  door.position.set(0, -solid.hy + 1.05, solid.hz + 0.01);
   group.add(door);
-  const cols = Math.max(2, Math.round(solid.hx / 1.1));
-  const rows = Math.max(2, Math.round(solid.hy / 1.4));
-  const place = (x: number, y: number, z: number, rotY: number) => {
-    const frame = new THREE.Mesh(new THREE.BoxGeometry(0.86, 1.05, 0.05), mats.paint(0x1c2126));
-    const lit = (Math.round(x * 4) + Math.round(y * 3) + Math.round(z * 2)) % 5 === 0;
-    const pane = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.88, 0.04), lit ? mats.lamp : mats.glass);
-    frame.position.set(x, y, z);
-    pane.position.set(x, y, z);
-    frame.rotation.y = rotY;
-    pane.rotation.y = rotY;
-    group.add(frame, pane);
-  };
+  const cols = Math.max(2, Math.round(solid.hx));
+  const rows = Math.max(1, Math.round(solid.hy / 1.6));
   for (let row = 0; row < rows; row++) {
-    const y = -solid.hy + 1.7 + row * 1.45;
-    if (y > solid.hy - 0.7) continue;
     for (let col = 0; col < cols; col++) {
-      const x = -solid.hx + ((col + 0.5) * width) / cols;
-      if (Math.abs(x) < 0.85 && row === 0) continue;
-      place(x, y, solid.hz + 0.03, 0);
-    }
-    const sideCols = Math.max(1, Math.round(solid.hz / 1.4));
-    for (let col = 0; col < sideCols; col++) {
-      const z = -solid.hz + ((col + 0.5) * depth) / sideCols;
-      place(solid.hx + 0.03, y, z, Math.PI / 2);
-      place(-solid.hx - 0.03, y, z, Math.PI / 2);
+      const window = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.85, 0.06), mats.glass);
+      const x = -solid.hx + ((col + 0.5) * (solid.hx * 2)) / cols;
+      const y = -solid.hy * 0.2 + row * 1.3;
+      window.position.set(x, y, solid.hz + 0.02);
+      group.add(window);
     }
   }
 }
@@ -935,7 +833,6 @@ function buildShelf(group: THREE.Group, solid: Solid, mats: Materials): void {
   const h = solid.hy * 2;
   const d = solid.hz * 2;
   const postGeo = new THREE.BoxGeometry(0.08, h, 0.08);
-  tileBox(postGeo, 0.08, h, 0.08, 2);
   for (const x of [-solid.hx + 0.04, solid.hx - 0.04]) {
     for (const z of [-solid.hz + 0.04, solid.hz - 0.04]) {
       const post = new THREE.Mesh(postGeo, mats.steel);
@@ -945,57 +842,14 @@ function buildShelf(group: THREE.Group, solid: Solid, mats: Materials): void {
   }
   const levels = 4;
   for (let i = 0; i < levels; i++) {
-    const boardGeo = new THREE.BoxGeometry(w * 0.96, 0.05, d * 0.96);
-    tileBox(boardGeo, w, 0.05, d, 0.8);
-    const board = new THREE.Mesh(boardGeo, mats.crate);
-    board.position.y = -solid.hy + 0.1 + (i * (h - 0.25)) / (levels - 1);
+    const board = new THREE.Mesh(new THREE.BoxGeometry(w, 0.06, d), mats.paint(0x6e5438));
+    board.position.y = -solid.hy + 0.08 + (i * (h - 0.2)) / (levels - 1);
     group.add(board);
     if (i < levels - 1) {
-      for (const side of [-1, 1]) {
-        const bw = w * 0.34;
-        const bh = h * 0.14;
-        const bd = d * 0.42;
-        const boxGeo = new THREE.BoxGeometry(bw, bh, bd);
-        tileBox(boxGeo, bw, bh, bd, 0.7);
-        const cargo = new THREE.Mesh(boxGeo, mats.crate);
-        cargo.position.set(side * w * 0.18, board.position.y + bh * 0.65, (i % 2 === 0 ? 0.08 : -0.08) * d);
-        group.add(cargo);
-      }
+      const cargo = new THREE.Mesh(new THREE.BoxGeometry(w * 0.7, h * 0.16, d * 0.55), mats.crate);
+      cargo.position.y = board.position.y + h * 0.12;
+      group.add(cargo);
     }
-  }
-}
-
-function addFoamTubes(group: THREE.Group, solid: Solid, mats: Materials): void {
-  const alongZ = solid.hz >= solid.hx;
-  const length = (alongZ ? solid.hz : solid.hx) * 2;
-  const radius = 0.2;
-  const rows = Math.max(3, Math.round((solid.hy * 2) / (radius * 1.7)));
-  for (let i = 0; i < rows; i++) {
-    const geo = new THREE.CylinderGeometry(radius, radius * 0.98, length * 0.995, 18);
-    if (alongZ) geo.rotateX(Math.PI / 2);
-    else geo.rotateZ(Math.PI / 2);
-    const tube = new THREE.Mesh(geo, i % 2 === 0 ? mats.foam : mats.foamBand);
-    const span = solid.hy * 2 - radius * 2;
-    tube.position.y = -solid.hy + radius + (rows === 1 ? span / 2 : (i * span) / (rows - 1));
-    group.add(tube);
-  }
-}
-
-function addFoliage(
-  group: THREE.Group,
-  width: number,
-  height: number,
-  y: number,
-  material: THREE.Material,
-  crosses: number,
-): void {
-  const geo = new THREE.PlaneGeometry(width, height);
-  for (let i = 0; i < crosses; i++) {
-    const card = new THREE.Mesh(geo, material);
-    card.position.set(Math.sin(i * 2.1) * width * 0.12, y, Math.cos(i * 1.7) * width * 0.12);
-    card.rotation.y = (i / crosses) * Math.PI + 0.4;
-    card.castShadow = false;
-    group.add(card);
   }
 }
 

@@ -2,8 +2,8 @@ import * as THREE from "three";
 import type RAPIER from "@dimforge/rapier3d-compat";
 import type { Solid } from "../course";
 import { mountSolids, type WorldMount } from "../course";
-import type { Atmosphere, GraphicsQuality } from "../scene";
-import { loadPropKit, tileUvs, TILES_PER_METER } from "../surfaces";
+import type { Atmosphere } from "../scene";
+import { concreteTexture } from "../textures";
 import type { SpawnPose } from "../vehicle";
 import { cuboid } from "./factory";
 
@@ -14,8 +14,8 @@ export const WAREHOUSE_SPAWN: SpawnPose = { x: 0, y: 0.84, z: -10, yaw: 0 };
 export const WAREHOUSE_ATMOSPHERE: Atmosphere = {
   background: "#4c545c",
   fog: "#6e767e",
-  fogNear: 22,
-  fogFar: 78,
+  fogNear: 10,
+  fogFar: 48,
   hemiSky: 0xc5ccd2,
   hemiGround: 0x3a4046,
   hemiIntensity: 0.55,
@@ -25,7 +25,6 @@ export const WAREHOUSE_ATMOSPHERE: Atmosphere = {
   zenith: "#5c656e",
   horizon: "#8b9298",
   skyGround: "#3e444a",
-  hdriBackground: false,
 };
 
 export function buildWarehouseSolids(): Solid[] {
@@ -55,22 +54,15 @@ export function buildWarehouseSolids(): Solid[] {
   return solids;
 }
 
-export async function mountWarehouse(
-  RAPIER: Rapier,
-  world: InstanceType<Rapier["World"]>,
-  scene: THREE.Scene,
-  quality: GraphicsQuality,
-): Promise<WorldMount> {
-  const kit = await loadPropKit(quality).catch(() => null);
+export function mountWarehouse(RAPIER: Rapier, world: InstanceType<Rapier["World"]>, scene: THREE.Scene): WorldMount {
   const group = new THREE.Group();
   group.name = "world-warehouse";
   scene.add(group);
 
-  const floorGeo = new THREE.PlaneGeometry(40, 70);
-  tileUvs(floorGeo, 40 * TILES_PER_METER, 70 * TILES_PER_METER);
+  const concrete = concreteTexture();
   const floor = new THREE.Mesh(
-    floorGeo,
-    kit?.concrete ?? new THREE.MeshStandardMaterial({ color: 0x8d9196, roughness: 0.86, metalness: 0.08 }),
+    new THREE.PlaneGeometry(40, 70),
+    new THREE.MeshStandardMaterial({ map: concrete, roughness: 0.86, metalness: 0.08, color: 0xffffff }),
   );
   floor.rotation.x = -Math.PI / 2;
   floor.position.set(0, 0.012, 10);
@@ -105,17 +97,6 @@ export async function mountWarehouse(
     group.add(line);
   }
 
-  if (kit) {
-    const railMat = new THREE.MeshStandardMaterial({ color: 0xd2a03a, roughness: 0.4, metalness: 0.65 });
-    for (const x of [-3.5, 3.5, -8.8, 8.8]) {
-      const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 24, 12), railMat);
-      rail.rotation.x = Math.PI / 2;
-      rail.position.set(x, 0.16, 14);
-      rail.castShadow = true;
-      group.add(rail);
-    }
-  }
-
-  const bodies = mountSolids(RAPIER, world, group, buildWarehouseSolids(), kit);
+  const bodies = mountSolids(RAPIER, world, group, buildWarehouseSolids());
   return { group, bodies };
 }
