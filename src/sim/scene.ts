@@ -31,14 +31,14 @@ export interface Atmosphere {
 export const CITY_ATMOSPHERE: Atmosphere = {
   background: "#8eabc8",
   fog: "#b9c6d4",
-  fogNear: 55,
-  fogFar: 190,
+  fogNear: 90,
+  fogFar: 260,
   hemiSky: 0xc5daf0,
   hemiGround: 0x6d8a52,
   hemiIntensity: 0.85,
   sunColor: 0xfff1d4,
-  sunIntensity: 3.1,
-  exposure: 1.12,
+  sunIntensity: 2.6,
+  exposure: 0.9,
   zenith: "#5480b8",
   horizon: "#edddb8",
   skyGround: "#8c8578",
@@ -66,6 +66,7 @@ export class SimView {
   private composer: EffectComposer | null = null;
   private gtao: GTAOPass | null = null;
   private hdriEnvironment: THREE.Texture | null = null;
+  private hdriSky: THREE.Texture | null = null;
   private quality: GraphicsQuality = "high";
   private atmosphere: Atmosphere = CITY_ATMOSPHERE;
   private viewportWidth = 1;
@@ -124,8 +125,11 @@ export class SimView {
   loadHdri(): Promise<void> {
     const pmrem = new THREE.PMREMGenerator(this.renderer);
     return new RGBELoader().loadAsync(`${import.meta.env.BASE_URL}assets/hdri/kloofendal_1k.hdr`).then((hdr) => {
+      hdr.mapping = THREE.EquirectangularReflectionMapping;
+      // The prefiltered PMREM is only for reflections. Using it as the
+      // background turns the sky into a gray blur.
+      this.hdriSky = hdr;
       this.hdriEnvironment = pmrem.fromEquirectangular(hdr).texture;
-      hdr.dispose();
       pmrem.dispose();
       this.applyEnvironment();
     });
@@ -163,10 +167,12 @@ export class SimView {
   private applyEnvironment(): void {
     const hdri = this.quality === "high" && this.hdriEnvironment;
     this.scene.environment = hdri ? this.hdriEnvironment : this.roomEnvironment;
-    this.scene.environmentIntensity = hdri ? 1.05 : 0.85;
-    const showSky = Boolean(hdri) && this.atmosphere.hdriBackground !== false;
-    if (showSky && this.hdriEnvironment) {
-      this.scene.background = this.hdriEnvironment;
+    this.scene.environmentIntensity = hdri ? 0.75 : 0.85;
+    const showSky = Boolean(hdri) && this.atmosphere.hdriBackground !== false && this.hdriSky;
+    if (showSky && this.hdriSky) {
+      this.scene.background = this.hdriSky;
+      this.scene.backgroundBlurriness = 0;
+      this.scene.backgroundIntensity = 0.85;
       this.skyMesh.visible = false;
     } else {
       this.scene.background = new THREE.Color(this.atmosphere.background);

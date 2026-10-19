@@ -396,7 +396,7 @@ export async function mountCity(
 
 function addCityGround(parent: THREE.Object3D, kit: PropKit | null): void {
   const ground = kit
-    ? paved(220, 220, kit.grass, 0.004)
+    ? paved(220, 220, kit.grass, 0.004, 1.15)
     : new THREE.Mesh(
         new THREE.BoxGeometry(220, 1, 220),
         new THREE.MeshStandardMaterial({ map: asphaltTexture(), roughness: 0.94, metalness: 0.02 }),
@@ -424,9 +424,9 @@ function addCityGround(parent: THREE.Object3D, kit: PropKit | null): void {
   parent.add(pad);
 }
 
-function paved(w: number, d: number, material: THREE.Material, y: number): THREE.Mesh {
+function paved(w: number, d: number, material: THREE.Material, y: number, tiles = TILES_PER_METER): THREE.Mesh {
   const geo = new THREE.PlaneGeometry(w, d);
-  tileUvs(geo, w * TILES_PER_METER, d * TILES_PER_METER);
+  tileUvs(geo, w * tiles, d * tiles);
   const mesh = new THREE.Mesh(geo, material);
   mesh.rotation.x = -Math.PI / 2;
   mesh.position.y = y;
@@ -612,10 +612,10 @@ function createMaterials(kit: PropKit | null): Materials {
     }),
     foliage: new THREE.MeshStandardMaterial({
       map: foliageMap,
-      alphaTest: 0.35,
+      alphaTest: 0.55,
       side: THREE.DoubleSide,
-      roughness: 0.85,
-      color: 0xd5e6c8,
+      roughness: 0.8,
+      color: 0xffffff,
     }),
     paint: (color: number) => {
       let material = paintCache.get(color);

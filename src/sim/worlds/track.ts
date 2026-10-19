@@ -86,7 +86,7 @@ export async function mountTrack(
   const grassMat = kit?.grass ?? new THREE.MeshStandardMaterial({ color: 0x3f6b45, roughness: 1 });
   const asphaltMat = kit?.asphalt ?? new THREE.MeshStandardMaterial({ color: 0x3a4148, roughness: 0.92, metalness: 0.04 });
   const yard = new THREE.PlaneGeometry(130, 150);
-  tileUvs(yard, 130 * TILES_PER_METER, 150 * TILES_PER_METER);
+  tileUvs(yard, 130 * 1.15, 150 * 1.15);
   const floor = new THREE.Mesh(yard, grassMat);
   floor.rotation.x = -Math.PI / 2;
   floor.position.y = 0.008;

@@ -15,14 +15,6 @@ export interface CarVisual {
   brakeLight: THREE.MeshStandardMaterial;
 }
 
-const paint = new THREE.MeshPhysicalMaterial({
-  color: 0xf2f4f6,
-  roughness: 0.18,
-  metalness: 0.04,
-  clearcoat: 1,
-  clearcoatRoughness: 0.08,
-  envMapIntensity: 1.35,
-});
 const orange = new THREE.MeshPhysicalMaterial({
   color: 0xe4572e,
   roughness: 0.32,
@@ -33,33 +25,26 @@ const orange = new THREE.MeshPhysicalMaterial({
 });
 const carbon = new THREE.MeshPhysicalMaterial({
   map: carbonTexture(),
-  color: 0x9aa0a6,
-  roughness: 0.42,
-  metalness: 0.72,
-  envMapIntensity: 1.15,
+  color: 0x1c2024,
+  roughness: 0.72,
+  metalness: 0.15,
+  envMapIntensity: 0.25,
 });
 const aluminum = new THREE.MeshPhysicalMaterial({
-  color: 0xd5dbe2,
-  roughness: 0.22,
-  metalness: 1,
-  envMapIntensity: 1.4,
+  color: 0x9aa3ab,
+  roughness: 0.38,
+  metalness: 0.82,
+  envMapIntensity: 0.7,
 });
+const beadlock = new THREE.MeshStandardMaterial({ color: 0x2a2e32, roughness: 0.42, metalness: 0.7 });
 const steel = new THREE.MeshStandardMaterial({ color: 0x3a4148, roughness: 0.38, metalness: 0.85 });
 const dark = new THREE.MeshStandardMaterial({ color: 0x14171b, roughness: 0.55, metalness: 0.25 });
 const rubber = new THREE.MeshStandardMaterial({
-  color: 0x1a1c1f,
-  roughness: 0.86,
-  metalness: 0.02,
-  normalMap: treadNormal(),
-  normalScale: new THREE.Vector2(0.7, 0.7),
-});
-const glass = new THREE.MeshPhysicalMaterial({
-  color: 0xb9d7de,
-  roughness: 0.04,
+  color: 0x16181b,
+  roughness: 0.94,
   metalness: 0,
-  transparent: true,
-  opacity: 0.45,
-  envMapIntensity: 1.5,
+  normalMap: treadNormal(),
+  normalScale: new THREE.Vector2(1.1, 1.1),
 });
 const headlightMat = new THREE.MeshStandardMaterial({
   color: 0xfff6e4,
@@ -82,8 +67,8 @@ const lens = new THREE.MeshStandardMaterial({
 });
 
 /**
- * Open-wheel research car in the spirit of an F1TENTH stack: molded shell,
- * carbon floor, exposed shocks, and a Hokuyo-style puck on the ray origin.
+ * F1TENTH-style electronics buggy: a low carbon chassis, battery and compute
+ * on the deck, and a Hokuyo puck on a front standoff. No body shell.
  * Geometry stays inside the existing chassis collider.
  */
 export function createResearchCar(radius: number, width: number): CarVisual {
@@ -91,13 +76,13 @@ export function createResearchCar(radius: number, width: number): CarVisual {
   group.name = "chassis";
 
   const plate = solid(
-    new THREE.ExtrudeGeometry(roundedRect(0.92, 1.85, 0.12), {
-      depth: 0.04,
+    new THREE.ExtrudeGeometry(roundedRect(1.02, 2.05, 0.06), {
+      depth: 0.035,
       bevelEnabled: true,
-      bevelThickness: 0.008,
-      bevelSize: 0.01,
+      bevelThickness: 0.006,
+      bevelSize: 0.008,
       bevelSegments: 2,
-      curveSegments: 6,
+      curveSegments: 4,
     }),
     carbon,
   );
@@ -105,63 +90,32 @@ export function createResearchCar(radius: number, width: number): CarVisual {
   plate.position.y = -0.2;
   group.add(plate);
 
-  const shell = solid(bodyShell(), paint);
-  shell.position.y = 0.0;
-  group.add(shell);
-
-  const stripe = solid(new THREE.BoxGeometry(0.07, 0.02, 1.35), orange);
-  stripe.position.set(0, 0.3, 0.02);
-  group.add(stripe);
-  const splitter = solid(new THREE.BoxGeometry(0.78, 0.018, 0.28), carbon);
-  splitter.position.set(0, -0.16, 0.98);
-  group.add(splitter);
+  // Upper electronics deck. The shell and fender domes are intentionally absent.
+  const deckPlate = solid(new THREE.BoxGeometry(0.72, 0.02, 1.55), carbon);
+  deckPlate.position.set(0, -0.1, -0.05);
+  group.add(deckPlate);
+  const railGeo = new THREE.BoxGeometry(0.025, 0.04, 1.7);
   for (const x of [-0.42, 0.42]) {
-    const pod = solid(new THREE.BoxGeometry(0.16, 0.1, 0.72), paint);
-    pod.position.set(x, -0.02, -0.05);
-    group.add(pod);
+    const rail = solid(railGeo, aluminum);
+    rail.position.set(x, -0.14, 0);
+    group.add(rail);
   }
-  const wing = solid(new THREE.BoxGeometry(0.78, 0.018, 0.16), paint);
-  wing.position.set(0, 0.34, -0.78);
-  const wingLip = solid(new THREE.BoxGeometry(0.78, 0.012, 0.04), orange);
-  wingLip.position.set(0, 0.35, -0.86);
-  group.add(wing, wingLip);
-  for (const x of [-0.36, 0.36]) {
-    const plate = solid(new THREE.BoxGeometry(0.018, 0.16, 0.14), dark);
-    plate.position.set(x, 0.24, -0.78);
-    group.add(plate);
-  }
-  for (const [x, z] of [
-    [-0.71, 0.95],
-    [0.71, 0.95],
-    [-0.71, -0.95],
-    [0.71, -0.95],
-  ] as const) {
-    const arch = solid(new THREE.SphereGeometry(0.32, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), paint);
-    arch.scale.set(0.72, 0.42, 1.05);
-    arch.position.set(x, -0.08, z);
-    group.add(arch);
-  }
+  const bumper = solid(new THREE.BoxGeometry(0.78, 0.06, 0.05), dark);
+  bumper.position.set(0, -0.12, 0.98);
+  group.add(bumper);
 
-  const cockpit = solid(new THREE.SphereGeometry(0.28, 24, 16), glass);
-  cockpit.scale.set(1.15, 0.55, 1.6);
-  cockpit.position.set(0, 0.16, -0.05);
-  group.add(cockpit);
-
-  const cowl = solid(new THREE.SphereGeometry(0.22, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2), paint);
-  cowl.scale.set(1.5, 0.45, 1.1);
-  cowl.position.set(0, 0.1, -0.55);
-  group.add(cowl);
-
-  // LiPo and the onboard computer, with cooling fins.
-  const battery = solid(new THREE.BoxGeometry(0.34, 0.08, 0.16), dark);
-  battery.position.set(0, -0.12, -0.35);
+  const battery = solid(new THREE.BoxGeometry(0.36, 0.09, 0.22), dark);
+  battery.position.set(0, -0.04, -0.15);
   group.add(battery);
-  const computer = solid(new THREE.BoxGeometry(0.28, 0.07, 0.18), aluminum);
-  computer.position.set(0, -0.08, -0.62);
+  const strap = solid(new THREE.BoxGeometry(0.38, 0.012, 0.03), orange);
+  strap.position.set(0, 0.01, -0.15);
+  group.add(strap);
+  const computer = solid(new THREE.BoxGeometry(0.32, 0.08, 0.22), aluminum);
+  computer.position.set(0, -0.04, -0.55);
   group.add(computer);
-  for (let i = 0; i < 5; i++) {
-    const fin = solid(new THREE.BoxGeometry(0.26, 0.012, 0.012), aluminum);
-    fin.position.set(0, -0.04 + i * 0.004, -0.62);
+  for (let i = 0; i < 6; i++) {
+    const fin = solid(new THREE.BoxGeometry(0.3, 0.008, 0.012), aluminum);
+    fin.position.set(0, 0.012 + i * 0.01, -0.55);
     fin.castShadow = false;
     group.add(fin);
   }
@@ -246,13 +200,13 @@ function createWheel(radius: number, width: number, sideX: number, steered: bool
   spin.add(tire);
 
   const rimGeo = new THREE.CylinderGeometry(radius * 0.62, radius * 0.66, width * 0.42, 28);
-  const rim = solid(rimGeo, aluminum);
-  rim.rotation.z = Math.PI / 2;
-  spin.add(rim);
+  const rimMesh = solid(rimGeo, beadlock);
+  rimMesh.rotation.z = Math.PI / 2;
+  spin.add(rimMesh);
   const barrel = solid(new THREE.CylinderGeometry(radius * 0.5, radius * 0.5, width * 0.2, 20), steel);
   barrel.rotation.z = Math.PI / 2;
   spin.add(barrel);
-  const sidewall = solid(new THREE.TorusGeometry(radius * 0.9, 0.012, 6, 24), aluminum);
+  const sidewall = solid(new THREE.TorusGeometry(radius * 0.9, 0.014, 6, 24), rubber);
   sidewall.rotation.y = Math.PI / 2;
   spin.add(sidewall);
   for (let i = 0; i < 8; i++) {
@@ -307,25 +261,6 @@ function createWheel(radius: number, width: number, sideX: number, steered: bool
   steer.add(shock);
 
   return { steer, spin };
-}
-
-function bodyShell(): THREE.BufferGeometry {
-  const pts = [
-    new THREE.Vector2(0.04, -0.92),
-    new THREE.Vector2(0.22, -0.78),
-    new THREE.Vector2(0.4, -0.45),
-    new THREE.Vector2(0.48, -0.05),
-    new THREE.Vector2(0.5, 0.28),
-    new THREE.Vector2(0.42, 0.58),
-    new THREE.Vector2(0.24, 0.82),
-    new THREE.Vector2(0.06, 0.98),
-  ];
-  const geo = new THREE.LatheGeometry(pts, 36);
-  // +Y along the lathe is the nose. +90° about X lays that axis onto +Z.
-  geo.rotateX(Math.PI / 2);
-  geo.scale(1.02, 0.62, 1.12);
-  geo.computeVertexNormals();
-  return geo;
 }
 
 function tireGeometry(radius: number, width: number): THREE.BufferGeometry {
@@ -406,10 +341,10 @@ function treadNormal(): THREE.DataTexture {
   const data = new Uint8Array(w * h * 4);
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
-      const groove = x % 8 < 2;
+      const lug = x % 10 < 6 && y % 8 < 5;
       const i = (y * w + x) * 4;
       data[i] = 128;
-      data[i + 1] = groove ? 80 : 160;
+      data[i + 1] = lug ? 196 : 70;
       data[i + 2] = 255;
       data[i + 3] = 255;
     }

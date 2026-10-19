@@ -3,8 +3,8 @@ import type RAPIER from "@dimforge/rapier3d-compat";
 import type { Solid } from "../course";
 import { mountSolids, type WorldMount } from "../course";
 import type { Atmosphere, GraphicsQuality } from "../scene";
-import { forestGroundMaterial, loadPropKit, tileUvs, TILES_PER_METER } from "../surfaces";
-import { foliageTexture } from "../textures";
+import { forestGroundMaterial, loadPropKit, tileUvs } from "../surfaces";
+import { bladeTexture } from "../textures";
 import type { SpawnPose } from "../vehicle";
 import { ballSolid, cuboid, logSolid, pillar } from "./factory";
 
@@ -15,8 +15,8 @@ export const FOREST_SPAWN: SpawnPose = { x: 0, y: 0.84, z: -4, yaw: 0 };
 export const FOREST_ATMOSPHERE: Atmosphere = {
   background: "#9aada0",
   fog: "#c5d0c2",
-  fogNear: 14,
-  fogFar: 78,
+  fogNear: 36,
+  fogFar: 120,
   hemiSky: 0xc9d8c4,
   hemiGround: 0x3d4a32,
   hemiIntensity: 0.72,
@@ -89,7 +89,7 @@ export async function mountForest(
   scene.add(group);
 
   const geo = new THREE.PlaneGeometry(90, 110, 70, 80);
-  tileUvs(geo, 90 * TILES_PER_METER, 110 * TILES_PER_METER);
+  tileUvs(geo, 90 * 1.15, 110 * 1.15);
   geo.rotateX(-Math.PI / 2);
   const pos = geo.attributes.position;
   if (!pos) throw new Error("forest ground is missing positions");
@@ -160,14 +160,16 @@ export async function mountForest(
 }
 
 function scatterGroundCover(group: THREE.Group): void {
-  const blade = new THREE.PlaneGeometry(0.16, 0.55);
-  blade.translate(0, 0.28, 0);
+  const blade = new THREE.PlaneGeometry(0.09, 0.42);
+  blade.translate(0, 0.21, 0);
   const grassMat = new THREE.MeshStandardMaterial({
-    color: 0x3e6a34,
-    roughness: 0.9,
+    map: bladeTexture(),
+    alphaTest: 0.6,
+    roughness: 0.85,
     side: THREE.DoubleSide,
+    color: 0xffffff,
   });
-  const count = 3200;
+  const count = 2600;
   const grass = new THREE.InstancedMesh(blade, grassMat, count);
   grass.castShadow = false;
   grass.receiveShadow = false;
@@ -186,7 +188,7 @@ function scatterGroundCover(group: THREE.Group): void {
     dummy.scale.set(1, h, 1);
     dummy.updateMatrix();
     grass.setMatrixAt(n, dummy.matrix);
-    color.setHex(Math.random() > 0.5 ? 0x4e7a3c : 0x2f5a30);
+    color.setHex(Math.random() > 0.5 ? 0xd7e8b0 : 0xb7d48a);
     grass.setColorAt(n, color);
     n += 1;
   }
@@ -196,12 +198,13 @@ function scatterGroundCover(group: THREE.Group): void {
   group.add(grass);
 
   const leafMat = new THREE.MeshStandardMaterial({
-    map: foliageTexture(),
-    alphaTest: 0.25,
+    map: bladeTexture(),
+    alphaTest: 0.55,
     roughness: 0.9,
     side: THREE.DoubleSide,
+    color: 0xc4a05a,
   });
-  const leafGeo = new THREE.PlaneGeometry(0.28, 0.18);
+  const leafGeo = new THREE.PlaneGeometry(0.16, 0.09);
   const leaves = new THREE.InstancedMesh(leafGeo, leafMat, 220);
   let leavesN = 0;
   for (let i = 0; i < 220; i++) {
