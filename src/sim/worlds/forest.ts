@@ -4,6 +4,7 @@ import type { Solid } from "../course";
 import { mountSolids, type WorldMount } from "../course";
 import type { Atmosphere, GraphicsQuality } from "../scene";
 import { forestGroundMaterial, loadPropKit, tileUvs } from "../surfaces";
+import { hashYaw, loadProps, scatter, type PropTemplate, type ScatterSolid } from "../props";
 import { bladeTexture } from "../textures";
 import type { SpawnPose } from "../vehicle";
 import { ballSolid, cuboid, logSolid, pillar } from "./factory";
@@ -14,9 +15,9 @@ export const FOREST_SPAWN: SpawnPose = { x: 0, y: 0.84, z: -4, yaw: 0 };
 
 export const FOREST_ATMOSPHERE: Atmosphere = {
   background: "#9aada0",
-  fog: "#c5d0c2",
-  fogNear: 36,
-  fogFar: 120,
+  fog: "#9aab98",
+  fogNear: 80,
+  fogFar: 210,
   hemiSky: 0xc9d8c4,
   hemiGround: 0x3d4a32,
   hemiIntensity: 0.72,
@@ -155,8 +156,190 @@ export async function mountForest(
     group.add(shaft);
   }
 
-  const bodies = mountSolids(RAPIER, world, group, buildForestSolids(), kit);
+  const solids = buildForestSolids();
+  const props = await loadProps(["broadleaf", "pine", "bushy", "shrub", "fern", "grass", "boulder", "rock", "log"]).catch(
+    (error: unknown) => {
+      console.warn("[robo-sim] forest props unavailable", error);
+      return null;
+    },
+  );
+  const bodies = mountSolids(
+    RAPIER,
+    world,
+    group,
+    solids,
+    kit,
+    props ? new Set(["tree", "pine", "rock", "bush", "log"]) : undefined,
+  );
+  if (props) dressForest(group, solids, props, quality);
   return { group, bodies };
+}
+
+function dressForest(
+  group: THREE.Group,
+  solids: readonly Solid[],
+  props: Record<string, PropTemplate>,
+  quality: GraphicsQuality,
+): void {
+  const list = solids as readonly ScatterSolid[];
+  const trees = list.filter((solid) => solid.look === "tree");
+  const broad = trees.filter((solid) => hashYaw(solid.x, solid.z) < Math.PI);
+  const leafy = trees.filter((solid) => hashYaw(solid.x, solid.z) >= Math.PI);
+  scatter(
+    group,
+    props.broadleaf!,
+    broad.map((solid) => ({
+      x: solid.x,
+      y: forestHeight(solid.x, solid.z),
+      z: solid.z,
+      yaw: hashYaw(solid.x, solid.z),
+      scale: (solid.hy * 2 * 2.15) / props.broadleaf!.height,
+    })),
+  );
+  scatter(
+    group,
+    props.bushy!,
+    leafy.map((solid) => ({
+      x: solid.x,
+      y: forestHeight(solid.x, solid.z),
+      z: solid.z,
+      yaw: hashYaw(solid.z, solid.x),
+      scale: (solid.hy * 2 * 1.7) / props.bushy!.height,
+    })),
+  );
+  scatter(
+    group,
+    props.pine!,
+    list
+      .filter((solid) => solid.look === "pine")
+      .map((solid) => ({
+        x: solid.x,
+        y: forestHeight(solid.x, solid.z),
+        z: solid.z,
+        yaw: hashYaw(solid.x, solid.z),
+        scale: (solid.hy * 2 * 2.4) / props.pine!.height,
+      })),
+  );
+  for (const solid of list.filter((item) => item.look === "rock")) {
+    const template = solid.hx > 0.9 ? props.boulder! : props.rock!;
+    scatter(group, template, [
+      {
+        x: solid.x,
+        y: forestHeight(solid.x, solid.z),
+        z: solid.z,
+        yaw: hashYaw(solid.x, solid.z),
+        scale: (solid.hx * 1.8) / template.height,
+      },
+    ]);
+  }
+  scatter(
+    group,
+    props.shrub!,
+    list
+      .filter((solid) => solid.look === "bush")
+      .map((solid) => ({
+        x: solid.x,
+        y: forestHeight(solid.x, solid.z),
+        z: solid.z,
+        yaw: hashYaw(solid.x, solid.z),
+        scale: (solid.hx * 2.4) / props.shrub!.height,
+      })),
+  );
+  scatter(
+    group,
+    props.log!,
+    list
+      .filter((solid) => solid.look === "log")
+      .map((solid) => ({
+        x: solid.x,
+        y: forestHeight(solid.x, solid.z),
+        z: solid.z,
+        yaw: solid.yaw,
+        scale: (solid.hy * 2) / Math.max(0.2, props.log!.radius * 2),
+      })),
+    { cast: true },
+  );
+
+  const rand = mulberry32(19);
+  const background: { template: PropTemplate; scale: number }[] = [
+    { template: props.broadleaf!, scale: 8 },
+    { template: props.pine!, scale: 7.5 },
+    { template: props.bushy!, scale: 5.5 },
+  ];
+  const extras: { template: PropTemplate; items: { x: number; y: number; z: number; yaw: number; scale: number }[] }[] =
+    background.map((entry) => ({ template: entry.template, items: [] }));
+  for (let i = 0; i < 42; i++) {
+    const z = -16 + rand() * 96;
+    const side = rand() > 0.5 ? 1 : -1;
+    const x = side * (12 + rand() * 24);
+    const pick = extras[Math.floor(rand() * extras.length)]!;
+    const spec = background[extras.indexOf(pick)]!;
+    pick.items.push({
+      x,
+      y: forestHeight(x, z),
+      z,
+      yaw: rand() * Math.PI * 2,
+      scale: (spec.scale * (0.75 + rand() * 0.45)) / spec.template.height,
+    });
+  }
+  for (const batch of extras) scatter(group, batch.template, batch.items);
+
+  const edgeLogs: { x: number; y: number; z: number; yaw: number; scale: number }[] = [];
+  for (let i = 0; i < 6; i++) {
+    const z = 6 + i * 9;
+    const side = i % 2 === 0 ? 1 : -1;
+    const x = Math.sin(z * 0.09) * 1.2 + side * 3.4;
+    edgeLogs.push({
+      x,
+      y: forestHeight(x, z),
+      z,
+      yaw: side * 0.7,
+      scale: 2.6 / Math.max(0.2, props.log!.radius * 2),
+    });
+  }
+  scatter(group, props.log!, edgeLogs, { cast: true });
+
+  if (quality !== "high") return;
+  const ferns: { x: number; y: number; z: number; yaw: number; scale: number }[] = [];
+  const tufts: { x: number; y: number; z: number; yaw: number; scale: number }[] = [];
+  const shrubs: { x: number; y: number; z: number; yaw: number; scale: number }[] = [];
+  for (let i = 0; i < 70; i++) {
+    const z = -8 + (i / 70) * 78;
+    const side = i % 2 === 0 ? 1 : -1;
+    const x = Math.sin(z * 0.09) * 1.2 + side * (2.5 + (i % 5) * 0.45);
+    if (Math.abs(z - 28) < 5 && Math.abs(x) < 5.5) continue;
+    const y = forestHeight(x, z);
+    const yaw = hashYaw(x, z);
+    if (i % 3 === 0) ferns.push({ x, y, z, yaw, scale: (0.7 + (i % 4) * 0.15) / props.fern!.height });
+    else if (i % 3 === 1) tufts.push({ x, y, z, yaw, scale: 0.9 + (i % 3) * 0.25 });
+    else shrubs.push({ x, y, z, yaw, scale: (1.1 + (i % 3) * 0.25) / props.shrub!.height });
+  }
+  for (let i = 0; i < 80; i++) {
+    const x = (rand() - 0.5) * 64;
+    const z = -12 + rand() * 90;
+    const along = x - Math.sin(z * 0.09) * 1.2;
+    if (Math.abs(along) < 2.3) continue;
+    if (Math.abs(z - 28) < 5 && Math.abs(x) < 5.5) continue;
+    const y = forestHeight(x, z);
+    const yaw = rand() * Math.PI * 2;
+    if (i < 28) ferns.push({ x, y, z, yaw, scale: (0.55 + rand() * 0.5) / props.fern!.height });
+    else if (i < 48) shrubs.push({ x, y, z, yaw, scale: (0.9 + rand() * 0.7) / props.shrub!.height });
+    else tufts.push({ x, y, z, yaw, scale: 0.7 + rand() * 0.8 });
+  }
+  scatter(group, props.fern!, ferns, { shadow: false, cast: false });
+  scatter(group, props.shrub!, shrubs, { shadow: false });
+  scatter(group, props.grass!, tufts, { shadow: false, cast: false });
+}
+
+function mulberry32(seed: number): () => number {
+  let a = seed;
+  return () => {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 }
 
 function scatterGroundCover(group: THREE.Group): void {

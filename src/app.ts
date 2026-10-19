@@ -5,6 +5,7 @@ import { createEditor, type CodeEditor } from "./editor/editor";
 import { ChaseCamera } from "./sim/camera";
 import { LidarView } from "./sim/lidar-view";
 import { addPhysicsGround, SimView, type GraphicsQuality } from "./sim/scene";
+import { bindPropLoader } from "./sim/props";
 import { bindTextureLoader } from "./sim/surfaces";
 import { AckermannBuggy, SERVICE_BRAKE, STOP_BRAKE } from "./sim/vehicle";
 import {
@@ -66,6 +67,7 @@ export async function mountApp(): Promise<void> {
 
     const view = new SimView(viewport);
     bindTextureLoader(view.renderer);
+    bindPropLoader(view.renderer);
     void view.loadHdri().catch((error: unknown) => console.warn("[robo-sim] HDRI unavailable", error));
     const savedQuality = localStorage.getItem(QUALITY_STORAGE_KEY);
     let graphics: GraphicsQuality = savedQuality === "low" ? "low" : "high";

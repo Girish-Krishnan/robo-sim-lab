@@ -3,6 +3,7 @@ import type RAPIER from "@dimforge/rapier3d-compat";
 import type { Solid } from "../course";
 import { mountSolids, type WorldMount } from "../course";
 import type { Atmosphere, GraphicsQuality } from "../scene";
+import { loadProps, placeCargo } from "../props";
 import { loadPropKit, tileUvs, TILES_PER_METER } from "../surfaces";
 import type { SpawnPose } from "../vehicle";
 import { cuboid } from "./factory";
@@ -116,6 +117,19 @@ export async function mountWarehouse(
     }
   }
 
-  const bodies = mountSolids(RAPIER, world, group, buildWarehouseSolids(), kit);
+  const solids = buildWarehouseSolids();
+  const props = await loadProps(["crate", "barrel"]).catch((error: unknown) => {
+    console.warn("[robo-sim] warehouse props unavailable", error);
+    return null;
+  });
+  const bodies = mountSolids(
+    RAPIER,
+    world,
+    group,
+    solids,
+    kit,
+    props ? new Set(["crate", "barrel", "pallet"]) : undefined,
+  );
+  if (props) placeCargo(group, solids, props);
   return { group, bodies };
 }

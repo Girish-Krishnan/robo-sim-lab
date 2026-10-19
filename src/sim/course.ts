@@ -3,6 +3,15 @@ import type RAPIER from "@dimforge/rapier3d-compat";
 import { quatRotate } from "../api/math";
 import type { GraphicsQuality } from "./scene";
 import { isKept, loadPropKit, tileBox, tileUvs, TILES_PER_METER, type PropKit } from "./surfaces";
+import {
+  addBlobShadows,
+  hashYaw,
+  loadProps,
+  scatter,
+  solidFoot,
+  type PropTemplate,
+  type ScatterSolid,
+} from "./props";
 import { asphaltTexture, bollardTexture, buildingTexture, crateTexture, foliageTexture, padTexture, rampTexture } from "./textures";
 
 type Rapier = typeof RAPIER;
@@ -315,21 +324,24 @@ export function mountSolids(
   parent: THREE.Object3D,
   solids: readonly Solid[],
   kit: PropKit | null = null,
+  skipLooks?: ReadonlySet<string>,
 ): WorldMount["bodies"] {
   const mats = createMaterials(kit);
   const bodies: WorldMount["bodies"] = [];
   for (const solid of solids) {
-    const visual = buildVisual(solid, mats);
-    visual.position.set(solid.x, solid.y, solid.z);
     const q = solidQuaternion(solid.yaw, solid.pitch);
-    visual.quaternion.set(q.x, q.y, q.z, q.w);
-    visual.traverse((obj) => {
-      if (obj instanceof THREE.Mesh) {
-        obj.castShadow = true;
-        obj.receiveShadow = true;
-      }
-    });
-    parent.add(visual);
+    if (!skipLooks?.has(solid.look)) {
+      const visual = buildVisual(solid, mats);
+      visual.position.set(solid.x, solid.y, solid.z);
+      visual.quaternion.set(q.x, q.y, q.z, q.w);
+      visual.traverse((obj) => {
+        if (obj instanceof THREE.Mesh) {
+          obj.castShadow = true;
+          obj.receiveShadow = true;
+        }
+      });
+      parent.add(visual);
+    }
     bodies.push(addSolidBody(RAPIER, world, solid, q));
   }
   return bodies;
@@ -361,7 +373,7 @@ export function releaseMount(world: World, mount: WorldMount): void {
   const textures = new Set<THREE.Texture>();
   mount.group.traverse((obj) => {
     if (!(obj instanceof THREE.Mesh)) return;
-    obj.geometry.dispose();
+    if (!obj.geometry.userData.keep) obj.geometry.dispose();
     const materials = Array.isArray(obj.material) ? obj.material : [obj.material];
     for (const material of materials) {
       if (isKept(material)) continue;
@@ -390,7 +402,30 @@ export async function mountCity(
   scene.add(group);
   addCityGround(group, kit);
   addGroundDressing(group, kit);
-  const bodies = mountSolids(RAPIER, world, group, buildCourseSolids(), kit);
+  const solids = buildCourseSolids();
+  const props = await loadProps([
+    "broadleaf",
+    "pine",
+    "shrub",
+    "boulder",
+    "barrel",
+    "crate",
+    "bench",
+    "lamp",
+    "manhole",
+  ]).catch((error: unknown) => {
+    console.warn("[robo-sim] city props unavailable", error);
+    return null;
+  });
+  const bodies = mountSolids(
+    RAPIER,
+    world,
+    group,
+    solids,
+    kit,
+    props ? new Set(["tree", "pine", "rock", "bush", "barrel", "crate", "bench", "light"]) : undefined,
+  );
+  if (props) dressCity(group, solids, props);
   return { group, bodies };
 }
 
@@ -447,9 +482,8 @@ function addGroundDressing(parent: THREE.Object3D, kit: PropKit | null): void {
     mesh.position.z = z;
     parent.add(mesh);
   };
-  // Gap around z = 0 so the painted start pad stays visible.
-  road(5.5, 37, 9.2, 66);
-  road(5.5, -14, 9.2, 16);
+  // One avenue through the spawn, so the car starts in the lane.
+  road(5.5, 24, 9.2, 92);
   road(8, 27.2, 52, 9);
   const plazaGeo = new THREE.CircleGeometry(9.2, 48);
   tileUvs(plazaGeo, 8, 8);
@@ -461,7 +495,8 @@ function addGroundDressing(parent: THREE.Object3D, kit: PropKit | null): void {
 
   const paint = new THREE.MeshBasicMaterial({ color: 0xf4f1e6 });
   const amber = new THREE.MeshBasicMaterial({ color: 0xe0b15a });
-  for (let z = 6; z <= 70; z += 4.2) {
+  for (let z = -16; z <= 70; z += 4.2) {
+    if (Math.abs(z) < 2.2) continue;
     if (z > 22 && z < 33) continue;
     if (z > 52 && z < 64) continue;
     const dash = new THREE.Mesh(new THREE.PlaneGeometry(0.16, 1.7), paint);
@@ -470,10 +505,15 @@ function addGroundDressing(parent: THREE.Object3D, kit: PropKit | null): void {
     parent.add(dash);
   }
   for (const edge of [1.15, 9.85]) {
-    const line = new THREE.Mesh(new THREE.PlaneGeometry(0.12, 64), amber);
-    line.rotation.x = -Math.PI / 2;
-    line.position.set(edge, 0.03, 38);
-    parent.add(line);
+    for (const [z, depth] of [
+      [2, 38],
+      [51, 36],
+    ] as const) {
+      const line = new THREE.Mesh(new THREE.PlaneGeometry(0.12, depth), amber);
+      line.rotation.x = -Math.PI / 2;
+      line.position.set(edge, 0.03, z);
+      parent.add(line);
+    }
   }
   for (let x = -12; x <= 30; x += 3.4) {
     if (x > 0.5 && x < 10.5) continue;
@@ -490,30 +530,39 @@ function addGroundDressing(parent: THREE.Object3D, kit: PropKit | null): void {
   const walk = kit?.concrete ?? new THREE.MeshStandardMaterial({ color: 0xd2cdc4, roughness: 0.92, metalness: 0.02 });
   const curbMat = kit?.concrete ?? new THREE.MeshStandardMaterial({ color: 0x9a9ea2, roughness: 0.8 });
   const sidewalk = (x: number, z: number, w: number, d: number) => {
-    const mesh = kit ? paved(w, d, walk, 0.028) : new THREE.Mesh(new THREE.PlaneGeometry(w, d), walk);
+    const mesh = kit ? paved(w, d, walk, 0.17) : new THREE.Mesh(new THREE.PlaneGeometry(w, d), walk);
     if (!kit) {
       mesh.rotation.x = -Math.PI / 2;
       mesh.receiveShadow = true;
     }
-    mesh.position.set(x, kit ? 0.028 : 0.028, z);
+    mesh.position.set(x, 0.17, z);
     parent.add(mesh);
   };
-  sidewalk(-0.8, 36, 1.7, 64);
-  sidewalk(11.6, 36, 1.7, 64);
+  for (const x of [-0.8, 11.6]) {
+    sidewalk(x, 0.5, 1.7, 40);
+    sidewalk(x, 52, 1.7, 36);
+  }
   sidewalk(8, 21.4, 50, 1.5);
   sidewalk(8, 33, 50, 1.5);
 
   const curb = (x: number, z: number, w: number, d: number) => {
-    const geo = new THREE.BoxGeometry(w, 0.12, d);
-    if (kit) tileBox(geo, w, 0.12, d, TILES_PER_METER);
+    const geo = new THREE.BoxGeometry(w, 0.16, d);
+    if (kit) tileBox(geo, w, 0.16, d, TILES_PER_METER);
     const mesh = new THREE.Mesh(geo, curbMat);
-    mesh.position.set(x, 0.06, z);
+    mesh.position.set(x, 0.08, z);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     parent.add(mesh);
   };
-  curb(0.15, 38, 0.18, 60);
-  curb(10.85, 38, 0.18, 60);
+  // Broken at the cross street so the intersection stays open.
+  for (const x of [0.15, 10.85]) {
+    curb(x, 0.5, 0.22, 40);
+    curb(x, 52, 0.22, 36);
+  }
+  curb(-8, 22.55, 18, 0.22);
+  curb(24, 22.55, 22, 0.22);
+  curb(-8, 31.85, 18, 0.22);
+  curb(24, 31.85, 22, 0.22);
 
   const stripe = new THREE.MeshBasicMaterial({ color: 0xf7f4ee });
   const cross = (x: number, z: number, alongX: boolean) => {
@@ -530,16 +579,118 @@ function addGroundDressing(parent: THREE.Object3D, kit: PropKit | null): void {
   cross(10.3, 27.2, false);
 
   const wearMat = new THREE.MeshBasicMaterial({ color: 0x1c2126, transparent: true, opacity: 0.28, depthWrite: false });
+  const patchMat = new THREE.MeshBasicMaterial({ color: 0x2a3036, transparent: true, opacity: 0.35, depthWrite: false });
   for (const [x, z, w, d] of [
     [4.2, 18, 1.4, 6],
     [7.1, 44, 1.1, 8],
     [5.2, 62, 2.2, 3.5],
+    [6.4, -8, 1.6, 3.2],
+    [3.8, 8.5, 2.4, 1.6],
   ] as const) {
     const patch = new THREE.Mesh(new THREE.PlaneGeometry(w, d), wearMat);
     patch.rotation.x = -Math.PI / 2;
     patch.position.set(x, 0.033, z);
     parent.add(patch);
   }
+  const stain = stainTexture();
+  for (const [x, z, sx, sz] of [
+    [6.6, 11, 1.8, 2.6],
+    [4.1, 28.8, 2.2, 1.4],
+    [7.4, 51, 1.5, 2.8],
+    [5.8, -6, 1.3, 2.1],
+  ] as const) {
+    const oil = new THREE.Mesh(new THREE.PlaneGeometry(sx, sz), new THREE.MeshBasicMaterial({
+      map: stain,
+      transparent: true,
+      depthWrite: false,
+      opacity: 0.85,
+    }));
+    oil.rotation.x = -Math.PI / 2;
+    oil.position.set(x, 0.036, z);
+    parent.add(oil);
+  }
+  const repair = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 0.7), patchMat);
+  repair.rotation.x = -Math.PI / 2;
+  repair.position.set(4.8, 0.034, 36);
+  parent.add(repair);
+}
+
+function stainTexture(): THREE.DataTexture {
+  const size = 64;
+  const data = new Uint8Array(size * size * 4);
+  const spots = [
+    [0.42, 0.48, 0.34],
+    [0.62, 0.4, 0.18],
+    [0.35, 0.66, 0.14],
+  ];
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      let alpha = 0;
+      for (const [cx, cy, r] of spots) {
+        const dx = x / size - (cx ?? 0);
+        const dy = y / size - (cy ?? 0);
+        const d = Math.sqrt(dx * dx + dy * dy) / (r ?? 1);
+        alpha = Math.max(alpha, Math.max(0, 1 - d) ** 1.4);
+      }
+      const i = (y * size + x) * 4;
+      data[i] = 18;
+      data[i + 1] = 16;
+      data[i + 2] = 12;
+      data[i + 3] = alpha * 170;
+    }
+  }
+  const texture = new THREE.DataTexture(data, size, size);
+  texture.needsUpdate = true;
+  return texture;
+}
+
+function dressCity(parent: THREE.Object3D, solids: readonly Solid[], props: Record<string, PropTemplate>): void {
+  const list = solids as readonly ScatterSolid[];
+  placeLook(parent, props.broadleaf, list, "tree", (solid, template) => (solid.hy * 2 * 2.4) / template.height, (solid) => hashYaw(solid.x, solid.z));
+  placeLook(parent, props.pine, list, "pine", (solid, template) => (solid.hy * 2 * 2.2) / template.height, (solid) => hashYaw(solid.x, solid.z));
+  placeLook(parent, props.shrub, list, "bush", (solid, template) => (solid.hx * 2.2) / template.height, (solid) => hashYaw(solid.x, solid.z));
+  placeLook(parent, props.boulder, list, "rock", (solid, template) => (solid.hx * 1.7) / template.height, (solid) => hashYaw(solid.x, solid.z));
+  placeLook(parent, props.barrel, list, "barrel", (solid, template) => (solid.hy * 2) / template.height, (solid) => hashYaw(solid.x, solid.z));
+  placeLook(parent, props.crate, list, "crate", (solid, template) => (solid.hy * 2) / template.height, (solid) => solid.yaw);
+  placeLook(parent, props.bench, list, "bench", (solid, template) => (Math.max(solid.hx, solid.hz) * 2) / (template.radius * 2));
+  placeLook(parent, props.lamp, list, "light", (solid, template) => (solid.hy * 2) / template.height);
+  const hole = 1.15 / Math.max(0.2, props.manhole.radius * 2);
+  scatter(parent, props.manhole, [
+    { x: 4.4, y: 0.04, z: 15, yaw: 0.4, scale: hole },
+    { x: 6.8, y: 0.04, z: 42, yaw: 1.1, scale: hole },
+    { x: 5.2, y: 0.04, z: 66, yaw: 0.2, scale: hole },
+    { x: 3.2, y: 0.04, z: -10, yaw: 2.1, scale: hole },
+  ], { shadow: false, cast: false });
+  addBlobShadows(
+    parent,
+    list
+      .filter((solid) => solid.look === "car")
+      .map((solid) => ({ x: solid.x, z: solid.z, y: 0.025, radius: Math.max(solid.hx, solid.hz) * 0.85 })),
+  );
+}
+
+function placeLook(
+  parent: THREE.Object3D,
+  template: PropTemplate | undefined,
+  solids: readonly ScatterSolid[],
+  look: string,
+  scaleOf: (solid: ScatterSolid, template: PropTemplate) => number,
+  yawOf: (solid: ScatterSolid) => number = (solid) => solid.yaw,
+): void {
+  if (!template) return;
+  scatter(
+    parent,
+    template,
+    solids
+      .filter((solid) => solid.look === look)
+      .map((solid) => ({
+        x: solid.x,
+        y: solidFoot(solid),
+        z: solid.z,
+        yaw: yawOf(solid),
+        scale: scaleOf(solid, template),
+      })),
+  );
 }
 
 interface Materials {
@@ -783,42 +934,56 @@ function buildVisual(solid: Solid, mats: Materials): THREE.Object3D {
 
 function buildCar(group: THREE.Group, solid: Solid, mats: Materials): void {
   const paint = mats.paint(solid.color);
-  const body = new THREE.Mesh(new THREE.SphereGeometry(1, 22, 16), paint);
-  body.scale.set(solid.hx * 0.95, solid.hy * 0.36, solid.hz * 0.98);
-  body.position.y = -solid.hy * 0.32;
-  group.add(body);
-  const cabin = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 14), mats.glass);
-  cabin.scale.set(solid.hx * 0.72, solid.hy * 0.3, solid.hz * 0.36);
-  cabin.position.set(0, -solid.hy * 0.02, -solid.hz * 0.06);
-  group.add(cabin);
-  const hood = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2), paint);
-  hood.scale.set(solid.hx * 0.9, solid.hy * 0.16, solid.hz * 0.34);
-  hood.position.set(0, -solid.hy * 0.12, solid.hz * 0.42);
-  group.add(hood);
-  const bumper = new THREE.Mesh(new THREE.BoxGeometry(solid.hx * 1.7, solid.hy * 0.1, 0.08), mats.paint(0x1a1e22));
-  bumper.position.set(0, -solid.hy * 0.42, solid.hz * 0.9);
-  group.add(bumper);
+  const darkPaint = mats.paint(0x1a1e22);
+  const w = solid.hx * 2;
+  const h = solid.hy * 2;
+  const l = solid.hz * 2;
+  const y0 = -solid.hy;
+  const body = new THREE.Mesh(new THREE.BoxGeometry(w * 0.92, h * 0.34, l * 0.94), paint);
+  body.position.y = y0 + h * 0.3;
+  const cabin = new THREE.Mesh(new THREE.BoxGeometry(w * 0.8, h * 0.28, l * 0.4), paint);
+  cabin.position.set(0, y0 + h * 0.52, -l * 0.02);
+  const glass = new THREE.Mesh(new THREE.BoxGeometry(w * 0.74, h * 0.16, l * 0.34), mats.glass);
+  glass.position.set(0, y0 + h * 0.56, -l * 0.02);
+  const hood = new THREE.Mesh(new THREE.BoxGeometry(w * 0.88, h * 0.07, l * 0.26), paint);
+  hood.position.set(0, y0 + h * 0.44, l * 0.32);
+  const trunk = new THREE.Mesh(new THREE.BoxGeometry(w * 0.88, h * 0.09, l * 0.16), paint);
+  trunk.position.set(0, y0 + h * 0.42, -l * 0.39);
+  group.add(body, cabin, glass, hood, trunk);
+  const front = new THREE.Mesh(new THREE.BoxGeometry(w * 0.96, h * 0.1, 0.1), darkPaint);
+  front.position.set(0, y0 + h * 0.2, l * 0.48);
+  const rear = front.clone();
+  rear.position.z = -l * 0.48;
+  const grille = new THREE.Mesh(new THREE.BoxGeometry(w * 0.46, h * 0.12, 0.04), darkPaint);
+  grille.position.set(0, y0 + h * 0.28, l * 0.5);
+  group.add(front, rear, grille);
   for (const side of [-1, 1]) {
-    const lamp = new THREE.Mesh(new THREE.SphereGeometry(solid.hx * 0.12, 10, 8), mats.lamp);
-    lamp.scale.set(1.5, 0.7, 0.55);
-    lamp.position.set(side * solid.hx * 0.55, -solid.hy * 0.18, solid.hz * 0.78);
-    group.add(lamp);
+    const lamp = new THREE.Mesh(new THREE.BoxGeometry(w * 0.16, h * 0.07, 0.05), mats.lamp);
+    lamp.position.set(side * w * 0.32, y0 + h * 0.32, l * 0.48);
+    const mirror = new THREE.Mesh(new THREE.BoxGeometry(w * 0.08, h * 0.05, 0.08), darkPaint);
+    mirror.position.set(side * w * 0.48, y0 + h * 0.52, l * 0.12);
+    group.add(lamp, mirror);
   }
-  const wheelGeo = new THREE.CylinderGeometry(0.3, 0.3, 0.2, 16);
-  const rimGeo = new THREE.CylinderGeometry(0.16, 0.16, 0.21, 12);
+  const wheelGeo = new THREE.CylinderGeometry(0.34, 0.34, 0.22, 18);
+  const rimGeo = new THREE.CylinderGeometry(0.18, 0.18, 0.23, 14);
+  const archGeo = new THREE.TorusGeometry(0.4, 0.045, 6, 12, Math.PI);
   for (const [x, z] of [
-    [-solid.hx * 0.78, solid.hz * 0.58],
-    [solid.hx * 0.78, solid.hz * 0.58],
-    [-solid.hx * 0.78, -solid.hz * 0.58],
-    [solid.hx * 0.78, -solid.hz * 0.58],
+    [-solid.hx * 0.82, solid.hz * 0.58],
+    [solid.hx * 0.82, solid.hz * 0.58],
+    [-solid.hx * 0.82, -solid.hz * 0.58],
+    [solid.hx * 0.82, -solid.hz * 0.58],
   ] as const) {
     const wheel = new THREE.Mesh(wheelGeo, mats.rubber);
     wheel.rotation.z = Math.PI / 2;
-    wheel.position.set(x, -solid.hy + 0.3, z);
+    wheel.position.set(x, y0 + 0.34, z);
     const rim = new THREE.Mesh(rimGeo, mats.metal);
     rim.rotation.z = Math.PI / 2;
     rim.position.copy(wheel.position);
-    group.add(wheel, rim);
+    const arch = new THREE.Mesh(archGeo, darkPaint);
+    arch.rotation.y = Math.PI / 2;
+    arch.rotation.z = x > 0 ? 0 : Math.PI;
+    arch.position.set(x, y0 + 0.42, z);
+    group.add(wheel, rim, arch);
   }
 }
 
@@ -875,25 +1040,55 @@ function buildBuilding(group: THREE.Group, solid: Solid, mats: Materials): void 
   const geo = new THREE.BoxGeometry(width, height, depth);
   tileBox(geo, width, height, depth, 0.45);
   const body = new THREE.Mesh(geo, mats.building);
-  const lipGeo = new THREE.BoxGeometry(width + 0.35, 0.18, depth + 0.35);
-  tileBox(lipGeo, width + 0.35, 0.18, depth + 0.35, 0.4);
-  const lip = new THREE.Mesh(lipGeo, mats.concrete);
-  lip.position.y = solid.hy - 0.02;
-  group.add(body, lip);
-  const door = new THREE.Mesh(new THREE.BoxGeometry(1.15, 2.15, 0.08), mats.paint(0x2a3036));
-  door.position.set(0, -solid.hy + 1.08, solid.hz + 0.02);
+  group.add(body);
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(width + 0.7, 0.16, depth + 0.7), mats.concrete);
+  roof.position.y = solid.hy + 0.06;
+  group.add(roof);
+  const parapetH = 0.38;
+  for (const [sx, sz, px, pz] of [
+    [width + 0.55, 0.1, 0, depth / 2 + 0.22],
+    [width + 0.55, 0.1, 0, -depth / 2 - 0.22],
+    [0.1, depth + 0.55, width / 2 + 0.22, 0],
+    [0.1, depth + 0.55, -width / 2 - 0.22, 0],
+  ] as const) {
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(sx, parapetH, sz), mats.concrete);
+    wall.position.set(px, solid.hy + 0.16 + parapetH / 2, pz);
+    group.add(wall);
+  }
+  const floors = Math.max(2, Math.round(height / 3.2));
+  for (let floor = 1; floor < floors; floor++) {
+    const band = new THREE.Mesh(new THREE.BoxGeometry(width + 0.16, 0.1, depth + 0.16), mats.concrete);
+    band.position.y = -solid.hy + (floor * height) / floors;
+    group.add(band);
+  }
+  const jamb = mats.paint(0x1c2126);
+  const door = new THREE.Mesh(new THREE.BoxGeometry(1.05, 2.05, 0.06), mats.paint(0x3a2a22));
+  door.position.set(0, -solid.hy + 1.05, solid.hz + 0.04);
   group.add(door);
+  for (const x of [-0.62, 0.62]) {
+    const side = new THREE.Mesh(new THREE.BoxGeometry(0.1, 2.2, 0.1), jamb);
+    side.position.set(x, -solid.hy + 1.1, solid.hz + 0.06);
+    group.add(side);
+  }
+  const head = new THREE.Mesh(new THREE.BoxGeometry(1.34, 0.1, 0.1), jamb);
+  head.position.set(0, -solid.hy + 2.2, solid.hz + 0.06);
+  const step = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.08, 0.4), mats.concrete);
+  step.position.set(0, -solid.hy + 0.04, solid.hz + 0.18);
+  group.add(head, step);
   const cols = Math.max(2, Math.round(solid.hx / 1.1));
   const rows = Math.max(2, Math.round(solid.hy / 1.4));
   const place = (x: number, y: number, z: number, rotY: number) => {
-    const frame = new THREE.Mesh(new THREE.BoxGeometry(0.86, 1.05, 0.05), mats.paint(0x1c2126));
+    const frame = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.12, 0.08), mats.paint(0x1c2126));
     const lit = (Math.round(x * 4) + Math.round(y * 3) + Math.round(z * 2)) % 5 === 0;
-    const pane = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.88, 0.04), lit ? mats.lamp : mats.glass);
+    const pane = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.86, 0.04), lit ? mats.lamp : mats.glass);
+    const sill = new THREE.Mesh(new THREE.BoxGeometry(1.02, 0.06, 0.12), mats.concrete);
     frame.position.set(x, y, z);
-    pane.position.set(x, y, z);
+    pane.position.set(x, y, z + Math.sign(z || 1) * 0.01);
+    sill.position.set(x, y - 0.56, z);
     frame.rotation.y = rotY;
     pane.rotation.y = rotY;
-    group.add(frame, pane);
+    sill.rotation.y = rotY;
+    group.add(frame, pane, sill);
   };
   for (let row = 0; row < rows; row++) {
     const y = -solid.hy + 1.7 + row * 1.45;
