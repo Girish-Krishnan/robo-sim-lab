@@ -55,11 +55,40 @@ export interface MapPoint {
 }
 
 /**
+ * A known map in the odometry frame at reset. Same idea as handing a
+ * real robot a floor plan: walls and a grid, not the robot's pose.
+ * `corner` is the cell-(0, 0) anchor. The name `origin` is not used,
+ * so it cannot be confused with a pose.
+ */
+export interface KnownMap {
+  /** Metres per cell. */
+  resolution: number;
+  /** Odometry-frame coordinates of the minimum corner of cell (0, 0). */
+  corner: { x: number; y: number };
+  width: number;
+  height: number;
+  /**
+   * Base64 bytes, row-major, one byte per cell. The value is the chamfer
+   * distance to the nearest occupied cell, in centimetres, clipped at 255.
+   * A 0 is an occupied cell. Row 0 is the minimum y.
+   */
+  field: string;
+  /**
+   * Wall edges in the odometry frame, packed as x0, y0, x1, y1.
+   * These are the lidar-visible outlines the grid was built from.
+   */
+  segments: number[];
+  /** Changes when the grid changes. Student code can cache on this. */
+  stamp: number;
+}
+
+/**
  * A goal the world is allowed to give the program, the way a real robot
  * is given a lane or a route. This is not ground-truth state.
  */
 export interface TaskInfo {
   path: MapPoint[];
+  map: KnownMap;
 }
 
 /** Placeholder so a real camera can be added without changing the call shape. */

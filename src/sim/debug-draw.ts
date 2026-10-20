@@ -33,9 +33,7 @@ export class DebugDraw {
       }
       const points = op.points.map((point) => place(spawn, point.x, point.y));
       if (op.kind === "path" && points.length >= 2) this.group.add(ribbon(points, op.color));
-      if (op.kind === "points") {
-        for (const point of points) this.group.add(marker(point, op.color));
-      }
+      if (op.kind === "points" && points.length > 0) this.group.add(markers(points, op.color));
     }
   }
 }
@@ -71,10 +69,21 @@ function ribbon(points: THREE.Vector3[], color: string): THREE.Mesh {
   return new THREE.Mesh(geometry, basic(color, 0.92));
 }
 
-function marker(point: THREE.Vector3, color: string): THREE.Mesh {
-  const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 8), basic(color, 1));
-  mesh.position.copy(point);
-  mesh.position.y += 0.12;
+function markers(points: THREE.Vector3[], color: string): THREE.InstancedMesh {
+  const mesh = new THREE.InstancedMesh(new THREE.SphereGeometry(0.32, 8, 6), basic(color, 1), points.length);
+  const dummy = new THREE.Object3D();
+  for (let i = 0; i < points.length; i++) {
+    const point = points[i]!;
+    // Above the roof. A cloud at axle height sits inside the body and disappears.
+    dummy.position.set(point.x, point.y + 0.9, point.z);
+    dummy.scale.setScalar(1);
+    dummy.updateMatrix();
+    mesh.setMatrixAt(i, dummy.matrix);
+  }
+  mesh.instanceMatrix.needsUpdate = true;
+  // Instances sit on the car, far from the mesh origin. A bounds sphere at
+  // the origin would cull the whole cloud.
+  mesh.frustumCulled = false;
   return mesh;
 }
 

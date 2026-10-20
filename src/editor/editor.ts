@@ -11,11 +11,17 @@ export interface CodeEditor {
   destroy: () => void;
 }
 
-export function createEditor(parent: HTMLElement, source: string, onRun: () => void): CodeEditor {
+export function createEditor(
+  parent: HTMLElement,
+  source: string,
+  onRun: () => void,
+  onChange?: (source: string) => void,
+): CodeEditor {
   const run = () => {
     onRun();
     return true;
   };
+  let mute = false;
   const view = new EditorView({
     parent,
     state: EditorState.create({
@@ -24,6 +30,10 @@ export function createEditor(parent: HTMLElement, source: string, onRun: () => v
         basicSetup,
         python(),
         oneDark,
+        EditorView.updateListener.of((update) => {
+          if (mute || !update.docChanged || !onChange) return;
+          onChange(update.state.doc.toString());
+        }),
         Prec.high(
           keymap.of([
             { key: "Mod-Enter", run },
@@ -50,9 +60,11 @@ export function createEditor(parent: HTMLElement, source: string, onRun: () => v
   return {
     getValue: () => view.state.doc.toString(),
     setValue: (next: string) => {
+      mute = true;
       view.dispatch({
         changes: { from: 0, to: view.state.doc.length, insert: next },
       });
+      mute = false;
     },
     relayout: () => view.requestMeasure(),
     destroy: () => view.destroy(),

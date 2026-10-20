@@ -55,8 +55,9 @@ Pyodide stays loaded across Run and Stop. Each Run loads the editor buffer under
 | `src/robots/types.ts` | `SimRobot`. A new platform implements this and still speaks `SensorFrame` / `ControlCommand`. |
 | `src/sim/` | World, vehicle, sensor models, camera, lidar overlay. |
 | `src/sandbox/` | Pyodide worker and its host. The worker imports only `src/api` and Pyodide. |
-| `src/editor/` | CodeMirror (Python) and the two starter programs. |
-| `src/lessons` | Not a package yet. The example list in `src/editor/examples.ts` is the seed for lessons. |
+| `src/editor/` | CodeMirror (Python) and the starter programs, including the particle filter. |
+| `src/lessons/` | Course markdown. One file per lesson. See below. |
+| `src/course/` | Sidebar, hash routes, KaTeX rendering, and saved progress. |
 
 ### Why these libraries
 
@@ -102,7 +103,7 @@ All of these are noisy. None of them is the body's true pose.
 | Wheel odometry | Rear-wheel speed, the actuator steering angle, and a pose. Physics already slips the tires. Each reset draws a speed bias (1.2% one-sigma) and a steering bias (0.004 rad one-sigma), plus white noise of 2 cm/s and 0.003 rad. Heading is the integral of the gyro yaw rate, not `(speed / wheelbase) * tan(steer)`. The steering bias is reported on `steering_angle` and is not integrated. A bicycle-model heading turned that small steer bias into a curvature bias, which walked one oval lap about 50 m off the car. The gyro bias is 0.0012 rad/s one-sigma (about 0.07 deg/s); over 60 s that is a few degrees and a few metres of cross-track, under 5% of distance, and still visible on the amber trail. The speed bias is what scales distance. `pose` starts at the origin on reset. It is not where the car is in the world. |
 | IMU | Yaw rate about body +z, and specific force in the robot frame (about +9.81 m/s² on +z when level and still). Gyro white noise is 0.002 rad/s with a 0.0015 rad/s bias chosen at reset. Accelerometer white noise is 0.04 m/s² with a 0.02 m/s² bias. |
 | Camera | Stub, `{ available: false }`. A later version can attach pixels here without changing the call shape. |
-| Task | `sensors.task.path`, a list of `{x, y}` waypoints in the odometry frame. Each world publishes one: the oval centerline, the city roundabout, the forest trail (out through the trunks, back on the west lane), and the warehouse loop on the open floor south of the bay rack. This is a map the robot is given. It is not the car's pose. |
+| Task | `sensors.task.path`, a list of `{x, y}` waypoints in the odometry frame. Each world publishes one: the oval centerline, the city roundabout, the forest trail (out through the trunks, back on the west lane), and the warehouse loop on the open floor south of the bay rack. `sensors.task.map` is a known floor plan in that same frame: `resolution`, `corner` (the cell-(0, 0) anchor — not a pose), `width`, `height`, `field` (base64 centimetres of distance to the nearest occupied cell; 0 is occupied), `segments` (wall edges packed `x0, y0, x1, y1`), and `stamp`. The grid covers the path plus the lidar's reach. This is a map the robot is given. It is not the car's pose. |
 
 The numbers live in `src/api/descriptor.ts` (`ACKERMANN_BUGGY.sensors`). That is the only sensor config. A Hokuyo UST-10LX, the usual F1TENTH lidar, is 270°, 1081 beams (0.25°), 10 m, ±40 mm, and 40 Hz. This sandbox keeps the 270° field and a 12 m range, publishes one scan per 20 Hz control tick, and keeps every fourth hardware angle (about 1°) so the raycasts stay interactive. Range noise of 2 cm sits inside the 1–3 cm band of that sensor. On a real F1TENTH car, wheel odometry plus a gyro is typically 1–5% of distance, a few metres per lap, not tens of metres. The pose here is built the same way: distance from the biased wheel speed, heading from the biased gyro. **Reset seed** replays the same noise. **Paths** draws the true trail (coloured by speed) and the odometry trail (amber) in the view. Both are render-only: they are not fields on the sensor frame and they are not posted to the worker.
 
@@ -124,14 +125,54 @@ Colors are `#rrggbb`. The 3D view and the lidar inset both draw the list. The in
 
 The **Pure pursuit** example tracks `sensors.task.path` with a lookahead and a small speed PID. It draws the path, the lookahead point, and the arc implied by the steering command. Because the pose is odometry, cross-track error against the true trail grows over the minute. The eval records mean and max cross-track, lap time, and contacts, and the path plot draws the planned path against the driven one.
 
+**PF pursuit** is the same law using a particle-filter mean instead of raw odometry. **PF kidnapped** starts that cloud spread over the free cells. Both draw particles and the estimate with `draw.points` and `draw.path`. The eval reads the short heading tick (`#ffe08a`) as the student's estimate and scores it against the true pose. That comparison stays in the eval. It is not a sensor.
+
 `npm run eval` runs every example in every world for 60 s of simulated time, headless, with the same physics, the same sensor code, and the same Python prelude as the browser. It writes `eval/out/<world>/<example>/metrics.json`, a top-down `path.png` (legend, metre scale bar, roads, curbs, and the trail outline), `eval/out/contact-sheet.png`, and `eval/out/summary.md`. `npm run eval:ci` is that same 60 s suite with gates on contacts, stuck time, and drift as a percent of distance. GitHub Actions runs it on every push to `main`.
 
-The editor examples are **Circle drive** (open-loop steer and throttle, turning left, on an open pad in each world), **Lidar avoid** (aim at the widest forward gap the car fits through, and slow down when the nose is close), **Wall follow** (PD on the distance to the right-hand wall from the −90° and −45° beams, with a creep into outside corners and a reverse when the bumper is in), and **Pure pursuit** (lookahead tracking of the world's reference path). Wall follow starts beside a real wall: the oval, a lot fence, the forest corridor, or a warehouse rack. Pure pursuit starts on the path, headed along the first segment. Ctrl or ⌘ Enter runs the buffer from anywhere on the page, including inside the editor.
+The editor examples are **Circle drive**, **Lidar avoid**, **Wall follow**, **Pure pursuit**, **PF pursuit**, and **PF kidnapped**. Wall follow starts beside a real wall. Pure pursuit and both particle-filter examples start on the path, headed along the first segment. Ctrl or ⌘ Enter runs the buffer from anywhere on the page, including inside the editor.
 
-## Adding a robot or a lesson
+Lessons are hash routes (`#/lesson/<module>/<slug>`, and `#/lesson/.../lab` for the simulator). `#/sandbox` is free play. GitHub Pages does not rewrite paths, so the course does not use history paths.
+
+## Adding a lesson
+
+Lessons are markdown files under `src/lessons/<module>/<slug>.md`. The course picks them up with a glob. No registry edit.
+
+```markdown
+---
+title: Wall following
+order: 3
+world: track
+spawn: wall
+starter: wall
+action: lab
+prerequisites: reactive/avoid
+status: ready
+---
+
+The reading. Use `$inline$` and `$$display$$` math. SVG can sit inline.
+
+## Try it
+
+1. First exercise.
+2. Second exercise.
+```
+
+| Field | Meaning |
+| --- | --- |
+| `title`, `order` | Sidebar label and order within the module. Module order is the list in `src/course/catalog.ts`. |
+| `world` | `city`, `track`, `forest`, or `warehouse`. |
+| `spawn` | `default`, `circle`, `avoid`, `wall`, `pursuit`, `mcl`, or `mcl-global`. These are the scenario spawns. |
+| `starter` | An example id from `src/editor/examples.ts`, or `none`. |
+| `action` | `lab` opens the editor, `drive` opens the car, `sandbox` jumps to free play. `status: soon` hides the button. |
+| `prerequisites` | Comma-separated lesson ids, `module/slug`. |
+| `status` | `ready` or `soon`. |
+
+`#/lesson/<module>/<slug>/lab` loads that world and spawn into the existing simulator and puts the starter (or the student's saved edit) in the editor. Edits and visited/completed marks live in `localStorage`. **Reset to starter** drops the saved edit.
+
+Math is [KaTeX](https://katex.org/), bundled from `node_modules`. Do not add a CDN link. The page is cross-origin isolated.
 
 - **Another robot.** Implement `SimRobot` in `src/robots/types.ts`. Build its collider in `src/sim/`, and keep returning a `SensorFrame`. The sandbox does not change.
-- **Lessons.** Add an entry beside the examples in `src/editor/examples.ts` (id, label, source). A world path is `referenceRoute` in `src/sim/routes.ts`, published on `sensors.task.path`. A second language can be another worker that speaks the same tick and result messages.
+- **Another example.** Add an entry in `src/editor/examples.ts`, then point a lesson's `starter` at its id. A world path is `referenceRoute` in `src/sim/routes.ts`, published on `sensors.task.path`. The known map is `buildKnownMap` in `src/sim/known-map.ts`.
 
 ## Deploy
 

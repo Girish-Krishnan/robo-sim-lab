@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { loadPyodide, type PyodideInterface } from "pyodide";
-import { ACKERMANN_BUGGY, clampCommand, type SensorFrame } from "../api";
+import { ACKERMANN_BUGGY, clampCommand, parseDrawOps, type SensorFrame } from "../api";
 import { STUDENT_PRELUDE } from "../sandbox/prelude";
 import type { Policy } from "./simulate";
 
@@ -34,12 +34,31 @@ export function loadStudentPolicy(pyodide: PyodideInterface, source: string): Po
   const defined = pyodide.runPython("callable(_robo_ns.get('control'))");
   if (defined !== true) throw new Error("Example did not define control(sensors).");
   const limits = ACKERMANN_BUGGY.limits;
-  return (frame: SensorFrame) => {
+  const controlMs: number[] = [];
+  const policy: Policy = (frame: SensorFrame) => {
     pyodide.globals.set("_robo_raw", JSON.stringify(frame));
+    const started = performance.now();
     const output = pyodide.runPython("_robo_call(_robo_raw)") as { get?: (index: number) => unknown; destroy?: () => void };
+    controlMs.push(performance.now() - started);
     const steering = Number(output.get?.(0));
     const throttle = Number(output.get?.(1));
+    const estimate = estimateFromDraw(output.get?.(2));
     output.destroy?.();
-    return clampCommand({ steering, throttle }, limits);
+    return { ...clampCommand({ steering, throttle }, limits), estimate };
   };
+  policy.controlMs = controlMs;
+  return policy;
+}
+
+/** The heading tick is the short path drawn in #ffe08a. Its start is the estimate. */
+function estimateFromDraw(raw: unknown): { x: number; y: number; yaw: number } | undefined {
+  const ops = parseDrawOps(typeof raw === "string" ? raw : "");
+  for (let i = ops.length - 1; i >= 0; i--) {
+    const op = ops[i];
+    if (!op || op.kind !== "path" || op.color.toLowerCase() !== "#ffe08a" || op.points.length < 2) continue;
+    const start = op.points[0]!;
+    const end = op.points[1]!;
+    return { x: start.x, y: start.y, yaw: Math.atan2(end.y - start.y, end.x - start.x) };
+  }
+  return undefined;
 }

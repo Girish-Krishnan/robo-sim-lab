@@ -1,5 +1,5 @@
 import { clamp } from "./math";
-import type { ControlCommand, RobotLimits, SensorFrame, TaskInfo } from "./types";
+import type { ControlCommand, KnownMap, RobotLimits, SensorFrame, TaskInfo } from "./types";
 
 /**
  * Keys that must never appear anywhere in a message posted to user code.
@@ -54,6 +54,12 @@ export const ALLOWED_SENSOR_KEYS = [
   "height",
   "task",
   "path",
+  "map",
+  "resolution",
+  "corner",
+  "field",
+  "segments",
+  "stamp",
 ] as const;
 
 const BANNED = new Set<string>(BANNED_SENSOR_KEYS.map((key) => key.toLowerCase()));
@@ -103,6 +109,16 @@ export function publishSensorFrame(frame: SensorFrame): SensorFrame {
   };
 }
 
+export const EMPTY_MAP: KnownMap = {
+  resolution: 0.5,
+  corner: { x: 0, y: 0 },
+  width: 0,
+  height: 0,
+  field: "",
+  segments: [],
+  stamp: 0,
+};
+
 function copyTask(task: TaskInfo | undefined): TaskInfo {
   const source = task?.path ?? [];
   const path = [];
@@ -111,7 +127,34 @@ function copyTask(task: TaskInfo | undefined): TaskInfo {
     const point = source[i];
     path.push({ x: finite(point?.x ?? 0, 0), y: finite(point?.y ?? 0, 0) });
   }
-  return { path };
+  return { path, map: copyMap(task?.map) };
+}
+
+function copyMap(map: KnownMap | undefined): KnownMap {
+  if (!map) return EMPTY_MAP;
+  const width = Math.max(0, Math.min(256, Math.round(finite(map.width, 0))));
+  const height = Math.max(0, Math.min(256, Math.round(finite(map.height, 0))));
+  const source = map.segments ?? [];
+  const segments: number[] = [];
+  const count = Math.min(source.length, 2000);
+  for (let i = 0; i < count; i++) segments.push(finite(source[i] ?? 0, 0));
+  return {
+    resolution: finite(map.resolution, 0.5),
+    corner: { x: finite(map.corner?.x ?? 0, 0), y: finite(map.corner?.y ?? 0, 0) },
+    width,
+    height,
+    field: sanitizeField(map.field),
+    segments,
+    stamp: finite(map.stamp, 0) >>> 0,
+  };
+}
+
+function sanitizeField(value: unknown): string {
+  if (typeof value !== "string") return "";
+  const trimmed = value.trim();
+  if (trimmed.length > 120000) return "";
+  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(trimmed)) return "";
+  return trimmed;
 }
 
 export function assertNoBannedKeys(value: unknown, path = "sensors"): void {

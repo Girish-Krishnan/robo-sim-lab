@@ -8,3 +8,4 @@ coverage
 eval/out
 eval/before
 eval/ci
+eval/probe

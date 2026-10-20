@@ -1,5 +1,5 @@
 import type RAPIER from "@dimforge/rapier3d-compat";
-import { ACKERMANN_BUGGY, createOdometry, createSeededRandom, type SensorFrame } from "../api";
+import { ACKERMANN_BUGGY, EMPTY_MAP, createOdometry, createSeededRandom, type SensorFrame } from "../api";
 import {
   beamDirection,
   dot,
@@ -103,7 +103,7 @@ export class SensorSuite {
       },
       imu,
       camera: { available: false, width: 0, height: 0 },
-      task: { path: [] },
+      task: { path: [], map: EMPTY_MAP },
     };
   }
 

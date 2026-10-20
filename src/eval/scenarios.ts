@@ -8,7 +8,7 @@ import { buildWarehouseSolids, WAREHOUSE_SPAWN } from "../sim/worlds/warehouse";
 import type { WorldId } from "../sim/worlds";
 
 export const EVAL_WORLDS = ["city", "track", "forest", "warehouse"] as const;
-export const EVAL_EXAMPLES = ["circle", "avoid", "wall", "pursuit"] as const;
+export const EVAL_EXAMPLES = ["circle", "avoid", "wall", "pursuit", "mcl"] as const;
 
 export type EvalWorld = (typeof EVAL_WORLDS)[number];
 export type EvalExample = (typeof EVAL_EXAMPLES)[number];
@@ -117,10 +117,10 @@ export function pursuitSpawn(world: EvalWorld): SpawnPose {
   return { x: start.x, y: 0.84, z: start.z, yaw };
 }
 
-export function spawnFor(world: EvalWorld, example: EvalExample, mode: "scenario" | "default"): SpawnPose {
+export function spawnFor(world: EvalWorld, example: string, mode: "scenario" | "default"): SpawnPose {
   if (mode !== "scenario") return worldSpawn(world);
   if (example === "circle") return circleSpawn(world);
   if (example === "wall") return wallSpawn(world);
-  if (example === "pursuit") return pursuitSpawn(world);
+  if (example === "pursuit" || example === "mcl" || example === "mcl-global") return pursuitSpawn(world);
   return AVOID_SPAWN[world] ?? worldSpawn(world);
 }

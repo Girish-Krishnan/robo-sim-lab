@@ -33,6 +33,7 @@
         </div>
 
         <div class="header-actions">
+          <button id="toc-toggle" type="button">Lessons</button>
           <label class="header-select">
             World
             <select id="world" aria-label="Environment"></select>
@@ -55,6 +56,10 @@
         </div>
       </header>
 
+      <div id="shell">
+        <nav id="toc" aria-label="Lessons"></nav>
+        <div id="stage">
+          <article id="lesson" hidden></article>
       <main>
         <div id="viewport">
           <div id="loading">
@@ -95,6 +100,7 @@
             <button id="run" type="button" class="primary">Run</button>
             <button id="stop" type="button">Stop</button>
             <button id="reset" type="button">Reset world</button>
+            <button id="reset-starter" type="button" hidden>Reset to starter</button>
             <span class="shortcut">Ctrl/⌘ Enter</span>
           </div>
           <div class="console-wrap">
@@ -106,6 +112,8 @@
           </div>
         </aside>
       </main>
+        </div>
+      </div>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

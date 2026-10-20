@@ -1,4 +1,5 @@
 import { ACKERMANN_BUGGY } from "../api";
+import { particleFilterSource } from "./particle-filter";
 
 export interface CodeExample {
   id: string;
@@ -552,6 +553,8 @@ export const EXAMPLES: CodeExample[] = [
   { id: "avoid", label: "Lidar avoid", source: avoid },
   { id: "wall", label: "Wall follow", source: wall },
   { id: "pursuit", label: "Pure pursuit", source: pursuit },
+  { id: "mcl", label: "PF pursuit", source: particleFilterSource("track") },
+  { id: "mcl-global", label: "PF kidnapped", source: particleFilterSource("global") },
 ];
 
 export const DEFAULT_EXAMPLE = EXAMPLES[0]!;

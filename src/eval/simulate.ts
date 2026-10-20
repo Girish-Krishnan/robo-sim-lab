@@ -13,6 +13,7 @@ import {
 } from "../api";
 import { chaseGroundFraction, placeChaseCamera } from "../sim/camera";
 import { solidQuaternion, type Solid } from "../sim/course";
+import { buildKnownMap } from "../sim/known-map";
 import { referenceRoute, type RoutePoint } from "../sim/routes";
 import { AckermannBuggy, type SpawnPose } from "../sim/vehicle";
 import type { EvalExample, EvalWorld } from "./scenarios";
@@ -27,6 +28,9 @@ export interface TrailSample {
   odomX: number;
   odomZ: number;
   hit: boolean;
+  /** Particle-filter estimate placed in the world. Absent when the policy did not publish one. */
+  estX?: number;
+  estZ?: number;
 }
 
 export interface ShotPose {
@@ -60,11 +64,20 @@ export interface RunMetrics {
   laps: number;
   lapTimes: number[];
   odomDrift: number;
-  /** Metres from the true pose to the reference polyline. Zero outside pure pursuit. */
+  /** Metres from the true pose to the reference polyline. Zero outside path trackers. */
   crossTrackMean: number;
   crossTrackMax: number;
   crossTrackEarly: number;
   crossTrackLate: number;
+  /** Estimate versus true pose. Zero when the policy publishes no estimate. */
+  poseErrorMean: number;
+  poseErrorMax: number;
+  /** Radians. */
+  headingErrorMean: number;
+  headingErrorMax: number;
+  /** Milliseconds inside the Python control call. Zero for a non-Python policy. */
+  controlMsMean: number;
+  controlMsMax: number;
   final: { x: number; z: number; yaw: number };
   shots: ShotPose[];
   /** Lower half of the chase frame sees the ground at the spawn and at each still. */
@@ -77,7 +90,12 @@ export interface Episode {
   solids: Solid[];
 }
 
-export type Policy = (frame: SensorFrame) => { steering: number; throttle: number };
+export type Policy = ((frame: SensorFrame) => {
+  steering: number;
+  throttle: number;
+  /** Student estimate in the odometry frame. Not ground truth. */
+  estimate?: { x: number; y: number; yaw: number };
+}) & { controlMs?: number[] };
 
 const SHOT_TIMES = [5, 20, 40, 55];
 const STUCK_SPEED = 0.1;
@@ -189,6 +207,8 @@ export function runEpisode(
   robot.reset(options.spawn);
   const route = referenceRoute(options.world);
   const taskPath = route.map((point) => worldToOdom(options.spawn, point));
+  const taskMap = buildKnownMap(solids, options.spawn, taskPath);
+  const tracksPath = options.example === "pursuit" || options.example === "mcl";
 
   const steps = Math.round(options.seconds * PHYSICS_HZ);
   let sensorAccumulator = 0;
@@ -210,6 +230,11 @@ export function runEpisode(
   let prevX = options.spawn.x;
   let prevZ = options.spawn.z;
   let lastOdom = { x: options.spawn.x, z: options.spawn.z };
+  let poseSum = 0;
+  let poseMax = 0;
+  let headSum = 0;
+  let headMax = 0;
+  let poseCount = 0;
 
   for (let i = 0; i < steps; i++) {
     robot.preStep(PHYSICS_DT);
@@ -264,7 +289,7 @@ export function runEpisode(
       sensorAccumulator = 0;
       const raw = robot.sampleSensors(sampleDt);
       raw.time = simTime;
-      raw.task = { path: taskPath };
+      raw.task = { path: taskPath, map: taskMap };
       const frame = publishSensorFrame(raw);
       assertNoBannedKeys(frame);
       for (const range of frame.lidar.ranges) minLidar = Math.min(minLidar, range);
@@ -278,7 +303,7 @@ export function runEpisode(
         },
         0,
       );
-      trail.push({
+      const sample: TrailSample = {
         t: simTime,
         x: focus.x,
         z: focus.z,
@@ -286,7 +311,22 @@ export function runEpisode(
         odomX: odom.x,
         odomZ: odom.z,
         hit: started,
-      });
+      };
+      if (command.estimate && Number.isFinite(command.estimate.x) && Number.isFinite(command.estimate.y)) {
+        const estimated = odomToWorld(options.spawn, command.estimate);
+        sample.estX = estimated.x;
+        sample.estZ = estimated.z;
+        const truth = worldToOdom(options.spawn, { x: focus.x, z: focus.z });
+        const position = Math.hypot(command.estimate.x - truth.x, command.estimate.y - truth.y);
+        const truthYaw = wrapAngle(options.spawn.yaw - focus.yaw);
+        const heading = Math.abs(wrapAngle(command.estimate.yaw - truthYaw));
+        poseSum += position;
+        poseMax = Math.max(poseMax, position);
+        headSum += heading;
+        headMax = Math.max(headMax, heading);
+        poseCount += 1;
+      }
+      trail.push(sample);
     }
 
     for (const t of SHOT_TIMES) {
@@ -297,19 +337,18 @@ export function runEpisode(
   }
 
   if (slowFor > STUCK_HOLD) stuckTime += slowFor;
-  const laps =
-    options.example === "pursuit"
-      ? countRouteLaps(route, trail)
-      : options.world === "track"
-        ? countLaps(options.spawn.z, trail)
-        : { laps: 0, lapTimes: [] };
+  const laps = tracksPath
+    ? countRouteLaps(route, trail)
+    : options.world === "track"
+      ? countLaps(options.spawn.z, trail)
+      : { laps: 0, lapTimes: [] };
   let crossSum = 0;
   let crossMax = 0;
   let earlySum = 0;
   let earlyCount = 0;
   let lateSum = 0;
   let lateCount = 0;
-  if (options.example === "pursuit") {
+  if (tracksPath) {
     for (const sample of trail) {
       const error = distanceToRoute(route, sample.x, sample.z);
       crossSum += error;
@@ -356,10 +395,16 @@ export function runEpisode(
     laps: laps.laps,
     lapTimes: laps.lapTimes,
     odomDrift: round(odomDrift),
-    crossTrackMean: round(trail.length > 0 && options.example === "pursuit" ? crossSum / trail.length : 0),
+    crossTrackMean: round(trail.length > 0 && tracksPath ? crossSum / trail.length : 0),
     crossTrackMax: round(crossMax),
     crossTrackEarly: round(earlyCount > 0 ? earlySum / earlyCount : 0),
     crossTrackLate: round(lateCount > 0 ? lateSum / lateCount : 0),
+    poseErrorMean: round(poseCount > 0 ? poseSum / poseCount : 0),
+    poseErrorMax: round(poseMax),
+    headingErrorMean: round(poseCount > 0 ? headSum / poseCount : 0),
+    headingErrorMax: round(headMax),
+    controlMsMean: round(meanOf(options.policy.controlMs)),
+    controlMsMax: round(maxOf(options.policy.controlMs)),
     final: { x: round(end.x), z: round(end.z), yaw: round(end.yaw) },
     shots,
     chaseGround,
@@ -369,4 +414,22 @@ export function runEpisode(
 
 function round(value: number): number {
   return Number(value.toFixed(3));
+}
+
+function wrapAngle(angle: number): number {
+  return Math.atan2(Math.sin(angle), Math.cos(angle));
+}
+
+function meanOf(values: number[] | undefined): number {
+  if (!values || values.length === 0) return 0;
+  let sum = 0;
+  for (const value of values) sum += value;
+  return sum / values.length;
+}
+
+function maxOf(values: number[] | undefined): number {
+  if (!values || values.length === 0) return 0;
+  let max = 0;
+  for (const value of values) max = Math.max(max, value);
+  return max;
 }

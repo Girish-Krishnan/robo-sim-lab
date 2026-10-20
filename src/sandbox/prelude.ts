@@ -40,10 +40,27 @@ def _robo_frame(raw):
             ),
         ),
         camera=SimpleNamespace(available=False),
-        task=SimpleNamespace(path=[
-            SimpleNamespace(x=float(point["x"]), y=float(point["y"]))
-            for point in (raw.get("task") or {}).get("path") or []
-        ]),
+        task=_robo_task(raw.get("task") or {}),
+    )
+
+def _robo_task(task):
+    path = [
+        SimpleNamespace(x=float(point["x"]), y=float(point["y"]))
+        for point in task.get("path") or []
+    ]
+    raw_map = task.get("map") or {}
+    corner = raw_map.get("corner") or {}
+    return SimpleNamespace(
+        path=path,
+        map=SimpleNamespace(
+            resolution=float(raw_map.get("resolution") or 0.5),
+            corner=SimpleNamespace(x=float(corner.get("x") or 0.0), y=float(corner.get("y") or 0.0)),
+            width=int(raw_map.get("width") or 0),
+            height=int(raw_map.get("height") or 0),
+            field=str(raw_map.get("field") or ""),
+            segments=list(raw_map.get("segments") or []),
+            stamp=int(raw_map.get("stamp") or 0),
+        ),
     )
 
 class _RoboDraw:

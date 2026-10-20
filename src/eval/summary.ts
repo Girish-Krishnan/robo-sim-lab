@@ -27,17 +27,20 @@ export function renderSummary(rows: Compared[]): string {
     "",
     "The path plot legend labels the speed colour bar in m/s, the true path, the odometry trail, and contacts. Pure pursuit also draws the planned path. A scale bar is in metres. Roads, curbs, the oval asphalt, and the forest trail are drawn under the path.",
     "Pure pursuit cross-track is the distance from the true pose to the reference polyline. It grows when odometry heading drifts. That is the point of the lesson.",
+    "PF pursuit (mcl) is the same law driven by a particle-filter mean. The path plot adds that estimate in red, beside truth and odometry. Pose error is the estimate against the true pose in the odometry frame. Control time is the Python tick in this runtime.",
     ...pursuitNotes(rows),
+    ...localizationNotes(rows),
     "",
   ].join("\n");
 }
 
 function cells(row: RunMetrics, tag?: string): string {
   const example = tag ? `${row.example} (${tag})` : row.example;
-  const laps = row.world === "track" || row.example === "pursuit" ? String(row.laps) : "—";
+  const tracks = row.example === "pursuit" || row.example === "mcl";
+  const laps = row.world === "track" || tracks ? String(row.laps) : "—";
   const lapTimes = row.lapTimes.length ? row.lapTimes.join(", ") : "—";
   const cross =
-    row.example === "pursuit" && row.crossTrackMean !== undefined
+    tracks && row.crossTrackMean !== undefined
       ? `${row.crossTrackMean.toFixed(2)} / ${row.crossTrackMax.toFixed(2)}`
       : "—";
   return [
@@ -58,6 +61,19 @@ function cells(row: RunMetrics, tag?: string): string {
     driftPercent(row).toFixed(1),
     cross,
   ].join(" | ");
+}
+
+function localizationNotes(rows: Compared[]): string[] {
+  const notes: string[] = [];
+  for (const row of rows) {
+    const metrics = row.after;
+    if (metrics.example !== "mcl" || metrics.poseErrorMean === undefined) continue;
+    const heading = ((metrics.headingErrorMean ?? 0) * 180) / Math.PI;
+    notes.push(
+      `${metrics.world} mcl pose error mean ${metrics.poseErrorMean.toFixed(2)} m max ${metrics.poseErrorMax.toFixed(2)} m, heading mean ${heading.toFixed(1)} deg, control ${metrics.controlMsMean.toFixed(1)} / ${metrics.controlMsMax.toFixed(1)} ms.`,
+    );
+  }
+  return notes;
 }
 
 function pursuitNotes(rows: Compared[]): string[] {
@@ -88,6 +104,9 @@ const AVOID_CONTACTS: Record<string, number> = { city: 2, track: 0, forest: 0, w
 const AVOID_DISTANCE: Record<string, number> = { city: 110, track: 110, forest: 80, warehouse: 90 };
 const PURSUIT_CONTACTS: Record<string, number> = { city: 0, track: 0, forest: 0, warehouse: 0 };
 const PURSUIT_DISTANCE: Record<string, number> = { city: 120, track: 160, forest: 100, warehouse: 140 };
+const MCL_DISTANCE: Record<string, number> = { city: 120, track: 160, forest: 140, warehouse: 140 };
+const MCL_CROSS: Record<string, number> = { city: 1.2, track: 0.6, forest: 0.9, warehouse: 1.5 };
+const MCL_POSE: Record<string, number> = { city: 1.6, track: 0.8, forest: 1.0, warehouse: 2.0 };
 
 export function regressionErrors(row: RunMetrics): string[] {
   const errors: string[] = [];
@@ -127,6 +146,23 @@ export function regressionErrors(row: RunMetrics): string[] {
     if (row.distance < distance) errors.push(`${name} travelled ${row.distance.toFixed(1)} m`);
     if (row.crossTrackMean > 3) errors.push(`${name} cross-track mean ${row.crossTrackMean.toFixed(2)} m`);
     if (row.laps < 1) errors.push(`${name} laps ${row.laps}`);
+  }
+  if (row.example === "mcl") {
+    if (row.collisionCount > 0) errors.push(`${name} collisions ${row.collisionCount}`);
+    if (row.stuckTime > 2) errors.push(`${name} stuck ${row.stuckTime.toFixed(1)} s`);
+    if (row.distance < (MCL_DISTANCE[row.world] ?? 100)) errors.push(`${name} travelled ${row.distance.toFixed(1)} m`);
+    if (row.crossTrackMean > (MCL_CROSS[row.world] ?? 1.5)) {
+      errors.push(`${name} cross-track mean ${row.crossTrackMean.toFixed(2)} m`);
+    }
+    if (row.world === "track" && row.crossTrackLate > 1) {
+      errors.push(`${name} late cross-track ${row.crossTrackLate.toFixed(2)} m`);
+    }
+    if (row.laps < 1) errors.push(`${name} laps ${row.laps}`);
+    if ((row.poseErrorMean ?? 0) > (MCL_POSE[row.world] ?? 2)) {
+      errors.push(`${name} pose error ${row.poseErrorMean.toFixed(2)} m`);
+    }
+    if ((row.controlMsMean ?? 0) > 20) errors.push(`${name} control ${row.controlMsMean.toFixed(1)} ms`);
+    if ((row.controlMsMax ?? 0) > 45) errors.push(`${name} control max ${row.controlMsMax.toFixed(1)} ms`);
   }
   return errors;
 }

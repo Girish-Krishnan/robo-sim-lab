@@ -37,7 +37,10 @@ describe("publishSensorFrame", () => {
 
     const published = publishSensorFrame(dirty);
     expect(Object.keys(published).sort()).toEqual(["camera", "dt", "imu", "lidar", "odometry", "task", "time"]);
-    expect(published.task).toEqual({ path: [] });
+    expect(published.task).toEqual({
+      path: [],
+      map: { resolution: 0.5, corner: { x: 0, y: 0 }, width: 0, height: 0, field: "", segments: [], stamp: 0 },
+    });
     expect(Object.keys(published.odometry).sort()).toEqual(["pose", "speed", "steeringAngle"]);
     expect(Object.keys(published.odometry.pose).sort()).toEqual(["x", "y", "yaw"]);
     expect(Object.keys(published.lidar).sort()).toEqual(["angles", "maxRange", "ranges"]);
@@ -167,9 +170,13 @@ describe("sandbox source", () => {
     expect(controller.includes("terminate")).toBe(true);
   });
 
-  it("ships Python examples that define control(sensors)", () => {
+  it("ships Python examples that define control(sensors)", async () => {
     const examples = readFileSync("src/editor/examples.ts", "utf8");
+    const filter = readFileSync("src/editor/particle-filter.ts", "utf8");
     expect(examples.includes("function update")).toBe(false);
-    expect(examples.match(/def control\(sensors\)/g)?.length).toBe(4);
+    expect(filter.includes("groundTruth")).toBe(false);
+    const { EXAMPLES } = await import("../src/editor/examples");
+    expect(EXAMPLES).toHaveLength(6);
+    for (const example of EXAMPLES) expect(example.source).toContain("def control(sensors)");
   });
 });

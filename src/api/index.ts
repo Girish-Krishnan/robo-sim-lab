@@ -7,6 +7,7 @@ export {
   BANNED_SENSOR_KEYS,
   assertNoBannedKeys,
   clampCommand,
+  EMPTY_MAP,
   publishSensorFrame,
 } from "./protocol";
 export { parseDrawOps } from "./draw";
@@ -16,6 +17,7 @@ export type {
   ControlCommand,
   ImuSample,
   LidarScan,
+  KnownMap,
   MapPoint,
   OdometryPose,
   RobotDescriptor,

@@ -1,6 +1,6 @@
 import RAPIER from "@dimforge/rapier3d-compat";
 import { ACKERMANN_BUGGY, CONTROL_DT, PHYSICS_DT, clampCommand, odomToWorld, worldToOdom, type DrawOp } from "./api";
-import { spawnFor, type EvalExample } from "./eval/scenarios";
+import { solidsFor, spawnFor } from "./eval/scenarios";
 import { EXAMPLES, DEFAULT_EXAMPLE } from "./editor/examples";
 import { createEditor, type CodeEditor } from "./editor/editor";
 import { ChaseCamera } from "./sim/camera";
@@ -10,6 +10,7 @@ import { bindPropLoader } from "./sim/props";
 import { bindTextureLoader } from "./sim/surfaces";
 import { DebugDraw } from "./sim/debug-draw";
 import { PathOverlay } from "./sim/path-overlay";
+import { buildKnownMap } from "./sim/known-map";
 import { referenceRoute } from "./sim/routes";
 import { AckermannBuggy, SERVICE_BRAKE, STOP_BRAKE, type SpawnPose } from "./sim/vehicle";
 import {
@@ -22,6 +23,7 @@ import {
   type SimWorld,
   type WorldId,
 } from "./sim/worlds";
+import { mountCourse } from "./course/shell";
 import { CodeSandbox, type SandboxState } from "./sandbox/controller";
 import { ConsolePanel } from "./ui/console-panel";
 import { Hud, type AppMode } from "./ui/hud";
@@ -45,6 +47,7 @@ export async function mountApp(): Promise<void> {
 
   let sandbox: CodeSandbox | null = null;
   let editor: CodeEditor | null = null;
+  let onCodeChange: (source: string) => void = () => undefined;
 
   const setRunState = (state: SandboxState) => {
     runState.dataset.state = state;
@@ -117,7 +120,7 @@ export async function mountApp(): Promise<void> {
     });
     const code = sandbox;
 
-    editor = createEditor(mustGet("editor"), DEFAULT_EXAMPLE.source, () => runProgram());
+    editor = createEditor(mustGet("editor"), DEFAULT_EXAMPLE.source, () => runProgram(), (source) => onCodeChange(source));
     const codeEditor = editor;
     for (const example of EXAMPLES) {
       const option = document.createElement("option");
@@ -141,9 +144,25 @@ export async function mountApp(): Promise<void> {
       );
     };
 
+    let lessonSpawn: SpawnPose | null = null;
+    let lessonWorld: string | null = null;
+    let mapCache: { key: string; map: ReturnType<typeof buildKnownMap> } | null = null;
+    const taskMap = () => {
+      const key = `${yard.id}|${activeSpawn.x.toFixed(2)}|${activeSpawn.z.toFixed(2)}|${activeSpawn.yaw.toFixed(3)}`;
+      if (mapCache?.key === key) return mapCache.map;
+      const map = buildKnownMap(
+        solidsFor(yard.id),
+        activeSpawn,
+        referenceRoute(yard.id).map((point) => worldToOdom(activeSpawn, point)),
+      );
+      mapCache = { key, map };
+      return map;
+    };
+
     const currentSpawn = (): SpawnPose => {
+      if (lessonSpawn && lessonWorld === yard.id) return lessonSpawn;
       const example = exampleSelect.value;
-      if (mode === "code" && isExample(example)) return spawnFor(yard.id, example, "scenario");
+      if (mode === "code" && EXAMPLES.some((item) => item.id === example)) return spawnFor(yard.id, example, "scenario");
       return yard.spawn;
     };
 
@@ -223,6 +242,7 @@ export async function mountApp(): Promise<void> {
         disposeWorld(world, yard);
         yard = await mountWorld(id, RAPIER, world, view.scene, graphics);
         view.setAtmosphere(yard.atmosphere);
+        worldSelect.value = id;
         activeSpawn = currentSpawn();
         paths.clear();
         drawOps = [];
@@ -317,6 +337,29 @@ export async function mountApp(): Promise<void> {
     setMode("drive");
     loading.hidden = true;
 
+    mountCourse({
+      setWorld: async (id) => {
+        await switchWorld(id, true);
+      },
+      setMode,
+      setPaused: (next) => {
+        paused = next;
+      },
+      setLessonSpawn: (spawn, worldId) => {
+        lessonSpawn = spawn;
+        lessonWorld = worldId;
+      },
+      resetWorld,
+      setCode: (source) => codeEditor.setValue(source),
+      onCodeChange: (listener) => {
+        onCodeChange = listener;
+      },
+      relayout: () => {
+        view.resize(viewport.clientWidth, viewport.clientHeight);
+        codeEditor.relayout();
+      },
+    });
+
     window.roboSim = {
       ready: true,
       resetToSeed,
@@ -334,7 +377,7 @@ export async function mountApp(): Promise<void> {
         await switchWorld(id, true);
       },
       setExample: (id) => {
-        if (!isExample(id)) return;
+        if (!EXAMPLES.some((item) => item.id === id)) return;
         exampleSelect.value = id;
         exampleSelect.dispatchEvent(new Event("change"));
       },
@@ -372,6 +415,7 @@ export async function mountApp(): Promise<void> {
               sensors.time = simTime;
               sensors.task = {
                 path: referenceRoute(yard.id).map((point) => worldToOdom(activeSpawn, point)),
+                map: taskMap(),
               };
               studentPose = sensors.odometry.pose;
               if (mode === "code") code.offer(sensors);
@@ -413,10 +457,6 @@ function mustGet<T extends HTMLElement>(id: string): T {
 function readSeed(input: HTMLInputElement): number {
   const value = Number(input.value);
   return Number.isFinite(value) ? value >>> 0 : 1;
-}
-
-function isExample(id: string): id is EvalExample {
-  return id === "circle" || id === "avoid" || id === "wall" || id === "pursuit";
 }
 
 function isTypingTarget(target: EventTarget | null): boolean {
