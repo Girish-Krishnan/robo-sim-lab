@@ -34,14 +34,19 @@ export function buildWarehouseSolids(): Solid[] {
   const shelf = (x: number, z: number, length: number) => {
     solids.push(cuboid(x, z, 1.35, 2.35, length, "shelf"));
   };
-  // Main aisle is about 16 m between shelf faces so a teaching circle
-  // (radius ~5.4 m, body out to ~6.4 m) fits in the south bay.
-  // Side aisles stay wide enough for the car.
-  shelf(-9.4, 14, 26);
-  shelf(9.4, 14, 26);
-  shelf(-15, 14, 26);
-  shelf(15, 14, 26);
+  // Aisle shelves sit north of the bay rack. Their south faces are at
+  // z=22, clear of the outside orbit (the car rides ~3.2 m off the rack,
+  // so the north lane is around z=18).
+  shelf(-9.4, 27, 10);
+  shelf(9.4, 27, 10);
+  shelf(-16.2, 26, 10);
+  shelf(16.2, 26, 10);
   solids.push(cuboid(0, 33.2, 16.2, 2.35, 1.2, "shelf"));
+  // 16 m by 16 m. The south face stays at z=-1.2, outside the circle
+  // envelope around (0, -8). Each face is long enough for the wall
+  // follower to settle and brake before the corner. The outside of
+  // this rack is the wall-follow loop and is kept empty.
+  solids.push(cuboid(0, 6.8, 16, 2.2, 16, "shelf"));
 
   // Perimeter walls. The south wall sits behind the open bay.
   solids.push(cuboid(0, 36, 36, 3.2, 0.4, "concrete"));
@@ -49,13 +54,13 @@ export function buildWarehouseSolids(): Solid[] {
   solids.push(cuboid(-17.8, 8, 0.4, 3.2, 56, "concrete"));
   solids.push(cuboid(17.8, 8, 0.4, 3.2, 56, "concrete"));
 
-  // Pallets in the main aisle. Each leaves a gap wider than the car.
-  solids.push(cuboid(2.15, 6, 1.2, 1.35, 1.05, "pallet", 0.08));
-  solids.push(cuboid(-2.05, 14, 1.15, 1.4, 1.1, "pallet", -0.12));
-  solids.push(cuboid(1.9, 22, 1.2, 1.3, 1.15, "pallet", 0.2));
-  solids.push(cuboid(-1.7, 28, 1.05, 1.45, 1.05, "crate", -0.05));
-  solids.push(cuboid(-12.2, 8, 1.1, 1.35, 1.0, "pallet", 0.4));
-  solids.push(cuboid(12.2, 18, 1.15, 1.4, 1.05, "barrel"));
+  // A loose slalom in the centre aisle. Each gap is several metres, so
+  // lidar-avoid can weave without planting on a pallet. The rack's
+  // outside lane stays empty for wall follow.
+  solids.push(cuboid(5.0, 23.2, 1.2, 1.35, 1.05, "pallet", 0.08));
+  solids.push(cuboid(-5.0, 26.8, 1.15, 1.4, 1.1, "pallet", -0.12));
+  solids.push(cuboid(4.2, 30.2, 1.05, 1.45, 1.05, "crate", 0.15));
+  solids.push(cuboid(0.2, 24.6, 1.15, 1.4, 1.05, "barrel"));
   return solids;
 }
 

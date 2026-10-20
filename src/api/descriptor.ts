@@ -38,14 +38,23 @@ export const ACKERMANN_BUGGY: RobotDescriptor = {
     },
     odometry: {
       speedStdDev: 0.02,
+      // 1.2% scale factor. This stretches distance. It does not turn the heading.
       speedBiasStdDev: 0.012,
       steeringStdDev: 0.003,
+      // Reported on steering_angle only. Heading is the gyro integral, so this
+      // bias does not walk the pose around a curve.
       steeringBiasStdDev: 0.004,
     },
     imu: {
-      // MEMS gyro, published at the control rate. Bias is chosen once per reset.
+      // MEMS gyro at the control rate, after a startup calibration.
+      // 0.0012 rad/s is about 0.07 deg/s. Seed 1 draws nearly one sigma,
+      // so the integrated heading walks about 4 deg in 60 s. On a straight
+      // that is a few metres of cross-track, under 5% of distance. White
+      // noise is small next to that bias. A larger residual (a few tenths
+      // of a deg/s) is what previously turned one oval lap into a 50 m miss;
+      // that was the bicycle-model steering bias, and it is not used here.
       yawRateStdDev: 0.002,
-      yawRateBiasStdDev: 0.0015,
+      yawRateBiasStdDev: 0.0012,
       accelStdDev: 0.04,
       accelBiasStdDev: 0.02,
     },

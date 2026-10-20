@@ -33,7 +33,7 @@ export const CIRCLE_ENVELOPE = circleRadius() + ACKERMANN_BUGGY.trackWidth / 2 +
 const CIRCLE_CENTER: Record<EvalWorld, { x: number; z: number }> = {
   city: { x: 5.5, z: -30 },
   track: { x: 0, z: 0 },
-  forest: { x: 0, z: -20 },
+  forest: { x: 0, z: -34 },
   warehouse: { x: 0, z: -8 },
 };
 
@@ -87,10 +87,20 @@ export function solidsFor(world: EvalWorld): Solid[] {
  * The oval spawn is already on the east straight with the inner wall to the right.
  */
 const WALL_SPAWN: Record<EvalWorld, SpawnPose> = {
-  city: { x: 8.6, y: 0.84, z: -6, yaw: 0 },
+  // Outside the south-west lot, east fence on the driver's right.
+  city: { x: -14.4, y: 0.84, z: -30, yaw: 0 },
   track: { x: 16, y: 0.84, z: -20, yaw: 0 },
-  forest: { x: -4.2, y: 0.84, z: -2, yaw: 0 },
-  warehouse: { x: -5.7, y: 0.84, z: 4, yaw: 0 },
+  // West corridor fence on the right, heading up the trail.
+  forest: { x: 19.0, y: 0.84, z: 4, yaw: 0 },
+  // South face of the bay rack, wall on the right, heading east.
+  warehouse: { x: -5, y: 0.84, z: -4.6, yaw: -Math.PI / 2 },
+};
+
+/** Forest avoid starts on the trail, aimed at the rocks, inside the tree corridor. */
+const AVOID_SPAWN: Partial<Record<EvalWorld, SpawnPose>> = {
+  forest: { x: 0.2, y: 0.84, z: -2, yaw: 0 },
+  // Just north of the bay rack, aimed up the aisle at the pallets.
+  warehouse: { x: 0, y: 0.84, z: 17.4, yaw: 0 },
 };
 
 export function wallSpawn(world: EvalWorld): SpawnPose {
@@ -101,5 +111,5 @@ export function spawnFor(world: EvalWorld, example: EvalExample, mode: "scenario
   if (mode !== "scenario") return worldSpawn(world);
   if (example === "circle") return circleSpawn(world);
   if (example === "wall") return wallSpawn(world);
-  return worldSpawn(world);
+  return AVOID_SPAWN[world] ?? worldSpawn(world);
 }

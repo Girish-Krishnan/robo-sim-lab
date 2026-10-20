@@ -60,8 +60,8 @@ export function buildTrackSolids(): Solid[] {
     [-20.4, 12],
     [-19.5, -2],
     [-20.2, -16],
-    [8, 44.2],
-    [-4, 43.6],
+    [16, 44.5],
+    [-16, 44.5],
     [2, -44.2],
   ];
   for (const [x, z] of cones) solids.push(coneSolid(x, z, 0.34, 1.45, 0xf06a12));
@@ -69,7 +69,7 @@ export function buildTrackSolids(): Solid[] {
   solids.push(cuboid(20.4, 16, 1.15, 1.5, 1.15, "crate", 0.15));
   solids.push(cuboid(19.6, 4, 1.1, 1.45, 1.15, "crate", -0.1));
   solids.push(cuboid(-20.2, 2, 1.15, 1.5, 1.1, "crate", 0.3));
-  solids.push(cuboid(6, 44.8, 1.15, 1.45, 1.15, "barrel"));
+  solids.push(cuboid(18, 45.2, 1.15, 1.45, 1.15, "barrel"));
   return solids;
 }
 

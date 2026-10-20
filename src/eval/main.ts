@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { EXAMPLES } from "../editor/examples";
-import { renderPathPlot } from "./plot";
+import { paintPathPlot, rasterToPng, renderContactSheet } from "./plot";
 import { loadStudentPolicy, loadStudentRuntime } from "./python";
 import { EVAL_EXAMPLES, EVAL_WORLDS, solidsFor, spawnFor, type EvalExample, type EvalWorld } from "./scenarios";
 import { runEpisode, type RunMetrics } from "./simulate";
@@ -23,7 +23,7 @@ function has(name: string): boolean {
 
 async function main(): Promise<void> {
   const ci = has("ci");
-  const seconds = Number(arg("seconds") ?? (ci ? 8 : 60));
+  const seconds = Number(arg("seconds") ?? 60);
   const seed = Number(arg("seed") ?? 1);
   const outDir = path.resolve(root, arg("out") ?? (ci ? "eval/ci" : "eval/out"));
   const spawnMode = arg("spawns") === "default" ? "default" : "scenario";
@@ -35,6 +35,7 @@ async function main(): Promise<void> {
   const pyodide = await loadStudentRuntime(root);
 
   const rows: RunMetrics[] = [];
+  const rasters: { world: (typeof pairs)[number][0]; example: string; rgba: Uint8Array }[] = [];
   for (const [world, example] of pairs) {
     const started = Date.now();
     const source = EXAMPLES.find((item) => item.id === example)?.source;
@@ -46,12 +47,18 @@ async function main(): Promise<void> {
     const dir = path.join(outDir, world, example);
     mkdirSync(dir, { recursive: true });
     writeFileSync(path.join(dir, "metrics.json"), JSON.stringify(episode.metrics, null, 2));
-    writeFileSync(path.join(dir, "path.png"), renderPathPlot(episode.solids, episode.trail, `${world} / ${example}`));
+    const raster = paintPathPlot(episode.solids, episode.trail, `${world} / ${example}`, world);
+    writeFileSync(path.join(dir, "path.png"), rasterToPng(raster));
+    rasters.push({ world, example, rgba: raster.rgba });
     rows.push(episode.metrics);
     const m = episode.metrics;
+    const driftPct = m.distance > 1 ? (100 * m.odomDrift) / m.distance : 0;
     process.stdout.write(
-      `${world}/${example}  dist ${m.distance.toFixed(1)}  coll ${m.collisionCount}  stuck ${m.stuckTime.toFixed(1)}  up ${m.minUp.toFixed(2)}  laps ${m.laps}  ${(Date.now() - started) / 1000}s\n`,
+      `${world}/${example}  dist ${m.distance.toFixed(1)}  coll ${m.collisionCount}  stuck ${m.stuckTime.toFixed(1)}  drift ${m.odomDrift.toFixed(2)} (${driftPct.toFixed(1)}%)  laps ${m.laps}  ${(Date.now() - started) / 1000}s\n`,
     );
+  }
+  if (rasters.length === 12) {
+    writeFileSync(path.join(outDir, "contact-sheet.png"), renderContactSheet(rasters));
   }
 
   const beforeDir = path.resolve(root, "eval/before");

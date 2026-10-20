@@ -1,12 +1,38 @@
 import { deflateSync, crc32 } from "node:zlib";
 import type { Solid } from "../sim/course";
+import type { EvalWorld } from "./scenarios";
 import type { TrailSample } from "./simulate";
+
+export interface PathRaster {
+  width: number;
+  height: number;
+  rgba: Uint8Array;
+}
 
 /**
  * Top-down path plot. Truth is coloured by speed, odometry is amber,
  * and a new contact is a red mark. This file is evaluation-only.
  */
-export function renderPathPlot(solids: readonly Solid[], trail: readonly TrailSample[], title: string): Buffer {
+export function renderPathPlot(
+  solids: readonly Solid[],
+  trail: readonly TrailSample[],
+  title: string,
+  world: EvalWorld,
+): Buffer {
+  const raster = paintPathPlot(solids, trail, title, world);
+  return rasterToPng(raster);
+}
+
+export function rasterToPng(raster: PathRaster): Buffer {
+  return encodePng(raster.width, raster.height, raster.rgba);
+}
+
+export function paintPathPlot(
+  solids: readonly Solid[],
+  trail: readonly TrailSample[],
+  title: string,
+  world: EvalWorld,
+): PathRaster {
   const width = 960;
   const height = 960;
   const rgba = new Uint8Array(width * height * 4);
@@ -22,12 +48,14 @@ export function renderPathPlot(solids: readonly Solid[], trail: readonly TrailSa
     minZ = Math.min(minZ, z - pad);
     maxZ = Math.max(maxZ, z + pad);
   };
-  for (const solid of solids) {
-    grow(solid.x, solid.z, Math.hypot(solid.hx, solid.hz) + 1);
-  }
+  // Frame on the path. Taking in every solid shrinks a lap to a speck
+  // on the whole yard, and a few metres of drift disappears.
   for (const sample of trail) {
-    grow(sample.x, sample.z, 2);
-    grow(sample.odomX, sample.odomZ, 2);
+    grow(sample.x, sample.z, 8);
+    grow(sample.odomX, sample.odomZ, 8);
+  }
+  if (trail.length === 0) {
+    for (const solid of solids) grow(solid.x, solid.z, Math.hypot(solid.hx, solid.hz) + 1);
   }
   if (!Number.isFinite(minX)) {
     minX = -20;
@@ -49,6 +77,8 @@ export function renderPathPlot(solids: readonly Solid[], trail: readonly TrailSa
     const v = (z - minZ) / (maxZ - minZ);
     return [margin + u * (width - margin * 2), height - margin - v * (height - margin * 2)];
   };
+
+  drawGround(rgba, width, height, world, project);
 
   for (const solid of solids) {
     const corners = footprint(solid).map(([x, z]) => project(x, z));
@@ -88,9 +118,110 @@ export function renderPathPlot(solids: readonly Solid[], trail: readonly TrailSa
     disc(rgba, width, height, sx, sy, 6, 80, 210, 170, 255);
   }
 
-  legend(rgba, width, maxSpeed);
+  drawLegend(rgba, width, height, maxSpeed);
+  drawScaleBar(rgba, width, height, maxX - minX);
   stamp(rgba, width, height, title);
+  return { width, height, rgba };
+}
+
+/** 4 columns of worlds, 3 rows of examples, each cell a half-size path plot. */
+export function renderContactSheet(panels: { world: EvalWorld; example: string; rgba: Uint8Array }[]): Buffer {
+  const worlds: EvalWorld[] = ["city", "track", "forest", "warehouse"];
+  const examples = ["circle", "avoid", "wall"];
+  const cell = 480;
+  const gap = 8;
+  const labelW = 88;
+  const labelH = 32;
+  const width = labelW + worlds.length * cell + (worlds.length - 1) * gap;
+  const height = labelH + examples.length * cell + (examples.length - 1) * gap;
+  const rgba = new Uint8Array(width * height * 4);
+  fill(rgba, width, height, 10, 14, 12, 255);
+  for (let col = 0; col < worlds.length; col++) {
+    const name = worlds[col]!;
+    text(rgba, width, height, labelW + col * (cell + gap) + 8, 8, name, 2);
+  }
+  for (let row = 0; row < examples.length; row++) {
+    const name = examples[row]!;
+    text(rgba, width, height, 8, labelH + row * (cell + gap) + 8, name, 2);
+  }
+  for (const panel of panels) {
+    const col = worlds.indexOf(panel.world);
+    const row = examples.indexOf(panel.example);
+    if (col < 0 || row < 0) continue;
+    const small = downsample(panel.rgba, 960, 960, 2);
+    blit(rgba, width, small, cell, labelW + col * (cell + gap), labelH + row * (cell + gap));
+  }
   return encodePng(width, height, rgba);
+}
+
+function drawGround(
+  rgba: Uint8Array,
+  width: number,
+  height: number,
+  world: EvalWorld,
+  project: (x: number, z: number) => [number, number],
+): void {
+  const rect = (x: number, z: number, w: number, d: number, r: number, g: number, b: number) => {
+    fillPoly(
+      rgba,
+      width,
+      height,
+      [
+        [x - w / 2, z - d / 2],
+        [x + w / 2, z - d / 2],
+        [x + w / 2, z + d / 2],
+        [x - w / 2, z + d / 2],
+      ].map(([px, pz]) => project(px, pz)),
+      r,
+      g,
+      b,
+      255,
+    );
+  };
+  if (world === "city") {
+    rect(5.5, 24, 9.2, 92, 46, 48, 52);
+    rect(8, 27.2, 52, 9, 46, 48, 52);
+    const plaza: [number, number][] = [];
+    for (let i = 0; i < 28; i++) {
+      const a = (i / 28) * Math.PI * 2;
+      plaza.push(project(5.5 + Math.cos(a) * 9.2, 58 + Math.sin(a) * 9.2));
+    }
+    fillPoly(rgba, width, height, plaza, 46, 48, 52, 255);
+    for (const x of [0.15, 10.85]) {
+      rect(x, 0.5, 0.45, 40, 168, 164, 150);
+      rect(x, 52, 0.45, 36, 168, 164, 150);
+    }
+    rect(-8, 22.55, 18, 0.45, 168, 164, 150);
+    rect(24, 22.55, 22, 0.45, 168, 164, 150);
+    rect(-8, 31.85, 18, 0.45, 168, 164, 150);
+    rect(24, 31.85, 22, 0.45, 168, 164, 150);
+    return;
+  }
+  if (world === "track") {
+    rect(16, 0, 15.6, 98, 52, 54, 58);
+    rect(-16, 0, 15.6, 98, 52, 54, 58);
+    rect(0, 42, 48, 14.4, 52, 54, 58);
+    rect(0, -42, 48, 14.4, 52, 54, 58);
+    return;
+  }
+  if (world === "forest") {
+    const left: [number, number][] = [];
+    const right: [number, number][] = [];
+    for (let z = -46; z <= 48; z += 1.4) {
+      const x = Math.sin(z * 0.09) * 1.2;
+      const slope = Math.cos(z * 0.09) * 1.2 * 0.09;
+      const len = Math.hypot(-1, slope);
+      const nx = -1 / len;
+      const nz = slope / len;
+      left.push(project(x + nx * 2.6, z + nz * 2.6));
+      right.push(project(x - nx * 2.6, z - nz * 2.6));
+    }
+    fillPoly(rgba, width, height, [...left, ...right.reverse()], 62, 86, 58, 255);
+    strokeTrail(rgba, width, height, left, 186, 196, 140, 255, 2);
+    strokeTrail(rgba, width, height, right, 186, 196, 140, 255, 2);
+    return;
+  }
+  rect(0, 10, 40, 70, 58, 60, 62);
 }
 
 function footprint(solid: Solid): [number, number][] {
@@ -129,33 +260,85 @@ function lerp(a: number, b: number, t: number): number {
   return Math.round(a + (b - a) * t);
 }
 
-function legend(rgba: Uint8Array, width: number, maxSpeed: number): void {
-  for (let i = 0; i < 120; i++) {
-    const tint = speedColor(i / 119);
-    for (let y = 18; y < 30; y++) set(rgba, width, 18 + i, y, tint[0], tint[1], tint[2], 255);
+function drawLegend(rgba: Uint8Array, width: number, height: number, maxSpeed: number): void {
+  fillRectScreen(rgba, width, 14, 14, 210, 108, 12, 18, 16, 220);
+  for (let i = 0; i < 150; i++) {
+    const tint = speedColor(i / 149);
+    for (let y = 0; y < 12; y++) set(rgba, width, 24 + i, 24 + y, tint[0], tint[1], tint[2], 255);
   }
-  for (let x = 150; x < 210; x++) {
-    for (let y = 20; y < 28; y++) set(rgba, width, x, y, 214, 150, 58, 255);
+  text(rgba, width, height, 24, 38, "0", 2);
+  const fast = `${maxSpeed.toFixed(1)} m/s`;
+  text(rgba, width, height, 174 - fast.length * 12, 38, fast, 2);
+  for (let i = 0; i < 28; i++) {
+    const tint = speedColor(i / 27);
+    for (let y = 0; y < 4; y++) set(rgba, width, 24 + i, 58 + y, tint[0], tint[1], tint[2], 255);
   }
-  disc(rgba, width, 960, 230, 24, 5, 220, 70, 60, 255);
-  void maxSpeed;
+  text(rgba, width, height, 58, 52, "true path", 2);
+  line(rgba, width, height, 24, 76, 52, 76, 214, 150, 58, 255, 3);
+  text(rgba, width, height, 58, 70, "odometry", 2);
+  disc(rgba, width, height, 32, 96, 5, 220, 70, 60, 255);
+  text(rgba, width, height, 44, 88, "contact", 2);
+}
+
+function drawScaleBar(rgba: Uint8Array, width: number, height: number, span: number): void {
+  const plotPx = width - 72;
+  const metresPerPx = span / plotPx;
+  let metres = 5;
+  for (const choice of [5, 10, 20, 50, 100]) {
+    if (choice / metresPerPx <= 160) metres = choice;
+  }
+  const px = metres / metresPerPx;
+  const x1 = width - 28;
+  const x0 = x1 - px;
+  const y = height - 28;
+  line(rgba, width, height, x0, y, x1, y, 230, 236, 230, 255, 2);
+  line(rgba, width, height, x0, y - 5, x0, y + 5, 230, 236, 230, 255, 2);
+  line(rgba, width, height, x1, y - 5, x1, y + 5, 230, 236, 230, 255, 2);
+  const label = `${metres} m`;
+  text(rgba, width, height, x0 + px / 2 - label.length * 6, y - 18, label, 2);
+}
+
+function fillRectScreen(
+  rgba: Uint8Array,
+  width: number,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number,
+  g: number,
+  b: number,
+  a: number,
+): void {
+  for (let py = y; py < y + h; py++) {
+    for (let px = x; px < x + w; px++) set(rgba, width, px, py, r, g, b, a);
+  }
 }
 
 function stamp(rgba: Uint8Array, width: number, height: number, title: string): void {
-  const text = title.slice(0, 48);
-  for (let i = 0; i < text.length; i++) blitGlyph(rgba, width, height, 16 + i * 6, height - 22, text.charCodeAt(i));
+  text(rgba, width, height, 16, height - 22, title.slice(0, 48), 1);
 }
 
-function blitGlyph(rgba: Uint8Array, width: number, height: number, x: number, y: number, code: number): void {
+function text(rgba: Uint8Array, width: number, height: number, x: number, y: number, message: string, scale: number): void {
+  for (let i = 0; i < message.length; i++) {
+    blitGlyph(rgba, width, height, x + i * 6 * scale, y, message.charCodeAt(i), scale);
+  }
+}
+
+function blitGlyph(rgba: Uint8Array, width: number, height: number, x: number, y: number, code: number, scale = 1): void {
   const rows = font(code);
   for (let row = 0; row < 7; row++) {
     const bits = rows[row] ?? 0;
     for (let col = 0; col < 5; col++) {
       if ((bits & (1 << (4 - col))) === 0) continue;
-      const px = x + col;
-      const py = y + row;
-      if (px < 0 || py < 0 || px >= width || py >= height) continue;
-      set(rgba, width, px, py, 230, 236, 230, 255);
+      for (let sy = 0; sy < scale; sy++) {
+        for (let sx = 0; sx < scale; sx++) {
+          const px = x + col * scale + sx;
+          const py = y + row * scale + sy;
+          if (px < 0 || py < 0 || px >= width || py >= height) continue;
+          set(rgba, width, px, py, 230, 236, 230, 255);
+        }
+      }
     }
   }
 }
@@ -198,6 +381,7 @@ for (const [ch, rows] of Object.entries({
   m: [0, 0b11010, 0b10101, 0b10101, 0b10101, 0b10101, 0],
   n: [0, 0b11110, 0b10001, 0b10001, 0b10001, 0b10001, 0],
   o: [0, 0b01110, 0b10001, 0b10001, 0b10001, 0b01110, 0],
+  p: [0b10000, 0b11110, 0b10001, 0b11110, 0b10000, 0b10000, 0],
   r: [0, 0b10110, 0b11001, 0b10000, 0b10000, 0b10000, 0],
   s: [0, 0b01111, 0b10000, 0b01110, 0b00001, 0b11110, 0],
   t: [0b01000, 0b11100, 0b01000, 0b01000, 0b01001, 0b00110, 0],
@@ -319,6 +503,45 @@ function fillPoly(
       const xb = Math.min(width - 1, Math.floor(xs[i + 1]!));
       for (let x = xa; x <= xb; x++) setIndex(rgba, y * width + x, r, g, b, a);
     }
+  }
+}
+
+function downsample(src: Uint8Array, sw: number, sh: number, factor: number): Uint8Array {
+  const dw = sw / factor;
+  const dh = sh / factor;
+  const out = new Uint8Array(dw * dh * 4);
+  const n = factor * factor;
+  for (let y = 0; y < dh; y++) {
+    for (let x = 0; x < dw; x++) {
+      let r = 0;
+      let g = 0;
+      let b = 0;
+      let a = 0;
+      for (let sy = 0; sy < factor; sy++) {
+        for (let sx = 0; sx < factor; sx++) {
+          const o = ((y * factor + sy) * sw + (x * factor + sx)) * 4;
+          r += src[o] ?? 0;
+          g += src[o + 1] ?? 0;
+          b += src[o + 2] ?? 0;
+          a += src[o + 3] ?? 0;
+        }
+      }
+      const o = (y * dw + x) * 4;
+      out[o] = r / n;
+      out[o + 1] = g / n;
+      out[o + 2] = b / n;
+      out[o + 3] = a / n;
+    }
+  }
+  return out;
+}
+
+function blit(dst: Uint8Array, dstWidth: number, src: Uint8Array, srcWidth: number, x: number, y: number): void {
+  const srcHeight = src.length / (srcWidth * 4);
+  for (let row = 0; row < srcHeight; row++) {
+    const from = row * srcWidth * 4;
+    const to = ((y + row) * dstWidth + x) * 4;
+    dst.set(src.subarray(from, from + srcWidth * 4), to);
   }
 }
 

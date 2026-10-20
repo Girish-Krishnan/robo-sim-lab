@@ -26,5 +26,5 @@ jobs:
       - name: Fetch Pyodide
         run: node scripts/fetch-pyodide.mjs
 
-      - name: Short eval
+      - name: 60s eval
         run: npm run eval:ci

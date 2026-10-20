@@ -229,7 +229,7 @@ export function buildCourseSolids(): Solid[] {
   ball(18.2, -16, 0.9, "rock", 0x6e7370);
   ball(16.4, -17.6, 0.85, "rock", 0x8a8680);
   ball(19.5, -14.2, 0.82, "rock", 0x5e6664);
-  ball(-14, -12, 0.95, "rock", 0x7a756e);
+  ball(-8, -10, 0.95, "rock", 0x7a756e);
   ball(-22, 16, 0.88, "bush", 0x2f6b45);
   ball(-20, 18.5, 0.84, "bush", 0x3d7d52);
   ball(20, 18, 0.86, "bush", 0x2a5e3d);
@@ -241,7 +241,7 @@ export function buildCourseSolids(): Solid[] {
   cyl(-14, 28, 0.24, 3.1, "pine", 0, 0x234432);
   cyl(32, -8, 0.2, 2.4, "pine", 0, 0x2d5340);
   cyl(-24, -6, 0.34, 2.2, "tree", 0, 0x6d4c34);
-  cyl(-16, -22, 0.3, 2.4, "tree", 0, 0x6a4a30);
+  cyl(-10, -28, 0.3, 2.4, "tree", 0, 0x6a4a30);
   cyl(28, 48, 0.32, 2.5, "tree", 0, 0x5e432c);
   cyl(36, 16, 0.28, 2.3, "tree", 0, 0x6d4c34);
   cyl(-36, 8, 0.3, 2.6, "tree", 0, 0x624832);
@@ -282,17 +282,31 @@ export function buildCourseSolids(): Solid[] {
   box(10.2, 32.5, 0.08, 0.85, 0.85, "sign", 0, 0, 1.35, 0xd23b3b);
 
   // Fountain in the west lawn.
-  cyl(-22, -14, 1.5, 1.25, "fountain", 0, 0xb7c0c6);
+  cyl(-22, -6, 1.5, 1.25, "fountain", 0, 0xb7c0c6);
 
-  // Loose perimeter, with a gap where the avenue continues north and south.
+  // Closed perimeter. Segments stay short so a long wall does not fail the
+  // spawn-clearance test, which treats each solid as a circle. The avenue
+  // used to run out through a gap; a reactive avoider then drove off the map.
   box(-28, 78, 28, 1.6, 0.4, "concrete");
   box(32, 78, 28, 1.6, 0.4, "concrete");
+  box(2, 78, 32, 1.6, 0.4, "concrete");
+  box(-45, 78, 6, 1.6, 0.4, "concrete");
+  box(47, 78, 2, 1.6, 0.4, "concrete");
   box(-28, -40, 28, 1.6, 0.4, "concrete");
   box(32, -40, 28, 1.6, 0.4, "concrete");
+  box(2, -40, 32, 1.6, 0.4, "concrete");
+  box(-45, -40, 6, 1.6, 0.4, "concrete");
+  box(47, -40, 2, 1.6, 0.4, "concrete");
   box(-48, -8, 0.4, 1.6, 24, "concrete");
   box(-48, 28, 0.4, 1.6, 28, "concrete");
+  box(-48, -30, 0.4, 1.6, 20, "concrete");
+  box(-48, 9, 0.4, 1.6, 10, "concrete");
+  box(-48, 60, 0.4, 1.6, 36, "concrete");
   box(48, 0, 0.4, 1.6, 28, "concrete");
   box(48, 40, 0.4, 1.6, 24, "concrete");
+  box(48, -27, 0.4, 1.6, 26, "concrete");
+  box(48, 21, 0.4, 1.6, 14, "concrete");
+  box(48, 65, 0.4, 1.6, 26, "concrete");
 
   // Signals on the sidewalks, outside the avenue and the cross street.
   cyl(-1.4, 20.6, 0.08, 3.5, "signal", 0, 0x2c3338);
@@ -303,6 +317,14 @@ export function buildCourseSolids(): Solid[] {
   box(-1.4, 34.2, 0.55, 0.9, 0.28, "signal", Math.PI, 0, 2.85, 0x1c2126);
   cyl(12.4, 34.2, 0.08, 3.5, "signal", 0, 0x2c3338);
   box(12.4, 34.2, 0.55, 0.9, 0.28, "signal", Math.PI, 0, 2.85, 0x1c2126);
+
+  // A free-standing lot on the south-west lawn. The outside is open on
+  // every side, so a right-hand follower can orbit it. The perimeter wall
+  // and the fountain sit outside that path. Tall enough for the lidar.
+  box(-18, -25, 0.45, 1.6, 14, "fence");
+  box(-34, -25, 0.45, 1.6, 14, "fence");
+  box(-26, -18, 16.45, 1.6, 0.45, "fence");
+  box(-26, -32, 16.45, 1.6, 0.45, "fence");
 
   // Bollards marking the cross-street corners, off the driving lines.
   cyl(1.3, 22.2, 0.22, 1.45, "bollard");

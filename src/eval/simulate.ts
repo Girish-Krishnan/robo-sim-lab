@@ -216,7 +216,7 @@ export function runEpisode(
         speed,
         odomX: odom.x,
         odomZ: odom.z,
-        hit: started || now.size > 0,
+        hit: started,
       });
     }
 

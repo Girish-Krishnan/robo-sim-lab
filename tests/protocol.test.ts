@@ -67,8 +67,8 @@ describe("publishSensorFrame", () => {
 });
 
 describe("odometry", () => {
-  it("integrates speed and steering only, starting from the origin", () => {
-    const odom = createOdometry(1.9);
+  it("integrates wheel speed and gyro yaw rate, starting from the origin", () => {
+    const odom = createOdometry();
     expect(odom.pose()).toEqual({ x: 0, y: 0, yaw: 0 });
     odom.integrate(2, 0, 0.5);
     const straight = odom.pose();
@@ -76,7 +76,9 @@ describe("odometry", () => {
     expect(straight.y).toBeCloseTo(0);
     expect(straight.yaw).toBeCloseTo(0);
     odom.integrate(2, 0.3, 0.5);
-    expect(odom.pose().yaw).toBeGreaterThan(0);
+    expect(odom.pose().yaw).toBeCloseTo(0.15);
+    odom.integrate(2, 0.3, 0.5);
+    expect(odom.pose().y).toBeGreaterThan(0);
     odom.reset();
     expect(odom.pose()).toEqual({ x: 0, y: 0, yaw: 0 });
   });

@@ -25,11 +25,12 @@ export const LIDAR_LOCAL = { x: 0, y: 0.28, z: 0.46 };
 
 /**
  * Samples sensors from the live physics state and returns only a SensorFrame.
- * Wheel-odometry pose is integrated from noisy speed and steering. The body's
- * translation is never copied into that pose.
+ * Pose is integrated from noisy wheel speed and the gyro yaw rate. The body's
+ * translation is never copied into that pose. Steering bias is reported on
+ * `steeringAngle` and is not integrated: a steer offset is not a heading.
  */
 export class SensorSuite {
-  private readonly odom = createOdometry(ACKERMANN_BUGGY.wheelbase);
+  private readonly odom = createOdometry();
   private readonly spec = ACKERMANN_BUGGY.sensors;
   private time = 0;
   private wheelRot = [0, 0, 0, 0];
@@ -87,7 +88,9 @@ export class SensorSuite {
     const noisySpeed = speed * (1 + this.bias.speed) + gaussian(this.spec.odometry.speedStdDev, this.random);
     const noisySteer = actuatorSteering + this.bias.steer + gaussian(this.spec.odometry.steeringStdDev, this.random);
     this.lastOdomSpeed = noisySpeed;
-    const pose = this.odom.integrate(noisySpeed, noisySteer, dt);
+    const imu = this.sampleImu(dt, q);
+    // Same yaw-rate sample the student receives. Positive is a left turn.
+    const pose = this.odom.integrate(noisySpeed, imu.yawRate, dt);
 
     return {
       time: this.time,
@@ -98,7 +101,7 @@ export class SensorSuite {
         steeringAngle: noisySteer,
         pose,
       },
-      imu: this.sampleImu(dt, q),
+      imu,
       camera: { available: false, width: 0, height: 0 },
     };
   }

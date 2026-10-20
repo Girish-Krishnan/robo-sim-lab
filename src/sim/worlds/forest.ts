@@ -38,6 +38,9 @@ export function buildForestSolids(): Solid[] {
 
   for (let i = 0; i < 18; i++) {
     const z = -8 + i * 4.3;
+    // The corridor fence closes at z=38. Trees past that sit in the
+    // outside lane a wall follower uses.
+    if (z > 34) continue;
     const wave = Math.sin(z * 0.18) * 1.4;
     tree(-7.2 - (i % 3) * 1.3, z + (i % 2), i % 3 === 0 ? "pine" : "tree");
     tree(7.4 + (i % 4) * 1.1, z - 1.2, i % 2 === 0 ? "pine" : "tree");
@@ -49,17 +52,19 @@ export function buildForestSolids(): Solid[] {
   // Trail obstacles, tall enough for the lidar, with a clear line down the middle.
   solids.push(ballSolid(2.8, 16, 0.9, "rock", 0x6e7370));
   solids.push(ballSolid(-3.0, 28, 0.95, "rock", 0x7c756c));
-  solids.push(ballSolid(2.7, 42, 0.88, "rock", 0x5e6664));
-  solids.push(logSolid(-2.8, 22, 0.72, 2.2, 0.5));
-  solids.push(logSolid(2.9, 36, 0.72, 2.4, -0.4));
+  solids.push(ballSolid(2.7, 30, 0.88, "rock", 0x5e6664));
+  solids.push(logSolid(3.4, 21, 0.72, 2.2, 0.5));
+  solids.push(logSolid(1.6, 6, 0.72, 2.4, -0.4));
   solids.push(ballSolid(-3.3, 10, 0.86, "bush", 0x2f6b45));
-  solids.push(ballSolid(3.2, 48, 0.9, "bush", 0x346b46));
+  solids.push(ballSolid(-1.4, 13, 0.9, "bush", 0x346b46));
   solids.push(ballSolid(6.2, 18, 0.92, "bush", 0x2a5e3d));
   solids.push(ballSolid(-6.4, 30, 0.88, "bush", 0x3d7d52));
 
   // Stream banks and bridge rails. The deck itself is the physics ground.
+  // The north posts stop short of the turnaround so a U-turn on the trail
+  // does not clip a post.
   for (const x of [-4.3, 4.3]) {
-    for (const z of [23.2, 25.4, 30.6, 32.8]) {
+    for (const z of [23.2, 25.4, 30.6]) {
       solids.push(pillar(x, z, 0.08, 1.45, "fence", 0x6a4a30));
     }
     solids.push(cuboid(x, 28, 0.1, 1.15, 6.2, "fence"));
@@ -68,6 +73,14 @@ export function buildForestSolids(): Solid[] {
   solids.push(ballSolid(8.2, 31, 0.95, "rock", 0x7a756e));
   solids.push(logSolid(-7.2, 29, 0.7, 2.4, 0.2));
   solids.push(logSolid(7.4, 24.5, 0.7, 2.4, -0.2));
+
+  // Corridor around the trail. The outer yard fence is far enough that a
+  // gap follower leaves the trees and laps empty grass. This one keeps
+  // that run among the trunks, and gives wall follow a continuous edge.
+  solids.push(cuboid(16.5, 11, 0.45, 1.6, 54, "fence"));
+  solids.push(cuboid(-16.5, 11, 0.45, 1.6, 54, "fence"));
+  solids.push(cuboid(0, 38, 33.4, 1.6, 0.45, "fence"));
+  solids.push(cuboid(0, -16, 33.4, 1.6, 0.45, "fence"));
 
   // Yard boundary, tall enough for the lidar. Keeps an open-space
   // follower from driving off the ground plane.

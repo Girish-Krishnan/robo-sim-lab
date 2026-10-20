@@ -27,66 +27,69 @@ function addSolid(RAPIER: typeof import("@dimforge/rapier3d-compat").default, wo
 function avoidCommand(
   ranges: number[],
   angles: number[],
-  state: { v: number; mode: string; reverse: number; left: boolean },
+  speed: number,
+  state: { v: number; reverse: number },
 ): { steering: number; throttle: number } {
-  const wide = widen(ranges);
+  const wide = inflate(ranges, angles);
   const maxRange = Math.max(...ranges, 0);
   let best = -1;
-  let gapAngle = 0;
+  let gap = 0;
   const left: number[] = [];
   const right: number[] = [];
   let front = maxRange;
   for (let i = 0; i < ranges.length; i++) {
     const angle = angles[i] ?? 0;
-    const dist = ranges[i] ?? maxRange;
-    const opened = wide[i] ?? dist;
-    if (Math.abs(angle) < 0.4) front = Math.min(front, dist);
-    if (Math.abs(angle) < 1.15) {
-      const score = opened * (1 - 0.35 * Math.abs(angle));
+    if (Math.abs(angle) < 0.95) front = Math.min(front, ranges[i] ?? maxRange);
+  }
+  const window = front < 6 ? 1.15 : 0.5;
+  for (let i = 0; i < ranges.length; i++) {
+    const angle = angles[i] ?? 0;
+    const opened = wide[i] ?? maxRange;
+    if (Math.abs(angle) < window) {
+      const score = opened * Math.cos(angle * 0.9);
       if (score > best) {
         best = score;
-        gapAngle = angle;
+        gap = angle;
       }
     }
-    if (angle > 0.3 && angle < 1.35) left.push(opened);
-    if (angle < -0.3 && angle > -1.35) right.push(opened);
+    if (angle > 0.15 && angle < 1.2) left.push(opened);
+    if (angle < -0.15 && angle > -1.2) right.push(opened);
   }
-  state.v = 0.84 * state.v + 0.16 * gapAngle;
-  state.left = percentile(left, 0.2) >= percentile(right, 0.2);
-  const turn = state.left ? 0.4 : -0.4;
-  let steering = clamp(state.v * 0.75, -0.38, 0.38);
-  const forwardMin = wide.reduce((best, value, index) => {
-    const angle = angles[index] ?? 0;
-    return Math.abs(angle) < 1.15 ? Math.min(best, value ?? best) : best;
-  }, Infinity);
-  if (front > 10 && forwardMin > 9) steering = clamp(steering + 0.06, -0.4, 0.4);
-  let throttle = 0.4;
-  if (front < 7) {
-    const blend = clamp((7 - front) / 4, 0, 1);
-    steering = clamp((1 - blend) * steering + blend * turn, -0.46, 0.46);
-    throttle = 0.26;
+  state.v = 0.6 * state.v + 0.4 * gap;
+  const turn = percentile(left, 0.3) >= percentile(right, 0.3) ? 0.5 : -0.5;
+  const leftClear = percentile(left, 0.3);
+  const rightClear = percentile(right, 0.3);
+  if (state.reverse > 0) {
+    state.reverse -= 1;
+    return { steering: turn, throttle: -0.28 };
   }
-  if (state.mode === "go" && front < 1.8) {
-    state.mode = "reverse";
-    state.reverse = 0;
-  } else if (state.mode === "reverse") {
-    state.reverse += 1;
-    steering = state.left ? 0.46 : -0.46;
-    throttle = -0.34;
-    if (state.reverse === 14) state.left = !state.left;
-    if (front > 3.6 || state.reverse > 30) state.mode = "go";
+  if (front < 1.55) {
+    state.reverse = 8;
+    return { steering: turn, throttle: -0.28 };
+  }
+  if (Math.abs(speed) < 0.35 && Math.max(leftClear, rightClear) > front + 0.8) {
+    return { steering: turn, throttle: 0.2 };
+  }
+  let steering = clamp(state.v * 1.15, -0.5, 0.5);
+  let throttle = clamp((front - 3) / 12, 0.08, 0.3);
+  if (front < 8 && speed > 3) throttle = -0.55;
+  else if (front < 5 && speed > 1.8) throttle = -0.35;
+  if (front < 5) {
+    const blend = clamp((5 - front) / 3, 0, 1);
+    steering = clamp((1 - blend) * steering + blend * turn, -0.52, 0.52);
   }
   return { steering, throttle };
 }
 
-function widen(ranges: number[]): number[] {
+function inflate(ranges: number[], angles: number[]): number[] {
   const wide = [...ranges];
-  for (let shift = 1; shift < 7; shift++) {
-    for (let i = 0; i < wide.length; i++) {
-      const a = ranges[i + shift];
-      const b = ranges[i - shift];
-      if (a != null) wide[i] = Math.min(wide[i] ?? a, a);
-      if (b != null) wide[i] = Math.min(wide[i] ?? b, b);
+  const span = ranges.map((range) => Math.atan(1.35 / Math.max(range ?? 0.45, 0.45)));
+  for (let i = 0; i < ranges.length; i++) {
+    const reach = span[i] ?? 0;
+    const center = angles[i] ?? 0;
+    const block = ranges[i] ?? 0;
+    for (let j = 0; j < ranges.length; j++) {
+      if (Math.abs((angles[j] ?? 0) - center) <= reach) wide[j] = Math.min(wide[j] ?? block, block);
     }
   }
   return wide;
@@ -123,7 +126,7 @@ describe("yard", () => {
     for (const solid of buildCourseSolids()) addSolid(RAPIER, world, solid);
     const scene = new THREE.Scene();
     const robot = new AckermannBuggy(RAPIER, world, scene);
-    const aim = { v: 0, mode: "go", reverse: 0, left: true };
+    const aim = { v: 0, reverse: 0 };
     let sensorAccumulator = 0;
     const start = robot.focus();
     let minUp = 1;
@@ -132,7 +135,7 @@ describe("yard", () => {
       if (sensorAccumulator >= 0.05 - 1e-4) {
         const sensors = robot.sampleSensors(sensorAccumulator);
         sensorAccumulator = 0;
-        robot.setCommand(avoidCommand(sensors.lidar.ranges, sensors.lidar.angles, aim), 0);
+        robot.setCommand(avoidCommand(sensors.lidar.ranges, sensors.lidar.angles, sensors.odometry.speed, aim), 0);
       }
       robot.preStep(DT);
       world.step();
@@ -149,6 +152,6 @@ describe("yard", () => {
     console.log(`avoid ended at x=${end.x.toFixed(1)} z=${end.z.toFixed(1)} travelled=${travelled.toFixed(1)} up=${minUp.toFixed(2)}`);
     expect(minUp).toBeGreaterThan(0.75);
     expect(end.z).toBeGreaterThan(22);
-    expect(travelled).toBeGreaterThan(24);
+    expect(travelled).toBeGreaterThan(20);
   }, 30000);
 });

@@ -5,10 +5,6 @@ export interface OdomPose {
 }
 
 /**
- * Bicycle-model dead reckoning from wheel speed and steering only.
- * There is no pose input: the integral cannot be seeded from ground truth.
- */
-/**
  * Place a dead-reckoned pose into the world.
  * Odometry starts at the origin when the car is reset: +x is the initial
  * forward axis and +y is the initial left axis. Spawn yaw uses the same
@@ -28,7 +24,16 @@ export function odomToWorld(
   };
 }
 
-export function createOdometry(wheelbase: number) {
+/**
+ * Dead reckoning from wheel speed and gyro yaw rate.
+ * Heading used to come from the bicycle model, `(speed / wheelbase) * tan(steer)`.
+ * A constant steering bias then became a curvature bias, and one oval lap
+ * walked the amber trail tens of metres off the car. A gyro bias integrates
+ * to a few degrees over a minute instead, which is what a calibrated MEMS
+ * unit actually does. Wheel-speed bias only scales the distance.
+ * There is no pose input: the integral cannot be seeded from ground truth.
+ */
+export function createOdometry() {
   let pose: OdomPose = { x: 0, y: 0, yaw: 0 };
 
   return {
@@ -38,8 +43,7 @@ export function createOdometry(wheelbase: number) {
     pose(): OdomPose {
       return { x: pose.x, y: pose.y, yaw: pose.yaw };
     },
-    integrate(speed: number, steering: number, dt: number): OdomPose {
-      const yawRate = wheelbase === 0 ? 0 : (speed / wheelbase) * Math.tan(steering);
+    integrate(speed: number, yawRate: number, dt: number): OdomPose {
       pose = {
         x: pose.x + speed * Math.cos(pose.yaw) * dt,
         y: pose.y + speed * Math.sin(pose.yaw) * dt,

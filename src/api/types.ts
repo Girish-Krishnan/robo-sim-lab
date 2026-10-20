@@ -32,7 +32,7 @@ export interface WheelOdometry {
   /** Measured front steering angle, radians, positive left, with noise. */
   steeringAngle: number;
   /**
-   * Pose integrated from the noisy speed and steering with a bicycle model.
+   * Pose integrated from noisy wheel speed and the gyro yaw rate. Steering bias is not part of the integral.
    * It starts at the origin on reset and drifts. It is not ground truth.
    */
   pose: OdometryPose;
@@ -94,7 +94,7 @@ export interface RobotDescriptor {
   id: string;
   name: string;
   kinematics: "ackermann";
-  /** Metres between front and rear axles. Used by the bicycle-model odometry. */
+  /** Metres between front and rear axles. */
   wheelbase: number;
   /** Metres between the left and right wheels. */
   trackWidth: number;
@@ -108,7 +108,7 @@ export interface RobotDescriptor {
       speedBiasStdDev: number;
       /** White noise on steering, radians. */
       steeringStdDev: number;
-      /** One-sigma steering bias, radians, sampled once per reset. */
+      /** One-sigma steering-angle bias, radians, sampled once per reset. Not integrated into pose. */
       steeringBiasStdDev: number;
     };
     imu: {

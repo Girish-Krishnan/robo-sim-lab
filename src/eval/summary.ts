@@ -7,8 +7,8 @@ export interface Compared {
 
 export function renderSummary(rows: Compared[]): string {
   const header = [
-    "| World | Example | Distance m | Mean m/s | Collisions | Contact s | Min lidar m | Stuck s | Flip | OOB | Laps | Lap times | Odom drift m |",
-    "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | ---: | --- | ---: |",
+    "| World | Example | Distance m | Mean m/s | Collisions | Contact s | Min lidar m | Stuck s | Flip | OOB | Laps | Lap times | Odom drift m | Drift % |",
+    "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | ---: | --- | ---: | ---: |",
   ];
   const lines = [...header];
   for (const row of rows) {
@@ -20,11 +20,11 @@ export function renderSummary(rows: Compared[]): string {
     "",
     "Each run is 60 s of simulated time unless noted in the metrics file. Physics is 60 Hz, control is 20 Hz, noise seed is 1.",
     "The true path is evaluation-only. Odometry drift is the gap between the true position and the dead-reckoned pose at the end.",
-    "A row tagged `before` is the same sensors and worlds with the previous example code and the world's default spawn.",
+    "A row tagged `before` is commit c119ca7: the same worlds with that revision's examples and its bicycle-model odometry.",
     "",
     ...lines,
     "",
-    "Speed colour on the path plot runs from blue (slow) to amber to red (fast). The amber line is odometry. Red dots are contacts. The teal dot is the start.",
+    "The path plot legend labels the speed colour bar in m/s, the true path, the odometry trail, and contacts. A scale bar is in metres. Roads, curbs, the oval asphalt, and the forest trail are drawn under the path.",
     "",
   ].join("\n");
 }
@@ -47,30 +47,40 @@ function cells(row: RunMetrics, tag?: string): string {
     laps,
     lapTimes,
     row.odomDrift.toFixed(2),
+    driftPercent(row).toFixed(1),
   ].join(" | ");
 }
 
-/** Short-run gates. A flip always fails. Circle must stay clear. Avoid stays nearly clear and moving. */
+function driftPercent(row: RunMetrics): number {
+  if (row.distance < 1) return 0;
+  return (100 * row.odomDrift) / row.distance;
+}
+
+/**
+ * 60 s gates. A flip or a yard exit always fails. Drift stays under 5% of
+ * distance. Wall follow and lidar avoid stay at 0–1 contacts and do not
+ * sit still. The forest avoid run has to finish inside the tree corridor.
+ */
 export function regressionErrors(row: RunMetrics): string[] {
   const errors: string[] = [];
-  if (row.flipped) errors.push(`${row.world}/${row.example} flipped`);
-  if (row.outOfBounds) errors.push(`${row.world}/${row.example} left the yard`);
+  const name = `${row.world}/${row.example}`;
+  if (row.flipped) errors.push(`${name} flipped`);
+  if (row.outOfBounds) errors.push(`${name} left the yard`);
+  if (driftPercent(row) > 5) errors.push(`${name} drift ${driftPercent(row).toFixed(1)}%`);
   if (row.example === "circle" && row.collisionCount > 0) {
-    errors.push(`${row.world}/circle collisions ${row.collisionCount}`);
+    errors.push(`${name} collisions ${row.collisionCount}`);
   }
-  if (row.example === "avoid") {
-    if (row.collisionCount > 2) errors.push(`${row.world}/avoid collisions ${row.collisionCount}`);
-    if (row.distance < 15) errors.push(`${row.world}/avoid travelled ${row.distance.toFixed(1)} m`);
-    if (row.stuckTime > 2) errors.push(`${row.world}/avoid stuck ${row.stuckTime.toFixed(1)} s`);
+  if (row.example === "circle" && row.stuckTime > 1) {
+    errors.push(`${name} stuck ${row.stuckTime.toFixed(1)} s`);
   }
-  if (row.example === "wall" && row.collisionCount > 3) {
-    errors.push(`${row.world}/wall collisions ${row.collisionCount}`);
+  if (row.example === "avoid" || row.example === "wall") {
+    if (row.collisionCount > 1) errors.push(`${name} collisions ${row.collisionCount}`);
+    if (row.stuckTime > 1) errors.push(`${name} stuck ${row.stuckTime.toFixed(1)} s`);
+    if (row.distance < 40) errors.push(`${name} travelled ${row.distance.toFixed(1)} m`);
   }
-  if (row.example === "wall" && row.distance < 8) {
-    errors.push(`${row.world}/wall travelled ${row.distance.toFixed(1)} m`);
-  }
-  if (row.example === "wall" && row.stuckTime > 2) {
-    errors.push(`${row.world}/wall stuck ${row.stuckTime.toFixed(1)} s`);
+  if (row.world === "forest" && row.example === "avoid") {
+    const inside = Math.abs(row.final.x) < 22 && row.final.z > -22 && row.final.z < 42;
+    if (!inside) errors.push(`${name} left the trees at ${row.final.x.toFixed(1)}, ${row.final.z.toFixed(1)}`);
   }
   return errors;
 }
