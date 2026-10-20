@@ -7,8 +7,8 @@ export interface Compared {
 
 export function renderSummary(rows: Compared[]): string {
   const header = [
-    "| World | Example | Distance m | Mean m/s | Collisions | Contact s | Min lidar m | Stuck s | Flip | OOB | Laps | Lap times | Odom drift m | Drift % | XT mean/max |",
-    "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | ---: | --- | ---: | ---: | ---: |",
+    "| World | Example | Distance m | Mean m/s | Contacts | Predicted | Contact s | Min lidar m | Stuck s | Flip | OOB | Laps | Lap times | Odom drift m | Drift % | XT mean/max |",
+    "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | ---: | --- | ---: | ---: | ---: |",
   ];
   const lines = [...header];
   for (const row of rows) {
@@ -20,6 +20,7 @@ export function renderSummary(rows: Compared[]): string {
     "",
     "Each run is 60 s of simulated time unless noted in the metrics file. Physics is 60 Hz, control is 20 Hz, noise seed is 1.",
     "The true path is evaluation-only. Odometry drift is the gap between the true position and the dead-reckoned pose at the end.",
+    "Contacts count manifolds that contain at least one point. Predicted is a reported pair whose manifold was empty. A `before` row has no predicted column because that revision counted every pair.",
     "A row tagged `before` is commit c119ca7: the same worlds with that revision's examples and its bicycle-model odometry.",
     "",
     ...lines,
@@ -45,6 +46,7 @@ function cells(row: RunMetrics, tag?: string): string {
     row.distance.toFixed(1),
     row.meanSpeed.toFixed(2),
     String(row.collisionCount),
+    row.predictedCount === undefined ? "—" : String(row.predictedCount),
     row.contactTime.toFixed(2),
     row.minLidar.toFixed(2),
     row.stuckTime.toFixed(2),
@@ -78,12 +80,13 @@ function driftPercent(row: RunMetrics): number {
 /**
  * 60 s gates. A flip or a yard exit always fails. Drift stays under 5% of
  * distance. Thresholds match measured seed-1 runs: wall follow is clean and
- * the oval completes a lap; lidar avoid keeps moving, with a contact cap per
- * world. Pure pursuit has to make progress along the reference path.
+ * the oval completes a lap; lidar avoid keeps moving, with a real-contact cap
+ * per world. Pure pursuit has to make progress along the reference path with
+ * no real contacts.
  */
-const AVOID_CONTACTS: Record<string, number> = { city: 2, track: 0, forest: 1, warehouse: 3 };
+const AVOID_CONTACTS: Record<string, number> = { city: 2, track: 0, forest: 0, warehouse: 2 };
 const AVOID_DISTANCE: Record<string, number> = { city: 110, track: 110, forest: 80, warehouse: 90 };
-const PURSUIT_CONTACTS: Record<string, number> = { city: 10, track: 2, forest: 14, warehouse: 1 };
+const PURSUIT_CONTACTS: Record<string, number> = { city: 0, track: 0, forest: 0, warehouse: 0 };
 const PURSUIT_DISTANCE: Record<string, number> = { city: 120, track: 160, forest: 100, warehouse: 140 };
 
 export function regressionErrors(row: RunMetrics): string[] {
@@ -92,6 +95,7 @@ export function regressionErrors(row: RunMetrics): string[] {
   if (row.flipped) errors.push(`${name} flipped`);
   if (row.outOfBounds) errors.push(`${name} left the yard`);
   if (driftPercent(row) > 5) errors.push(`${name} drift ${driftPercent(row).toFixed(1)}%`);
+  if (row.chaseGround === false) errors.push(`${name} chase frame has no ground in the lower half`);
   if (row.example === "circle" && row.collisionCount > 0) {
     errors.push(`${name} collisions ${row.collisionCount}`);
   }

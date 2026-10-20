@@ -154,6 +154,7 @@ export async function mountApp(): Promise<void> {
       drawOps = [];
       drawings.clear();
       robot.reset(activeSpawn);
+      camera.snap(robot.focus());
       if (mode === "drive") applyDrive();
     };
 
@@ -228,6 +229,7 @@ export async function mountApp(): Promise<void> {
         drawings.clear();
         robot.reset(activeSpawn);
         camera.reset();
+        camera.snap(robot.focus());
         localStorage.setItem(WORLD_STORAGE_KEY, id);
         if (mode === "drive") applyDrive();
       } finally {
@@ -349,7 +351,8 @@ export async function mountApp(): Promise<void> {
 
     const frame = (now: number) => {
       try {
-        const frameDt = Math.min(0.05, (now - last) / 1000);
+        const elapsed = (now - last) / 1000;
+        const frameDt = Number.isFinite(elapsed) ? Math.min(0.05, Math.max(0, elapsed)) : 0;
         last = now;
         if (!paused) {
           accumulator = Math.min(accumulator + frameDt, PHYSICS_DT * 5);

@@ -11,6 +11,7 @@ import {
   worldToOdom,
   type SensorFrame,
 } from "../api";
+import { chaseGroundFraction, placeChaseCamera } from "../sim/camera";
 import { solidQuaternion, type Solid } from "../sim/course";
 import { referenceRoute, type RoutePoint } from "../sim/routes";
 import { AckermannBuggy, type SpawnPose } from "../sim/vehicle";
@@ -45,7 +46,10 @@ export interface RunMetrics {
   controlHz: number;
   distance: number;
   meanSpeed: number;
+  /** Manifolds that contained at least one contact point. */
   collisionCount: number;
+  /** Pairs Rapier reported whose manifold had no points. */
+  predictedCount: number;
   contactTime: number;
   contactTimes: number[];
   minLidar: number;
@@ -63,6 +67,8 @@ export interface RunMetrics {
   crossTrackLate: number;
   final: { x: number; z: number; yaw: number };
   shots: ShotPose[];
+  /** Lower half of the chase frame sees the ground at the spawn and at each still. */
+  chaseGround: boolean;
 }
 
 export interface Episode {
@@ -189,6 +195,7 @@ export function runEpisode(
   let simTime = 0;
   let distance = 0;
   let collisionCount = 0;
+  let predictedCount = 0;
   let contactTime = 0;
   const contactTimes: number[] = [];
   let minLidar = Infinity;
@@ -199,6 +206,7 @@ export function runEpisode(
   const trail: TrailSample[] = [];
   const shots: ShotPose[] = [];
   const touching = new Set<number>();
+  const predictedTouching = new Set<number>();
   let prevX = options.spawn.x;
   let prevZ = options.spawn.z;
   let lastOdom = { x: options.spawn.x, z: options.spawn.z };
@@ -223,21 +231,33 @@ export function runEpisode(
       slowFor = 0;
     }
 
-    const now = new Set<number>();
+    const real = new Set<number>();
+    const predicted = new Set<number>();
     world.contactPairsWith(robot.collider(), (other) => {
-      if (other.handle !== groundHandle) now.add(other.handle);
+      if (other.handle === groundHandle) return;
+      let points = 0;
+      world.contactPair(robot.collider(), other, (manifold) => {
+        points += manifold.numContacts();
+      });
+      if (points > 0) real.add(other.handle);
+      else predicted.add(other.handle);
     });
     let started = false;
-    for (const handle of now) {
+    for (const handle of real) {
       if (!touching.has(handle)) {
         collisionCount += 1;
         contactTimes.push(round(simTime));
         started = true;
       }
     }
+    for (const handle of predicted) {
+      if (!predictedTouching.has(handle)) predictedCount += 1;
+    }
     touching.clear();
-    for (const handle of now) touching.add(handle);
-    if (now.size > 0) contactTime += PHYSICS_DT;
+    predictedTouching.clear();
+    for (const handle of real) touching.add(handle);
+    for (const handle of predicted) predictedTouching.add(handle);
+    if (real.size > 0) contactTime += PHYSICS_DT;
 
     if (sensorAccumulator >= CONTROL_DT - 1e-4) {
       const sampleDt = sensorAccumulator;
@@ -306,6 +326,12 @@ export function runEpisode(
   }
   const end = robot.focus();
   const odomDrift = Math.hypot(end.x - lastOdom.x, end.z - lastOdom.z);
+  const chasePoses = [options.spawn, ...shots];
+  const chaseCamera = new THREE.PerspectiveCamera(48, 16 / 9, 0.1, 600);
+  const chaseGround = chasePoses.every((pose) => {
+    placeChaseCamera(chaseCamera, pose);
+    return chaseGroundFraction(chaseCamera) >= 0.25;
+  });
   robot.dispose();
   world.free();
 
@@ -319,6 +345,7 @@ export function runEpisode(
     distance: round(distance),
     meanSpeed: round(distance / options.seconds),
     collisionCount,
+    predictedCount,
     contactTime: round(contactTime),
     contactTimes,
     minLidar: round(Number.isFinite(minLidar) ? minLidar : 0),
@@ -335,6 +362,7 @@ export function runEpisode(
     crossTrackLate: round(lateCount > 0 ? lateSum / lateCount : 0),
     final: { x: round(end.x), z: round(end.z), yaw: round(end.yaw) },
     shots,
+    chaseGround,
   };
   return { metrics, trail, solids };
 }

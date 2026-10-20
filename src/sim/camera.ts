@@ -28,10 +28,43 @@ export function placeChaseCamera(
   // focus().yaw is the opposite of Three.js rotation.y. See yawFromQuaternion.
   offset.applyQuaternion(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -target.yaw));
   const focus = new THREE.Vector3(target.x, target.y + 0.7, target.z);
+  camera.up.set(0, 1, 0);
   camera.position.copy(focus).add(offset);
   camera.lookAt(focus);
   camera.updateMatrixWorld(true);
   camera.updateProjectionMatrix();
+}
+
+/**
+ * Fraction of a chase frame's lower half whose view ray hits the ground
+ * plane. A camera pitched into the sky, or sitting under the ground plane,
+ * scores near zero. The eval treats that as a failed screenshot.
+ */
+export function chaseGroundFraction(
+  camera: THREE.PerspectiveCamera,
+  width = 96,
+  height = 54,
+): number {
+  const origin = new THREE.Vector3();
+  const sample = new THREE.Vector3();
+  let lower = 0;
+  let hits = 0;
+  for (let y = Math.floor(height / 2); y < height; y += 3) {
+    for (let x = 0; x < width; x += 3) {
+      lower += 1;
+      const ndcX = ((x + 0.5) / width) * 2 - 1;
+      const ndcY = 1 - ((y + 0.5) / height) * 2;
+      sample.set(ndcX, ndcY, 0.5).unproject(camera);
+      origin.copy(camera.position);
+      sample.sub(origin);
+      if (sample.y >= -1e-4) continue;
+      const t = -origin.y / sample.y;
+      const hitX = origin.x + sample.x * t;
+      const hitZ = origin.z + sample.z * t;
+      if (t > 0.3 && t < 80 && Math.abs(hitX) < 80 && Math.abs(hitZ) < 90) hits += 1;
+    }
+  }
+  return lower === 0 ? 0 : hits / lower;
 }
 
 /** Chase camera. Drag orbits around the car; the car stays in frame. */
@@ -64,14 +97,31 @@ export class ChaseCamera {
     this.distance = CHASE_DISTANCE;
   }
 
+  /** Jump the rig onto the car. Used after a reset or a world switch. */
+  snap(target: ChassisFocus): void {
+    this.focus.set(target.x, target.y + 0.7, target.z);
+    this.look.copy(this.focus);
+    placeChaseCamera(this.camera, target, this.orbitYaw, this.orbitPitch, this.distance);
+  }
+
   update(dt: number, target: ChassisFocus): void {
     this.held.copy(this.camera.position);
     placeChaseCamera(this.camera, target, this.orbitYaw, this.orbitPitch, this.distance);
     this.desired.copy(this.camera.position);
     this.focus.set(target.x, target.y + 0.7, target.z);
-    const blend = 1 - Math.exp(-dt * 5);
+    const gap = this.held.distanceTo(this.desired);
+    // A backwards timestamp used to extrapolate the rig under the ground and
+    // aim it at the sky. A dt of 1 is an explicit snap (teleport). Anything
+    // in between eases, and only while the rig is already near the car.
+    const tame = dt > 0 && dt < 1 && Number.isFinite(dt) && gap < 25 && this.held.y > 0.3;
+    if (!tame) {
+      this.look.copy(this.focus);
+      return;
+    }
+    const blend = 1 - Math.exp(-Math.min(dt, 0.05) * 5);
     this.camera.position.copy(this.held).lerp(this.desired, blend);
     this.look.lerp(this.focus, blend);
+    this.camera.up.set(0, 1, 0);
     this.camera.lookAt(this.look);
   }
 

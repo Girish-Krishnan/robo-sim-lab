@@ -38,8 +38,8 @@ export function buildForestSolids(): Solid[] {
 
   for (let i = 0; i < 18; i++) {
     const z = -8 + i * 4.3;
-    // The corridor fence closes at z=38. Trees past that sit in the
-    // outside lane a wall follower uses.
+    // The corridor fence closes at z=38. Trees past the trail's north
+    // bend sit in the outside lane a wall follower uses.
     if (z > 34) continue;
     const wave = Math.sin(z * 0.18) * 1.4;
     tree(-7.2 - (i % 3) * 1.3, z + (i % 2), i % 3 === 0 ? "pine" : "tree");
@@ -51,7 +51,9 @@ export function buildForestSolids(): Solid[] {
 
   // Trail obstacles, tall enough for the lidar, with a clear line down the middle.
   solids.push(ballSolid(2.8, 16, 0.9, "rock", 0x6e7370));
-  solids.push(ballSolid(-3.0, 28, 0.95, "rock", 0x7c756c));
+  // West of the bridge, off the reference line. On the deck it sat in the
+  // path a drifted second lap was tracking.
+  solids.push(ballSolid(-5.4, 22.8, 0.95, "rock", 0x7c756c));
   solids.push(ballSolid(2.7, 30, 0.88, "rock", 0x5e6664));
   solids.push(logSolid(3.4, 21, 0.72, 2.2, 0.5));
   solids.push(logSolid(1.6, 6, 0.72, 2.4, -0.4));
@@ -77,10 +79,12 @@ export function buildForestSolids(): Solid[] {
   // Corridor around the trail. The outer yard fence is far enough that a
   // gap follower leaves the trees and laps empty grass. This one keeps
   // that run among the trunks, and gives wall follow a continuous edge.
+  // West fence is set out so the return lane clears the pine row. The north
+  // and south fences stay on the original line and just reach the new corner.
   solids.push(cuboid(16.5, 11, 0.45, 1.6, 54, "fence"));
-  solids.push(cuboid(-16.5, 11, 0.45, 1.6, 54, "fence"));
-  solids.push(cuboid(0, 38, 33.4, 1.6, 0.45, "fence"));
-  solids.push(cuboid(0, -16, 33.4, 1.6, 0.45, "fence"));
+  solids.push(cuboid(-22.8, 11, 0.45, 1.6, 54, "fence"));
+  solids.push(cuboid(-3.15, 38, 40.2, 1.6, 0.45, "fence"));
+  solids.push(cuboid(-3.15, -16, 40.2, 1.6, 0.45, "fence"));
 
   // Yard boundary, tall enough for the lidar. Keeps an open-space
   // follower from driving off the ground plane.

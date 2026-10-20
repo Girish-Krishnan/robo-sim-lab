@@ -53,17 +53,20 @@ function trackRoute(): RoutePoint[] {
   ]);
 }
 
-/** Roundabout apron around the planter. The barriers below it close the avenue. */
+/**
+ * Roundabout apron, shifted northeast of the planter so the line clears both
+ * the planter and the lamps on the south side of the circle. Clockwise on the
+ * map is a left turn from the driver's seat.
+ */
 function cityRoute(): RoutePoint[] {
-  // Clockwise on the map, which is a left turn from the driver's seat.
-  return arc(5.5, 58, 5.8, -Math.PI / 2, -Math.PI / 2 - Math.PI * 2, 72);
+  return arc(6.3, 59.1, 5.9, -Math.PI / 2, -Math.PI / 2 - Math.PI * 2, 72);
 }
 
 /**
- * Trail through the trunks, then back along the open west lane.
- * The bridge deck is a single car wide, and the north fence sits too close
- * for a U-turn on the deck, so the loop leaves the trail only at the north
- * clearing and returns between the tree row and the corridor fence.
+ * Trail through the trunks, then back on the open lane west of the pines.
+ * The bridge deck is a single car wide, so the loop leaves the trail at the
+ * north clearing. The return is far enough from the pine row that a corner
+ * cut still clears the trunks.
  */
 function forestRoute(): RoutePoint[] {
   return join([
@@ -82,11 +85,13 @@ function forestRoute(): RoutePoint[] {
     line(-0.3, 29.2, -0.5, 30.6, 0.4),
     line(-0.5, 30.6, -0.4, 32, 0.6),
     arc(-4, 32, 3.6, 0, Math.PI / 2, 8),
-    line(-4, 35.6, -10.3, 35.6, 2),
-    arc(-10.3, 32, 3.6, Math.PI / 2, Math.PI, 8),
-    line(-13.9, 32, -13.9, -9.8, 2),
-    arc(-10.3, -9.8, 3.6, Math.PI, Math.PI * 1.5, 8),
-    line(-10.3, -13.4, -4.2, -13.4, 2),
+    // The west pine row sits at x=-11.5. The return stays west of x=-16 so a
+    // corner cut still leaves a metre of body clearance, then rejoins the trail.
+    line(-4, 35.6, -16.5, 35.65, 2),
+    arc(-16.5, 32.05, 3.6, Math.PI / 2, Math.PI, 8),
+    line(-20.1, 32.05, -20.1, -9.0, 2),
+    arc(-16.5, -9.0, 3.6, Math.PI, Math.PI * 1.5, 8),
+    line(-16.5, -12.6, -4.2, -13.4, 2),
     arc(-4.2, -9.8, 3.6, -Math.PI / 2, 0, 8),
   ]);
 }

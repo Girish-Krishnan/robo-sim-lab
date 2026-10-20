@@ -56,7 +56,7 @@ async function main(): Promise<void> {
     const m = episode.metrics;
     const driftPct = m.distance > 1 ? (100 * m.odomDrift) / m.distance : 0;
     process.stdout.write(
-      `${world}/${example}  dist ${m.distance.toFixed(1)}  coll ${m.collisionCount}  stuck ${m.stuckTime.toFixed(1)}  drift ${m.odomDrift.toFixed(2)} (${driftPct.toFixed(1)}%)  laps ${m.laps}  xt ${m.crossTrackMean.toFixed(2)}/${m.crossTrackMax.toFixed(2)} early ${m.crossTrackEarly.toFixed(2)} late ${m.crossTrackLate.toFixed(2)}  ${(Date.now() - started) / 1000}s\n`,
+      `${world}/${example}  dist ${m.distance.toFixed(1)}  real ${m.collisionCount}  pred ${m.predictedCount}  stuck ${m.stuckTime.toFixed(1)}  drift ${m.odomDrift.toFixed(2)} (${driftPct.toFixed(1)}%)  laps ${m.laps}  xt ${m.crossTrackMean.toFixed(2)}/${m.crossTrackMax.toFixed(2)} early ${m.crossTrackEarly.toFixed(2)} late ${m.crossTrackLate.toFixed(2)}  ground ${m.chaseGround ? "yes" : "NO"}  ${(Date.now() - started) / 1000}s\n`,
     );
   }
   if (rasters.length === 16) {
