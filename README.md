@@ -115,11 +115,13 @@ The HUD shows true forward speed next to odometry speed, and commanded steering 
 
 ```python
 draw.path(points, "#7dcea0")    # points are {x, y} or (x, y), at least two
-draw.points(points, "#f4d03f")
+draw.points(points, "#f4d03f")  # optional 3rd/4th value: yaw, weight
 draw.text(x, y, "lookahead", "#f4f1ea")
 ```
 
-Colors are `#rrggbb`. The 3D view and the lidar inset both draw the list. The inset is centered on the pose the program estimates, not on the true pose.
+Colors are `#rrggbb`. The 3D view and the lidar inset both draw the list. Point clouds are pixel-sized dots a few centimetres off the ground, with a short heading tick when a yaw is present, brighter when the weight is higher. The inset is centered on the pose the program estimates, not on the true pose. A spread-out cloud widens the inset so the dots stay on the dial.
+
+`sensors.task.map.grid` is a NumPy array of that distance field in metres, decoded once before the timed `control` call. `field` is still the base64 form. An optional `init(sensors)` runs once per map stamp, outside the timed step, so a program can warm that table without spending the 20 Hz budget.
 
 ### Pure pursuit
 

@@ -158,7 +158,8 @@ export function paintPathPlot(
 /** 4 columns of worlds, one row per example, each cell a half-size path plot. */
 export function renderContactSheet(panels: { world: EvalWorld; example: string; rgba: Uint8Array }[]): Buffer {
   const worlds: EvalWorld[] = ["city", "track", "forest", "warehouse"];
-  const examples = ["circle", "avoid", "wall", "pursuit", "mcl"];
+  const examples = ["circle", "avoid", "wall", "pursuit", "mcl", "mcl-global"];
+  const rowLabel: Record<string, string> = { "mcl-global": "kidnap" };
   const cell = 480;
   const gap = 8;
   const labelW = 112;
@@ -172,7 +173,7 @@ export function renderContactSheet(panels: { world: EvalWorld; example: string; 
     text(rgba, width, height, labelW + col * (cell + gap) + 8, 8, name, 2);
   }
   for (let row = 0; row < examples.length; row++) {
-    const name = examples[row]!;
+    const name = rowLabel[examples[row]!] ?? examples[row]!;
     text(rgba, width, height, 8, labelH + row * (cell + gap) + 8, name, 2);
   }
   for (const panel of panels) {

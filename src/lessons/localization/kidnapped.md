@@ -9,27 +9,27 @@ prerequisites: localization/pf-pursuit
 status: ready
 ---
 
-A kidnapped robot is one that was moved while it was not looking. The odometry origin is no longer a hint. Global localization starts the particles over the free cells of the map, with random yaw, and waits until the cloud collapses before it trusts the mean for pursuit.
+A kidnapped robot is one that was moved while it was not looking. The odometry origin is no longer a hint. The ideal prior is uniform over free space and yaw. A few hundred particles cannot tile that, so the starter puts most of them along the known path, at twelve headings, and scatters the rest on free cells. The car waits until the cloud collapses before it trusts a pose for pursuit.
 
 ## In plain words
 
-`UNKNOWN_START` in the kidnapped starter is true. The initial cloud is uniform over cells whose distance field is greater than about 0.9 m, so particles do not start inside walls, and yaw is uniform on $(-\pi, \pi)$. Until the standard deviation of the cloud drops and a couple of seconds have passed, the car only creeps and steers. A bad mean would otherwise pure-pursuit into the first wall that the mean happened to invent.
+`UNKNOWN_START` in the kidnapped starter is true. A few hundred particles cannot fill the yard in x, y, and yaw at once, so the prior is poses along the known path (the route is task info) plus a scatter of free cells, with a grid of headings. The car holds still until the weighted cloud tightens. Driving on a mean that sits between two modes is how you aim at the wrong aisle.
 
-The map is distinctive enough on the oval, the warehouse, and the city that a scan is not the same in every corridor. The forest is harder: many trunks look like many other trunks. Expect the oval to lock on, and do not be surprised if the trees take longer or lock onto a wrong aisle.
-
-This is still the same filter. Only the initial belief changed. The motion noise, the likelihood, and the resampler are the tracking starter's.
+On seed 1 the forest collapses and then completes a lap: the mode is under 0.5 m at the end, with no real contact. The oval's mode is also on the car within about a third of a metre, but the opposite straight is a second mode with the same wall distances, so the variance stays high and the car waits. That symmetry is the lesson. The warehouse aisle is similar along its length, so the mode can sit under a metre off without the cloud dying. The roundabout is less decisive: the mode stays near a metre. Watch the cloud, not the throttle.
 
 ## The math
 
-The initial belief is approximately uniform on the free set $\mathcal{F}$:
+The belief you want, if you had thousands of particles, is uniform on the free set $\mathcal{F}$:
 
 $$x^{[i]} \sim \mathrm{Uniform}(\mathcal{F}),\quad \theta^{[i]} \sim \mathrm{Uniform}(-\pi, \pi).$$
 
-After a scan, weights concentrate on poses whose wall distances match the beam endpoints. $N_{\mathrm{eff}}$ falls, resampling copies those poses, and the variance of the cloud drops. A practical gate for "I am localized" is
+The starter cannot afford that. About four fifths of the 360 particles sit on the known path, twelve headings, with a little position noise. The rest are free cells. Both are drawn, so the first frame is a cloud along the route plus a scatter, not a blob on the car.
+
+After a scan, weights concentrate on poses whose wall distances match the beam endpoints. The starter cubes those weights when the start is unknown, so one good mode pulls ahead of a flat prior. $N_{\mathrm{eff}}$ falls, resampling copies those poses, and the variance of the cloud drops. A practical gate for "I am localized" is
 
 $$\sigma_x + \sigma_y < \sigma^\star$$
 
-with $\sigma^\star$ around 1.5 m, after at least one full second of scans so a single lucky scan cannot start the car. The starter uses a gate in that spirit. It is a heuristic on the cloud, not a probability you were given.
+with $\sigma^\star$ around 1.2 m, after at least one full second of scans so a single lucky scan cannot start the car. The starter uses that gate. It is a heuristic on the cloud, not a probability you were given. While the spread is still large, the published pose is the best particle, because the mean of two modes sits in the wall between them.
 
 Kidnapping in the strict sense would also need a detector that says "my weights are all terrible, spread out again". This lesson only does the unknown start. Re-spreading when the mean likelihood collapses is the exercise.
 
@@ -43,6 +43,6 @@ Particle count matters more here than in tracking. A few hundred particles over 
 
 ## Try it
 
-1. Run the kidnapped starter on the oval. The blue points should begin scattered, then gather on the car, and only then should the car take the centreline.
-2. Tighten the spread gate (the `1.6` in the starter) to `0.4`. The car should wait longer. If it never goes, the cloud is localized enough to see and not enough to pass your gate.
+1. Run the kidnapped starter on the forest. The dots should begin spread along the trail, then gather on the car, and only then should the car take the path. On the oval, look for a second clump on the far straight that does not die.
+2. Tighten the spread gate (the `1.2` in `ready`) to `0.4`. The car should wait longer. If it never goes, the cloud is localized enough to see and not enough to pass your gate.
 3. Set the gate back, and after the cloud has collapsed, add a check: if the average beam distance in the field is suddenly large, spread the particles over free space again. That is a kidnapped detector. Try it by resetting the world mid-lap and see whether the cloud lets go of the old pose.

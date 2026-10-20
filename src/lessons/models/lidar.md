@@ -19,17 +19,18 @@ A beam that hits nothing is reported as `max_range`, 12 m. That is not a wall at
 
 The ray starts at the roof puck, not at the bumper. The nose of the body is about 0.7 m in front of that puck. A program that drives until the forward range is 0.2 m has already hit something.
 
-<svg viewBox="0 0 440 240" role="img" aria-label="Lidar beam angles">
-  <rect width="440" height="240" rx="12" fill="#10161a"/>
+<svg viewBox="0 0 440 250" role="img" aria-label="Lidar beam angles">
+  <rect width="440" height="250" rx="12" fill="#10161a"/>
   <polygon points="220,150 250,168 190,168" fill="#2fbfa8"/>
-  <line x1="220" y1="150" x2="220" y2="36" stroke="#f4f1ea" stroke-width="2"/>
-  <line x1="220" y1="150" x2="120" y2="55" stroke="#9fd8cf" stroke-width="2"/>
-  <line x1="220" y1="150" x2="320" y2="55" stroke="#e3a23a" stroke-width="2"/>
+  <line x1="220" y1="150" x2="220" y2="48" stroke="#f4f1ea" stroke-width="2"/>
+  <line x1="220" y1="150" x2="120" y2="70" stroke="#9fd8cf" stroke-width="2"/>
+  <line x1="220" y1="150" x2="320" y2="70" stroke="#e3a23a" stroke-width="2"/>
   <path d="M220 110 A 40 40 0 0 1 248 98" fill="none" stroke="#9fd8cf" stroke-width="1.5"/>
-  <text x="228" y="28" fill="#f4f1ea" font-size="13" font-family="sans-serif">0 forward</text>
-  <text x="78" y="48" fill="#9fd8cf" font-size="13" font-family="sans-serif">+ positive, left</text>
-  <text x="328" y="48" fill="#e3a23a" font-size="13" font-family="sans-serif">negative, right</text>
-  <text x="150" y="210" fill="#8e9b94" font-size="13" font-family="sans-serif">270 degree field. The rear wedge is blank.</text>
+  <text x="196" y="36" fill="#f4f1ea" font-size="13" font-family="sans-serif">0 forward</text>
+  <text x="16" y="64" fill="#9fd8cf" font-size="13" font-family="sans-serif">positive, left</text>
+  <text x="300" y="64" fill="#e3a23a" font-size="13" font-family="sans-serif">negative, right</text>
+  <text x="16" y="214" fill="#8e9b94" font-size="13" font-family="sans-serif">270 degree field.</text>
+  <text x="16" y="234" fill="#8e9b94" font-size="13" font-family="sans-serif">The rear wedge is blank.</text>
 </svg>
 
 ## The math

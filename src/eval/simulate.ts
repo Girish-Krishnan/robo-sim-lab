@@ -75,9 +75,16 @@ export interface RunMetrics {
   /** Radians. */
   headingErrorMean: number;
   headingErrorMax: number;
-  /** Milliseconds inside the Python control call. Zero for a non-Python policy. */
+  /** Milliseconds inside the Python control call. Map decode is not included. */
   controlMsMean: number;
   controlMsMax: number;
+  /**
+   * First time the pose error stays under 0.5 m for a full second.
+   * -1 when the policy has no estimate, or the cloud never settles.
+   */
+  convergeTime: number;
+  /** Pose error on the last control sample. Zero when there is no estimate. */
+  finalPoseError: number;
   final: { x: number; z: number; yaw: number };
   shots: ShotPose[];
   /** Lower half of the chase frame sees the ground at the spawn and at each still. */
@@ -208,7 +215,7 @@ export function runEpisode(
   const route = referenceRoute(options.world);
   const taskPath = route.map((point) => worldToOdom(options.spawn, point));
   const taskMap = buildKnownMap(solids, options.spawn, taskPath);
-  const tracksPath = options.example === "pursuit" || options.example === "mcl";
+  const tracksPath = options.example === "pursuit" || options.example === "mcl" || options.example === "mcl-global";
 
   const steps = Math.round(options.seconds * PHYSICS_HZ);
   let sensorAccumulator = 0;
@@ -235,6 +242,9 @@ export function runEpisode(
   let headSum = 0;
   let headMax = 0;
   let poseCount = 0;
+  let finalPoseError = 0;
+  let convergeTime = -1;
+  let underStart = -1;
 
   for (let i = 0; i < steps; i++) {
     robot.preStep(PHYSICS_DT);
@@ -325,6 +335,15 @@ export function runEpisode(
         headSum += heading;
         headMax = Math.max(headMax, heading);
         poseCount += 1;
+        finalPoseError = position;
+        if (convergeTime < 0) {
+          if (position < 0.5) {
+            if (underStart < 0) underStart = simTime;
+            else if (simTime - underStart >= 1) convergeTime = underStart;
+          } else {
+            underStart = -1;
+          }
+        }
       }
       trail.push(sample);
     }
@@ -405,6 +424,8 @@ export function runEpisode(
     headingErrorMax: round(headMax),
     controlMsMean: round(meanOf(options.policy.controlMs)),
     controlMsMax: round(maxOf(options.policy.controlMs)),
+    convergeTime: round(convergeTime),
+    finalPoseError: round(finalPoseError),
     final: { x: round(end.x), z: round(end.z), yaw: round(end.yaw) },
     shots,
     chaseGround,

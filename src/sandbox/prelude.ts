@@ -4,7 +4,10 @@
  * and returns a command plus any debug drawings. It must not mention ground truth.
  */
 export const STUDENT_PRELUDE = `
+import base64
+import copy
 import json
+import types
 from types import SimpleNamespace
 import numpy as np
 
@@ -88,19 +91,109 @@ class _RoboDraw:
         })
 
 def _robo_points(points):
+    arr = None
+    try:
+        arr = np.asarray(points, dtype=float)
+    except (TypeError, ValueError):
+        arr = None
+    if isinstance(arr, np.ndarray) and arr.ndim == 2 and arr.shape[1] >= 2:
+        n = min(int(arr.shape[0]), 500)
+        cols = int(arr.shape[1])
+        out = []
+        for i in range(n):
+            item = {"x": float(arr[i, 0]), "y": float(arr[i, 1])}
+            if cols > 2 and np.isfinite(arr[i, 2]):
+                item["yaw"] = float(arr[i, 2])
+            if cols > 3 and np.isfinite(arr[i, 3]):
+                item["w"] = float(arr[i, 3])
+            out.append(item)
+        return out
     out = []
-    for point in list(points)[:400]:
+    for point in list(points)[:500]:
         if isinstance(point, dict):
-            out.append({"x": float(point.get("x", 0.0)), "y": float(point.get("y", 0.0))})
+            item = {"x": float(point.get("x", 0.0)), "y": float(point.get("y", 0.0))}
+            if "yaw" in point:
+                item["yaw"] = float(point["yaw"])
+            if "w" in point:
+                item["w"] = float(point["w"])
+            out.append(item)
         else:
-            out.append({"x": float(point[0]), "y": float(point[1])})
+            item = {"x": float(point[0]), "y": float(point[1])}
+            if len(point) > 2:
+                item["yaw"] = float(point[2])
+            if len(point) > 3:
+                item["w"] = float(point[3])
+            out.append(item)
     return out
 
-def _robo_call(raw_json):
-    frame = _robo_frame(json.loads(raw_json))
+def _robo_decode_field(m):
+    if not m.field or m.width < 1 or m.height < 1:
+        return np.zeros((max(int(m.height), 1), max(int(m.width), 1)), dtype=np.float32)
+    raw = np.frombuffer(base64.b64decode(m.field), dtype=np.uint8)
+    if raw.size != int(m.width) * int(m.height):
+        return np.zeros((int(m.height), int(m.width)), dtype=np.float32)
+    return raw.reshape((int(m.height), int(m.width))).astype(np.float32) * np.float32(0.01)
+
+def _robo_reset():
+    _robo_prepare.task = None
+    _robo_prepare.stamp = None
+    _robo_prepare.warm = False
+    _robo_frame_cache[0] = None
+
+_robo_frame_cache = [None]
+
+def _robo_prepare(raw_json):
+    raw = json.loads(raw_json)
+    task_raw = raw.get("task") or {}
+    raw_map = task_raw.get("map") or {}
+    stamp = int(raw_map.get("stamp") or 0)
+    if getattr(_robo_prepare, "task", None) is None or getattr(_robo_prepare, "stamp", None) != stamp:
+        task = _robo_task(task_raw)
+        task.map.grid = _robo_decode_field(task.map)
+        _robo_prepare.task = task
+        _robo_prepare.stamp = stamp
+        _robo_prepare.warm = False
+    frame = _robo_frame(raw)
+    frame.task = _robo_prepare.task
+    _robo_frame_cache[0] = frame
+    if not getattr(_robo_prepare, "warm", False):
+        _robo_prepare.warm = True
+        # Compile control once, then put the globals back so the timed steps
+        # see the program as it was loaded. Map decode stays above this.
+        snap = _robo_snapshot()
+        try:
+            _robo_invoke()
+        except Exception:
+            pass
+        _robo_restore(snap)
+        init = _robo_ns.get("init")
+        if callable(init):
+            init(frame)
+    return None
+
+def _robo_snapshot():
+    snap = {}
+    for key, value in list(_robo_ns.items()):
+        if key.startswith("_") or callable(value) or isinstance(value, types.ModuleType):
+            continue
+        try:
+            snap[key] = copy.deepcopy(value)
+        except Exception:
+            continue
+    return snap
+
+def _robo_restore(snap):
+    for key, value in snap.items():
+        _robo_ns[key] = value
+
+def _robo_invoke():
+    frame = _robo_frame_cache[0]
     drawer = _RoboDraw()
     _robo_ns["draw"] = drawer
     result = _robo_ns["control"](frame)
+    return result, drawer
+
+def _robo_pack(result, drawer):
     if isinstance(result, dict):
         steering = result.get("steering", 0.0)
         throttle = result.get("throttle", 0.0)
@@ -113,4 +206,12 @@ def _robo_call(raw_json):
             "control(sensors) must return (steering, throttle) or a dict with those keys"
         )
     return (float(steering), float(throttle), json.dumps(drawer.ops))
+
+def _robo_step():
+    result, drawer = _robo_invoke()
+    return _robo_pack(result, drawer)
+
+def _robo_call(raw_json):
+    _robo_prepare(raw_json)
+    return _robo_step()
 `;

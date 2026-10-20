@@ -13,6 +13,9 @@ export class DebugDraw {
 
   constructor(scene: THREE.Scene) {
     this.group.name = "debug-draw";
+    // Children sit at world coordinates, often far from the origin. A culled
+    // parent would drop the whole cloud even when the points themselves opt out.
+    this.group.frustumCulled = false;
     scene.add(this.group);
   }
 
@@ -27,20 +30,21 @@ export class DebugDraw {
     this.clear();
     for (const op of ops) {
       if (op.kind === "text") {
-        const at = place(spawn, op.x, op.y);
+        const at = place(spawn, op.x, op.y, 0.46);
         this.group.add(textSprite(op.text, op.color, at));
         continue;
       }
-      const points = op.points.map((point) => place(spawn, point.x, point.y));
-      if (op.kind === "path" && points.length >= 2) this.group.add(ribbon(points, op.color));
-      if (op.kind === "points" && points.length > 0) this.group.add(markers(points, op.color));
+      if (op.kind === "path" && op.points.length >= 2) {
+        this.group.add(ribbon(op.points.map((point) => place(spawn, point.x, point.y, 0.46)), op.color));
+      }
+      if (op.kind === "points" && op.points.length > 0) this.group.add(markers(spawn, op.points, op.color));
     }
   }
 }
 
-function place(spawn: SpawnPose, x: number, y: number): THREE.Vector3 {
+function place(spawn: SpawnPose, x: number, y: number, height: number): THREE.Vector3 {
   const world = odomToWorld(spawn, { x, y });
-  return new THREE.Vector3(world.x, 0.46, world.z);
+  return new THREE.Vector3(world.x, height, world.z);
 }
 
 function ribbon(points: THREE.Vector3[], color: string): THREE.Mesh {
@@ -69,22 +73,98 @@ function ribbon(points: THREE.Vector3[], color: string): THREE.Mesh {
   return new THREE.Mesh(geometry, basic(color, 0.92));
 }
 
-function markers(points: THREE.Vector3[], color: string): THREE.InstancedMesh {
-  const mesh = new THREE.InstancedMesh(new THREE.SphereGeometry(0.32, 8, 6), basic(color, 1), points.length);
-  const dummy = new THREE.Object3D();
-  for (let i = 0; i < points.length; i++) {
+/** A few centimetres off the floor. Pixel size, so a cloud stays a cloud. */
+const DOT_Y = 0.035;
+const TICK_Y = 0.05;
+const TICK_LENGTH = 0.12;
+
+function particleColor(base: THREE.Color, hot: THREE.Color, weight: number, target: THREE.Color): THREE.Color {
+  // Weight only tints toward white. Darkening by weight hid the low-weight
+  // majority of a spread cloud against the ground.
+  target.copy(base).lerp(hot, weight * 0.45);
+  return target;
+}
+
+function markers(spawn: SpawnPose, points: { x: number; y: number; yaw?: number; w?: number }[], color: string): THREE.Group {
+  const group = new THREE.Group();
+  group.frustumCulled = false;
+  const count = points.length;
+  const positions = new Float32Array(count * 3);
+  const colors = new Float32Array(count * 3);
+  const base = new THREE.Color(color);
+  const hot = new THREE.Color("#f7fbff");
+  let maxWeight = 0;
+  for (const point of points) if (point.w !== undefined) maxWeight = Math.max(maxWeight, point.w);
+  const weighted = maxWeight > 0;
+  const scratch = new THREE.Color();
+  for (let i = 0; i < count; i++) {
     const point = points[i]!;
-    // Above the roof. A cloud at axle height sits inside the body and disappears.
-    dummy.position.set(point.x, point.y + 0.9, point.z);
-    dummy.scale.setScalar(1);
-    dummy.updateMatrix();
-    mesh.setMatrixAt(i, dummy.matrix);
+    const at = place(spawn, point.x, point.y, DOT_Y);
+    positions[i * 3] = at.x;
+    positions[i * 3 + 1] = at.y;
+    positions[i * 3 + 2] = at.z;
+    const weight = weighted ? Math.min(1, Math.max(0, (point.w ?? 0) / maxWeight)) : 1;
+    particleColor(base, hot, weight, scratch);
+    colors[i * 3] = scratch.r;
+    colors[i * 3 + 1] = scratch.g;
+    colors[i * 3 + 2] = scratch.b;
   }
-  mesh.instanceMatrix.needsUpdate = true;
-  // Instances sit on the car, far from the mesh origin. A bounds sphere at
-  // the origin would cull the whole cloud.
-  mesh.frustumCulled = false;
-  return mesh;
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+  const dots = new THREE.Points(
+    geometry,
+    new THREE.PointsMaterial({
+      size: count >= 24 ? 5 : 7,
+      sizeAttenuation: false,
+      vertexColors: true,
+      transparent: true,
+      opacity: 1,
+      depthTest: false,
+      depthWrite: false,
+      toneMapped: false,
+      fog: false,
+    }),
+  );
+  dots.frustumCulled = false;
+  dots.renderOrder = 8;
+  group.add(dots);
+
+  const ticks: number[] = [];
+  const tickColors: number[] = [];
+  for (let i = 0; i < count; i++) {
+    const point = points[i]!;
+    if (point.yaw === undefined || !Number.isFinite(point.yaw)) continue;
+    const at = place(spawn, point.x, point.y, TICK_Y);
+    const weight = weighted ? Math.min(1, Math.max(0, (point.w ?? 0) / maxWeight)) : 1;
+    particleColor(base, hot, weight, scratch);
+    const dx = Math.cos(point.yaw) * TICK_LENGTH;
+    const dy = Math.sin(point.yaw) * TICK_LENGTH;
+    const tip = place(spawn, point.x + dx, point.y + dy, TICK_Y);
+    ticks.push(at.x, at.y, at.z, tip.x, tip.y, tip.z);
+    tickColors.push(scratch.r, scratch.g, scratch.b, scratch.r, scratch.g, scratch.b);
+  }
+  if (ticks.length >= 6) {
+    const lines = new THREE.BufferGeometry();
+    lines.setAttribute("position", new THREE.BufferAttribute(new Float32Array(ticks), 3));
+    lines.setAttribute("color", new THREE.BufferAttribute(new Float32Array(tickColors), 3));
+    const mesh = new THREE.LineSegments(
+      lines,
+      new THREE.LineBasicMaterial({
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.95,
+        depthTest: false,
+        depthWrite: false,
+        toneMapped: false,
+        fog: false,
+      }),
+    );
+    mesh.frustumCulled = false;
+    mesh.renderOrder = 8;
+    group.add(mesh);
+  }
+  return group;
 }
 
 function textSprite(text: string, color: string, at: THREE.Vector3): THREE.Sprite {
@@ -119,6 +199,7 @@ function basic(color: string, opacity: number): THREE.MeshBasicMaterial {
 }
 
 function disposeObject(object: THREE.Object3D): void {
+  for (const child of [...object.children]) disposeObject(child);
   const mesh = object as THREE.Mesh;
   mesh.geometry?.dispose();
   const material = mesh.material;

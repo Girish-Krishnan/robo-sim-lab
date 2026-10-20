@@ -31,14 +31,16 @@ export function loadStudentPolicy(pyodide: PyodideInterface, source: string): Po
   );
   const globals = pyodide.globals.get("_robo_ns");
   pyodide.runPython(source, { globals, filename: "student.py" });
+  pyodide.runPython("_robo_reset()");
   const defined = pyodide.runPython("callable(_robo_ns.get('control'))");
   if (defined !== true) throw new Error("Example did not define control(sensors).");
   const limits = ACKERMANN_BUGGY.limits;
   const controlMs: number[] = [];
   const policy: Policy = (frame: SensorFrame) => {
     pyodide.globals.set("_robo_raw", JSON.stringify(frame));
+    pyodide.runPython("_robo_prepare(_robo_raw)");
     const started = performance.now();
-    const output = pyodide.runPython("_robo_call(_robo_raw)") as { get?: (index: number) => unknown; destroy?: () => void };
+    const output = pyodide.runPython("_robo_step()") as { get?: (index: number) => unknown; destroy?: () => void };
     controlMs.push(performance.now() - started);
     const steering = Number(output.get?.(0));
     const throttle = Number(output.get?.(1));

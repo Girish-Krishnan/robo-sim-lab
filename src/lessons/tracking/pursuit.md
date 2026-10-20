@@ -19,18 +19,19 @@ The starter draws the path, the lookahead point, and the arc implied by the comm
 
 There is also a short reverse if the bumper is in an obstacle and the speed is already near zero. That is a seatbelt, not the controller. The pursuit law itself does not know about lidar.
 
-<svg viewBox="0 0 460 240" role="img" aria-label="Pure pursuit lookahead geometry">
-  <rect width="460" height="240" rx="12" fill="#10161a"/>
-  <path d="M40 180 C 140 170, 200 80, 420 70" fill="none" stroke="#7dcea0" stroke-width="3"/>
-  <circle cx="150" cy="150" r="6" fill="#2fbfa8"/>
-  <circle cx="150" cy="150" r="78" fill="none" stroke="#355850" stroke-width="1.5"/>
-  <circle cx="214" cy="98" r="5" fill="#f4d03f"/>
-  <line x1="150" y1="150" x2="214" y2="98" stroke="#f4d03f" stroke-width="2"/>
-  <line x1="150" y1="150" x2="150" y2="70" stroke="#f4f1ea" stroke-width="1.5"/>
-  <text x="158" y="118" fill="#f4f1ea" font-size="13" font-family="sans-serif">Ld</text>
-  <text x="168" y="78" fill="#e3a23a" font-size="13" font-family="sans-serif">alpha</text>
-  <text x="300" y="58" fill="#7dcea0" font-size="13" font-family="sans-serif">path</text>
-  <text x="40" y="30" fill="#8e9b94" font-size="13" font-family="sans-serif">lookahead circle around the rear axle</text>
+<svg viewBox="0 0 460 250" role="img" aria-label="Pure pursuit lookahead geometry">
+  <rect width="460" height="250" rx="12" fill="#10161a"/>
+  <path d="M40 170 C 140 160, 200 90, 420 80" fill="none" stroke="#7dcea0" stroke-width="3"/>
+  <circle cx="150" cy="148" r="6" fill="#2fbfa8"/>
+  <circle cx="150" cy="148" r="70" fill="none" stroke="#355850" stroke-width="1.5"/>
+  <circle cx="206" cy="104" r="5" fill="#f4d03f"/>
+  <line x1="150" y1="148" x2="206" y2="104" stroke="#f4d03f" stroke-width="2"/>
+  <line x1="150" y1="148" x2="150" y2="78" stroke="#f4f1ea" stroke-width="1.5"/>
+  <text x="158" y="124" fill="#f4f1ea" font-size="13" font-family="sans-serif">Ld</text>
+  <text x="168" y="86" fill="#e3a23a" font-size="13" font-family="sans-serif">alpha</text>
+  <text x="360" y="72" fill="#7dcea0" font-size="13" font-family="sans-serif">path</text>
+  <text x="16" y="214" fill="#8e9b94" font-size="13" font-family="sans-serif">lookahead circle</text>
+  <text x="16" y="234" fill="#8e9b94" font-size="13" font-family="sans-serif">around the rear axle</text>
 </svg>
 
 ## The math

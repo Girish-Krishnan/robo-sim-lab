@@ -8,7 +8,7 @@ import { buildWarehouseSolids, WAREHOUSE_SPAWN } from "../sim/worlds/warehouse";
 import type { WorldId } from "../sim/worlds";
 
 export const EVAL_WORLDS = ["city", "track", "forest", "warehouse"] as const;
-export const EVAL_EXAMPLES = ["circle", "avoid", "wall", "pursuit", "mcl"] as const;
+export const EVAL_EXAMPLES = ["circle", "avoid", "wall", "pursuit", "mcl", "mcl-global"] as const;
 
 export type EvalWorld = (typeof EVAL_WORLDS)[number];
 export type EvalExample = (typeof EVAL_EXAMPLES)[number];

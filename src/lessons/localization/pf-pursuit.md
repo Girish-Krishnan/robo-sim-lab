@@ -17,9 +17,11 @@ On the oval, pursuit that trusts odometry lets cross-track grow from about 0.18 
 
 The starter still draws the path and the lookahead in the odometry frame. It also draws the particles and the estimate. Paths in the header still draws truth and raw odometry, which the program cannot see. The picture you want is: coloured truth on the centreline, red estimate on the car, amber odometry leaving.
 
-The city will not drop to zero cross-track. The body slides in a tight roundabout even with a perfect pose. Judge the filter on the oval, where slip is small and the bias has a full minute to integrate.
+The city will not drop to zero cross-track. The body slides in a tight roundabout even with a perfect pose, so the mean stays near 0.6 m. On seed 1 the filter's late cross-track, after 45 s, was about 0.43 m against about 0.63 m for raw odometry. That is a real correction of heading, on top of a slip the bicycle model does not remove.
 
-The control step has to finish inside the 20 Hz budget, 50 ms, with margin. The starter is sized for that: 360 particles, 40 beams, one distance-field decode on the first tick, then table lookups. If you add a Python loop over particles and beams, you will miss the budget before you miss the wall.
+The warehouse bay is the case where the filter does not clearly win. The loop sits in a long rectangle: the south wall and the rack face are straight, so a pose shifted along the aisle explains the scan about as well as the truth. On seed 1, late cross-track was about 1.04 m with the filter and about 1.10 m with raw odometry. The pose error stays near 1.5 m, mostly along the aisle. Parallel walls are a weak place to ask a lidar for along-track position. The forest and the oval are the places the correction shows up, because a corner or a trunk breaks that symmetry.
+
+The control step has to finish inside the 20 Hz budget, 50 ms, with margin. The host decodes `map.grid` once, before the timed step. The starter then does table lookups: 360 particles and 40 beams. If you add a Python loop over particles and beams, you will miss the budget before you miss the wall.
 
 ## The math
 

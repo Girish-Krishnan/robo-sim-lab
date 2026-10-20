@@ -207,7 +207,14 @@ function drawStudentOverlay(
   cy: number,
   radius: number,
 ): void {
-  const range = 12;
+  let reach = 12;
+  for (const op of overlay.ops) {
+    if (op.kind !== "points") continue;
+    for (const point of op.points) {
+      reach = Math.max(reach, Math.hypot(point.x - overlay.pose.x, point.y - overlay.pose.y));
+    }
+  }
+  const range = Math.min(48, reach * 1.08);
   const project = (x: number, y: number): [number, number] => {
     const dx = x - overlay.pose.x;
     const dy = y - overlay.pose.y;
@@ -229,12 +236,27 @@ function drawStudentOverlay(
       });
       ctx.stroke();
     } else if (op.kind === "points") {
+      let maxWeight = 0;
+      for (const point of op.points) if (point.w !== undefined) maxWeight = Math.max(maxWeight, point.w);
+      const weighted = maxWeight > 0;
+      const dot = op.points.length >= 24 ? 2.4 : 3.4;
       for (const point of op.points) {
         const [x, y] = project(point.x, point.y);
-        ctx.beginPath();
-        ctx.arc(x, y, 4, 0, Math.PI * 2);
-        ctx.fill();
+        const weight = weighted ? Math.min(1, Math.max(0, (point.w ?? 0) / maxWeight)) : 1;
+        ctx.globalAlpha = 0.55 + 0.45 * weight;
+        ctx.fillStyle = op.color;
+        ctx.fillRect(x - dot / 2, y - dot / 2, dot, dot);
+        if (point.yaw !== undefined && Number.isFinite(point.yaw)) {
+          const tip = project(point.x + Math.cos(point.yaw) * 0.35, point.y + Math.sin(point.yaw) * 0.35);
+          ctx.strokeStyle = op.color;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(x, y);
+          ctx.lineTo(tip[0], tip[1]);
+          ctx.stroke();
+        }
       }
+      ctx.globalAlpha = 1;
     } else if (op.kind === "text") {
       const [x, y] = project(op.x, op.y);
       ctx.font = "10px IBM Plex Mono, ui-monospace, monospace";

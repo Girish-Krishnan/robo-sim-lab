@@ -45,7 +45,7 @@ function renderProse(source: string): string {
       }
       if (i < lines.length) chunk.push(lines[i] ?? "");
       i += 1;
-      out.push(chunk.join("\n"));
+      out.push(`<div class="diagram">${chunk.join("\n")}</div>`);
       continue;
     }
     if (trimmed === "") {

@@ -383,6 +383,7 @@ export async function mountApp(): Promise<void> {
       },
       setQuality: (next) => applyQuality(next === "low" ? "low" : "high"),
       focus: () => robot.focus(),
+      frameCamera: (distance, pitch) => camera.frame(distance, pitch),
     };
 
     view.renderer.domElement.focus({ preventScroll: true });
@@ -391,6 +392,7 @@ export async function mountApp(): Promise<void> {
     let accumulator = 0;
     let sensorAccumulator = 0;
     let simTime = 0;
+    if (window.roboSim) window.roboSim.time = () => simTime;
 
     const frame = (now: number) => {
       try {

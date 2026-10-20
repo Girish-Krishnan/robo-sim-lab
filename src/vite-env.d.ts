@@ -10,6 +10,8 @@ interface RoboSimApi {
   setExample: (id: string) => void;
   setQuality: (quality: "low" | "high") => Promise<void>;
   focus: () => { x: number; y: number; z: number; yaw: number };
+  time?: () => number;
+  frameCamera?: (distance: number, pitch: number) => void;
 }
 
 declare global {

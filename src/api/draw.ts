@@ -6,6 +6,10 @@
 export interface DrawPoint {
   x: number;
   y: number;
+  /** Optional heading, radians in the odometry frame. Drawn as a short tick. */
+  yaw?: number;
+  /** Optional weight. The view scales brightness by this value within the cloud. */
+  w?: number;
 }
 
 export type DrawOp =
@@ -22,13 +26,18 @@ function color(value: unknown, fallback: string): string {
 function points(value: unknown): DrawPoint[] {
   if (!Array.isArray(value)) return [];
   const out: DrawPoint[] = [];
-  for (const item of value.slice(0, 400)) {
+  for (const item of value.slice(0, 500)) {
     if (!item || typeof item !== "object") continue;
-    const point = item as { x?: unknown; y?: unknown };
+    const point = item as { x?: unknown; y?: unknown; yaw?: unknown; w?: unknown };
     const x = Number(point.x);
     const y = Number(point.y);
     if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
-    out.push({ x, y });
+    const mark: DrawPoint = { x, y };
+    const yaw = Number(point.yaw);
+    const weight = Number(point.w);
+    if (Number.isFinite(yaw)) mark.yaw = yaw;
+    if (Number.isFinite(weight)) mark.w = weight;
+    out.push(mark);
   }
   return out;
 }

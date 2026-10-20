@@ -15,22 +15,22 @@ Monte Carlo localization represents the belief with $N$ poses, the particles. Ea
 
 The starter uses a few hundred particles, a few dozen lidar beams, and the precomputed distance field. That is the budget that fits in a 20 Hz Pyodide tick. Using all 270 beams and a few thousand particles will miss the deadline and the car will stutter. The geometry does not need it. Walls are large compared with a 0.5 m cell.
 
-Particles are drawn in blue. The weighted-mean estimate is a short yellow heading tick, and the trail of that mean is drawn in red. The green path is the route. None of these drawings are fed back into the next tick. If you want the estimate, keep it in a variable. Do not read it off the screen.
+Each particle is a small dot a few centimetres off the ground, plus a short heading tick. Brighter dots earned more weight. The weighted-mean estimate is a yellow heading mark, and the trail of that mean is drawn in red. The green path is the route. The same marks are in the lidar inset. None of these drawings are fed back into the next tick. If you want the estimate, keep it in a variable. Do not read it off the screen.
 
-<svg viewBox="0 0 460 220" role="img" aria-label="Particles against a wall">
-  <rect width="460" height="220" rx="12" fill="#10161a"/>
-  <line x1="40" y1="40" x2="420" y2="40" stroke="#9aa7a0" stroke-width="6"/>
+<svg viewBox="0 0 460 230" role="img" aria-label="Particles against a wall">
+  <rect width="460" height="230" rx="12" fill="#10161a"/>
+  <line x1="40" y1="36" x2="420" y2="36" stroke="#9aa7a0" stroke-width="6"/>
   <g fill="#8eb8ff">
-    <circle cx="160" cy="110" r="3"/><circle cx="175" cy="124" r="3"/><circle cx="190" cy="108" r="3"/>
-    <circle cx="200" cy="130" r="3"/><circle cx="214" cy="116" r="3"/><circle cx="228" cy="128" r="3"/>
-    <circle cx="180" cy="140" r="3"/><circle cx="210" cy="148" r="3"/>
+    <circle cx="160" cy="100" r="3"/><circle cx="175" cy="114" r="3"/><circle cx="190" cy="98" r="3"/>
+    <circle cx="200" cy="120" r="3"/><circle cx="214" cy="106" r="3"/><circle cx="228" cy="118" r="3"/>
+    <circle cx="180" cy="130" r="3"/><circle cx="210" cy="138" r="3"/>
   </g>
-  <circle cx="200" cy="120" r="5" fill="#ff5d73"/>
-  <line x1="200" y1="120" x2="200" y2="78" stroke="#ffe08a" stroke-width="2"/>
-  <text x="40" y="190" fill="#8eb8ff" font-size="13" font-family="sans-serif">particles</text>
-  <text x="140" y="190" fill="#ff5d73" font-size="13" font-family="sans-serif">weighted mean</text>
-  <text x="280" y="190" fill="#ffe08a" font-size="13" font-family="sans-serif">heading</text>
-  <text x="40" y="28" fill="#9aa7a0" font-size="13" font-family="sans-serif">wall from the known map</text>
+  <circle cx="200" cy="110" r="5" fill="#ff5d73"/>
+  <line x1="200" y1="110" x2="200" y2="70" stroke="#ffe08a" stroke-width="2"/>
+  <text x="16" y="186" fill="#8eb8ff" font-size="13" font-family="sans-serif">particles</text>
+  <text x="110" y="186" fill="#ff5d73" font-size="13" font-family="sans-serif">weighted mean</text>
+  <text x="250" y="186" fill="#ffe08a" font-size="13" font-family="sans-serif">heading</text>
+  <text x="16" y="214" fill="#9aa7a0" font-size="13" font-family="sans-serif">wall from the known map</text>
 </svg>
 
 ## The math
@@ -49,7 +49,7 @@ Subtracting the max keeps the exponential from underflowing to zero. Then divide
 
 $$N_{\mathrm{eff}} = \frac{1}{\sum_i (w^{[i]})^2}.$$
 
-When $N_{\mathrm{eff}}$ is near $N$, the weights are flat and resampling is a waste. When it falls below about half of $N$, a few particles own the belief and it is time to resample.
+When $N_{\mathrm{eff}}$ is near $N$, the weights are flat and resampling is a waste. When it falls below about $0.55N$, a few particles own the belief and it is time to resample. The tracking starter uses that threshold.
 
 **Low-variance resampling.** Draw one number $u_0 \sim \mathrm{Uniform}(0, 1/N)$, then take
 

@@ -97,6 +97,12 @@ export class ChaseCamera {
     this.distance = CHASE_DISTANCE;
   }
 
+  /** Pull the chase rig back. Used to see a cloud that is wider than the car. */
+  frame(distance: number, pitch: number): void {
+    this.distance = clamp(distance, 4.5, 130);
+    this.orbitPitch = clamp(pitch, 0.12, 1.45);
+  }
+
   /** Jump the rig onto the car. Used after a reset or a world switch. */
   snap(target: ChassisFocus): void {
     this.focus.set(target.x, target.y + 0.7, target.z);
@@ -150,7 +156,7 @@ export class ChaseCamera {
     this.lastX = event.clientX;
     this.lastY = event.clientY;
     this.orbitYaw -= dx * 0.005;
-    this.orbitPitch = clamp(this.orbitPitch + dy * 0.0035, 0.12, 1.15);
+    this.orbitPitch = clamp(this.orbitPitch + dy * 0.0035, 0.12, 1.45);
   };
 
   private onUp = (event: PointerEvent): void => {
@@ -162,6 +168,6 @@ export class ChaseCamera {
 
   private onWheel = (event: WheelEvent): void => {
     event.preventDefault();
-    this.distance = clamp(this.distance + event.deltaY * 0.008, 4.5, 22);
+    this.distance = clamp(this.distance + event.deltaY * 0.008, 4.5, 130);
   };
 }

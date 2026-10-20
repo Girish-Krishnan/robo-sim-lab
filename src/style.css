@@ -146,10 +146,10 @@ button.primary:hover { background: #49d0ba; }
 .toc-module a.is-soon { color: var(--muted); }
 .toc-sandbox.is-current { background: #1b2a28; }
 
-#lesson { min-height: 0; overflow: auto; background: #0c1013; }
+#lesson { min-height: 0; min-width: 0; overflow-x: hidden; overflow-y: auto; background: #0c1013; }
 #lesson[hidden] { display: none; }
 
-.lesson-scroll { max-width: 760px; padding: 28px 36px 72px; }
+.lesson-scroll { width: 100%; max-width: 760px; min-width: 0; box-sizing: border-box; padding: 28px 36px 72px; }
 .lesson-kicker {
   margin: 0 0 6px;
   color: var(--accent);
@@ -160,7 +160,7 @@ button.primary:hover { background: #49d0ba; }
 .lesson-scroll h1 { margin: 0 0 8px; font-size: 32px; letter-spacing: -0.04em; }
 .lesson-prereq { color: var(--muted); font-size: 14px; }
 .lesson-prereq a { color: var(--accent); }
-.lesson-body { font-size: 16.5px; line-height: 1.6; color: #dce6e1; }
+.lesson-body { font-size: 16.5px; line-height: 1.6; color: #dce6e1; min-width: 0; overflow-wrap: break-word; }
 .lesson-body h2 {
   margin: 28px 0 8px;
   font-size: 13px;
@@ -187,8 +187,17 @@ button.primary:hover { background: #49d0ba; }
 }
 .lesson-body pre code { background: transparent; padding: 0; }
 .lesson-body a { color: var(--accent); }
-.lesson-body .math-block { margin: 8px 0 16px; overflow-x: auto; }
-.lesson-body svg { width: 100%; height: auto; }
+.lesson-body .math-block,
+.lesson-body .katex-display {
+  display: block;
+  max-width: 100%;
+  margin: 8px 0 16px;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.lesson-body .katex-display { margin: 0; }
+.lesson-body .diagram { max-width: 100%; margin: 8px 0 16px; }
+.lesson-body svg { display: block; width: 100%; max-width: 100%; height: auto; }
 .lesson-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
 .lesson-actions button.is-on { background: var(--amber); color: #2a1c08; border-color: transparent; }
 .lesson-pager {
@@ -217,7 +226,7 @@ header {
   display: flex;
   align-items: center;
   gap: 10px;
-  min-width: 180px;
+  min-width: 0;
 }
 
 .mark { width: 32px; height: 32px; display: block; }
@@ -565,7 +574,8 @@ body.splitter-drag iframe { pointer-events: none; }
   }
   .lesson-scroll { padding: 20px 16px 48px; }
   header { padding: 0 10px; gap: 8px; }
-  .subtitle, #camera-reset, .shortcut, .header-select span { display: none; }
+  .subtitle, .title, #camera-reset, #reset-seed, .shortcut, .header-select span { display: none; }
+  header, .header-actions, .brand { min-width: 0; }
   .header-select { font-size: 0; }
   .header-select select { font-size: 13px; max-width: 112px; }
   #app.code-mode main {

@@ -105,6 +105,7 @@ function loadProgram(id: number, code: string, nextLimits: RobotLimits): void {
     student = globals as PyProxy;
     pyodide.globals.set("_robo_ns", student);
     pyodide.runPython(code, { globals: student, filename: "student.py" });
+    pyodide.runPython("_robo_reset()");
     const defined = pyodide.runPython("callable(_robo_ns.get('control'))");
     if (defined !== true) {
       throw new Error("Define control(sensors) that returns (steering, throttle).");
@@ -124,7 +125,8 @@ function tick(id: number, sensors: SensorFrame): void {
   }
   try {
     pyodide.globals.set("_robo_raw", JSON.stringify(sensors));
-    const output = pyodide.runPython("_robo_call(_robo_raw)") as PyProxy;
+    pyodide.runPython("_robo_prepare(_robo_raw)");
+    const output = pyodide.runPython("_robo_step()") as PyProxy;
     const steering = Number(output.get?.(0));
     const throttle = Number(output.get?.(1));
     const draw = parseDrawOps(output.get?.(2));

@@ -48,7 +48,7 @@ async function main(): Promise<void> {
     const dir = path.join(outDir, world, example);
     mkdirSync(dir, { recursive: true });
     writeFileSync(path.join(dir, "metrics.json"), JSON.stringify(episode.metrics, null, 2));
-    const planned = example === "pursuit" || example === "mcl" ? referenceRoute(world) : [];
+    const planned = example === "pursuit" || example === "mcl" || example === "mcl-global" ? referenceRoute(world) : [];
     const raster = paintPathPlot(episode.solids, episode.trail, `${world} / ${example}`, world, planned);
     writeFileSync(path.join(dir, "path.png"), rasterToPng(raster));
     rasters.push({ world, example, rgba: raster.rgba });
@@ -56,7 +56,7 @@ async function main(): Promise<void> {
     const m = episode.metrics;
     const driftPct = m.distance > 1 ? (100 * m.odomDrift) / m.distance : 0;
     process.stdout.write(
-      `${world}/${example}  dist ${m.distance.toFixed(1)}  real ${m.collisionCount}  pred ${m.predictedCount}  stuck ${m.stuckTime.toFixed(1)}  drift ${m.odomDrift.toFixed(2)} (${driftPct.toFixed(1)}%)  laps ${m.laps}  xt ${m.crossTrackMean.toFixed(2)}/${m.crossTrackMax.toFixed(2)} early ${m.crossTrackEarly.toFixed(2)} late ${m.crossTrackLate.toFixed(2)}  pose ${m.poseErrorMean.toFixed(2)}/${m.poseErrorMax.toFixed(2)}  head ${m.headingErrorMean.toFixed(3)}  ctrl ${m.controlMsMean.toFixed(1)}/${m.controlMsMax.toFixed(1)} ms  ground ${m.chaseGround ? "yes" : "NO"}  ${(Date.now() - started) / 1000}s\n`,
+      `${world}/${example}  dist ${m.distance.toFixed(1)}  real ${m.collisionCount}  pred ${m.predictedCount}  stuck ${m.stuckTime.toFixed(1)}  drift ${m.odomDrift.toFixed(2)} (${driftPct.toFixed(1)}%)  laps ${m.laps}  xt ${m.crossTrackMean.toFixed(2)}/${m.crossTrackMax.toFixed(2)} early ${m.crossTrackEarly.toFixed(2)} late ${m.crossTrackLate.toFixed(2)}  pose ${m.poseErrorMean.toFixed(2)}/${m.poseErrorMax.toFixed(2)}  head ${m.headingErrorMean.toFixed(3)}  conv ${m.convergeTime.toFixed(1)}  final ${m.finalPoseError.toFixed(2)}  ctrl ${m.controlMsMean.toFixed(1)}/${m.controlMsMax.toFixed(1)} ms  ground ${m.chaseGround ? "yes" : "NO"}  ${(Date.now() - started) / 1000}s\n`,
     );
   }
   if (rasters.length === EVAL_WORLDS.length * EVAL_EXAMPLES.length) {

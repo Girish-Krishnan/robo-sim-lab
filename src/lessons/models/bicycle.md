@@ -17,18 +17,19 @@ Imagine the car as two axles. The rear axle only rolls forward. The front axle i
 
 Positive $\delta$ is a left turn. On this spawn the car sits on the west side of an open pad, nose pointing along the pad, so a left circle stays in the grass, the infield, the meadow, or the open warehouse bay.
 
-<svg viewBox="0 0 440 230" role="img" aria-label="Top view of the bicycle model">
-  <rect x="0" y="0" width="440" height="230" rx="12" fill="#10161a"/>
-  <path d="M70 150 C 70 70, 210 40, 300 90" fill="none" stroke="#355850" stroke-width="10" stroke-linecap="round"/>
-  <circle cx="168" cy="118" r="3" fill="#e7eeea"/>
-  <line x1="168" y1="118" x2="250" y2="78" stroke="#9fd8cf" stroke-width="2"/>
-  <line x1="150" y1="132" x2="186" y2="104" stroke="#f4f1ea" stroke-width="3"/>
-  <line x1="232" y1="92" x2="268" y2="64" stroke="#f4d03f" stroke-width="3"/>
-  <path d="M210 96 l28 -14" stroke="#f4d03f" stroke-width="2" fill="none"/>
-  <text x="168" y="146" fill="#9fd8cf" font-size="13" font-family="sans-serif">L</text>
-  <text x="248" y="58" fill="#f4d03f" font-size="13" font-family="sans-serif">delta</text>
-  <text x="40" y="40" fill="#e7eeea" font-size="13" font-family="sans-serif">left turn, nose along the arc</text>
-  <text x="300" y="180" fill="#8e9b94" font-size="13" font-family="sans-serif">rear axle is white, front axle is yellow</text>
+<svg viewBox="0 0 440 248" role="img" aria-label="Top view of the bicycle model">
+  <rect x="0" y="0" width="440" height="248" rx="12" fill="#10161a"/>
+  <path d="M70 140 C 70 60, 210 36, 300 80" fill="none" stroke="#355850" stroke-width="10" stroke-linecap="round"/>
+  <circle cx="168" cy="108" r="3" fill="#e7eeea"/>
+  <line x1="168" y1="108" x2="250" y2="68" stroke="#9fd8cf" stroke-width="2"/>
+  <line x1="150" y1="122" x2="186" y2="94" stroke="#f4f1ea" stroke-width="3"/>
+  <line x1="232" y1="82" x2="268" y2="54" stroke="#f4d03f" stroke-width="3"/>
+  <path d="M210 86 l28 -14" stroke="#f4d03f" stroke-width="2" fill="none"/>
+  <text x="176" y="128" fill="#9fd8cf" font-size="13" font-family="sans-serif">L</text>
+  <text x="248" y="48" fill="#f4d03f" font-size="13" font-family="sans-serif">delta</text>
+  <text x="16" y="28" fill="#e7eeea" font-size="13" font-family="sans-serif">left turn, nose along the arc</text>
+  <text x="16" y="210" fill="#8e9b94" font-size="13" font-family="sans-serif">rear axle is white</text>
+  <text x="16" y="230" fill="#8e9b94" font-size="13" font-family="sans-serif">front axle is yellow</text>
 </svg>
 
 ## The math

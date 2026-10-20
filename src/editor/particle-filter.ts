@@ -6,7 +6,7 @@ const maxSteer = ACKERMANN_BUGGY.limits.maxSteering;
 /**
  * Monte Carlo localization, then optional pure pursuit on the estimate.
  * `track` starts the cloud near the odometry origin (the true start).
- * `global` spreads it over the free cells and creeps until the cloud collapses.
+ * `global` spreads it along the known path, plus free cells, and holds still until the cloud collapses.
  */
 export function particleFilterSource(mode: "track" | "global"): string {
   const unknown = mode === "global" ? "True" : "False";
@@ -22,6 +22,8 @@ export function particleFilterSource(mode: "track" | "global"): string {
 #                      occupied cell, in centimetres. 0 means occupied.
 #   map.segments       wall edges, packed x0, y0, x1, y1
 #   map.stamp          cache key. The field does not change while you drive.
+#   map.grid           metres, shape (height, width). The host decodes
+#                      field once, before the timed step. 0 is occupied.
 #
 # The filter integrates the odometry delta (wheel speed and gyro, already
 # in sensors.odometry.pose) with a little extra noise, weights each particle
@@ -47,12 +49,25 @@ particles = None
 prev_odom = None
 trail = []
 
+def init(sensors):
+    global particles, prev_odom, trail, rng
+    particles = None
+    prev_odom = None
+    trail = []
+    pursue.index = 0
+    pursue.integral = 0.0
+    pursue.escape = 0
+    pursue.escape_steer = 0.0
+    rng = np.random.default_rng(1)
+    control.held = None
+    distance_field(sensors.task.map)
+
 def control(sensors):
     global particles, prev_odom
     m = sensors.task.map
     field = distance_field(m)
     if particles is None:
-        particles = initial_cloud(m, field)
+        particles = initial_cloud(m, field, sensors.task.path)
 
     pose = sensors.odometry.pose
     if prev_odom is not None:
@@ -60,15 +75,34 @@ def control(sensors):
     prev_odom = (pose.x, pose.y, pose.yaw)
 
     weights = likelihood(particles, sensors, field, m)
+    if UNKNOWN_START:
+        sharp = np.maximum(weights, 0.0) ** 3
+        total = float(np.sum(sharp))
+        weights = sharp / total if total > 0.0 else np.full(N, 1.0 / N)
     estimate = weighted_mean(particles, weights)
-    if 1.0 / max(1e-12, float(np.dot(weights, weights))) < 0.55 * N:
+    dx = particles[:, 0] - estimate[0]
+    dy = particles[:, 1] - estimate[1]
+    spread = math.sqrt(max(0.0, float(np.dot(weights, dx * dx)))) + math.sqrt(max(0.0, float(np.dot(weights, dy * dy))))
+    # A multimodal cloud's mean sits between the modes. Publish the best particle until one mode wins.
+    if UNKNOWN_START and spread > 1.2:
+        best = int(np.argmax(weights))
+        estimate = (float(particles[best, 0]), float(particles[best, 1]), float(particles[best, 2]))
+    draw.points(np.column_stack((particles[:, 0], particles[:, 1], particles[:, 2], weights)), "#8eb8ff")
+    # Leave the kidnapped cloud visible for a moment, then let resampling collapse it.
+    settled = (not UNKNOWN_START) or sensors.time > 0.35
+    neff_limit = 0.97 * N if UNKNOWN_START else 0.55 * N
+    if settled and 1.0 / max(1e-12, float(np.dot(weights, weights))) < neff_limit:
         particles = resample(particles, weights)
-
-    spread = float(np.std(particles[:, 0]) + np.std(particles[:, 1]))
-    ready = (not UNKNOWN_START) or (sensors.time > 2.0 and spread < 1.6)
-    steer, throttle = pursue(sensors, estimate) if ready else (0.42, 0.16)
-
-    draw.points(particles[:, :2], "#8eb8ff")
+    if UNKNOWN_START and control.held is not None:
+        jump = math.hypot(estimate[0] - control.held[0], estimate[1] - control.held[1])
+        # A second aisle can outscore the truth for one scan. Ignore a jump the belief does not own.
+        if jump > 0.6 and float(np.max(weights)) < 0.45:
+            estimate = control.held
+    if UNKNOWN_START:
+        control.held = estimate
+    ready = (not UNKNOWN_START) or (sensors.time > 1.5 and spread < 1.2)
+    # Stay put until one mode owns the cloud. Creeping looks like the other straight.
+    steer, throttle = pursue(sensors, estimate) if ready else (0.0, 0.0)
     trail.append((float(estimate[0]), float(estimate[1])))
     if len(trail) > 280:
         del trail[: len(trail) - 280]
@@ -84,29 +118,63 @@ def control(sensors):
     return steer, throttle
 
 def distance_field(m):
-    if getattr(distance_field, "stamp", None) == m.stamp and m.stamp != 0:
+    grid = getattr(m, "grid", None)
+    if grid is not None and getattr(grid, "shape", None) == (m.height, m.width):
+        distance_field.grid = grid
+        distance_field.stamp = m.stamp
+        return grid
+    if getattr(distance_field, "stamp", None) == m.stamp and m.stamp != 0 and getattr(distance_field, "grid", None) is not None:
         return distance_field.grid
     raw = np.frombuffer(base64.b64decode(m.field), dtype=np.uint8)
-    grid = raw.reshape((m.height, m.width)).astype(np.float32) * 0.01
-    distance_field.grid = grid
+    decoded = raw.reshape((m.height, m.width)).astype(np.float32) * 0.01
+    distance_field.grid = decoded
     distance_field.stamp = m.stamp
-    return grid
+    return decoded
 
-def initial_cloud(m, field):
+def initial_cloud(m, field, path):
     cloud = np.zeros((N, 3), dtype=float)
     if UNKNOWN_START:
-        free_y, free_x = np.nonzero(field > 0.9)
-        if free_x.size == 0:
-            free_x = np.zeros(N, dtype=int)
-            free_y = np.zeros(N, dtype=int)
-        pick = rng.integers(0, free_x.size, N)
-        cloud[:, 0] = m.corner.x + (free_x[pick] + 0.5) * m.resolution
-        cloud[:, 1] = m.corner.y + (free_y[pick] + 0.5) * m.resolution
-        cloud[:, 2] = rng.uniform(-math.pi, math.pi, N)
-        return cloud
+        return kidnapped_cloud(m, field, path)
     cloud[:, 0] = rng.normal(0.0, 0.25, N)
     cloud[:, 1] = rng.normal(0.0, 0.25, N)
     cloud[:, 2] = rng.normal(0.0, 0.06, N)
+    return cloud
+
+def kidnapped_cloud(m, field, path):
+    """Poses along the known path, twelve headings, plus a scatter of free cells.
+
+    A few hundred particles cannot tile the whole yard in x, y, and yaw.
+    The path is task info, so the prior is "somewhere on the route".
+    The free-cell scatter is what the first frames draw before resampling.
+    """
+    cloud = np.zeros((N, 3), dtype=float)
+    headings = np.linspace(-math.pi, math.pi, 12, endpoint=False)
+    slots = min(N, max(12, (N * 4) // 5))
+    stations = max(1, slots // headings.size)
+    if len(path) >= 2:
+        choice = np.linspace(0, len(path) - 1, stations).astype(int)
+        i = 0
+        for index in choice:
+            point = path[int(index)]
+            for heading in headings:
+                if i >= slots:
+                    break
+                cloud[i, 0] = point.x + float(rng.normal(0.0, 0.25))
+                cloud[i, 1] = point.y + float(rng.normal(0.0, 0.25))
+                cloud[i, 2] = float(heading + rng.normal(0.0, 0.02))
+                i += 1
+        filled = i
+    else:
+        filled = 0
+    free_y, free_x = np.nonzero(field > 0.9)
+    if free_x.size == 0:
+        free_x = np.zeros(1, dtype=int)
+        free_y = np.zeros(1, dtype=int)
+    rest = N - filled
+    pick = rng.integers(0, free_x.size, rest)
+    cloud[filled:, 0] = m.corner.x + (free_x[pick] + 0.5) * m.resolution
+    cloud[filled:, 1] = m.corner.y + (free_y[pick] + 0.5) * m.resolution
+    cloud[filled:, 2] = rng.uniform(-math.pi, math.pi, rest)
     return cloud
 
 def apply_motion(cloud, before, after):
@@ -141,6 +209,7 @@ def likelihood(cloud, sensors, field, m):
     a = a[hit]
     if r.size < 6 or m.width < 2:
         return np.full(N, 1.0 / N)
+    sigma = SIGMA
     yaw = cloud[:, 2]
     ox = cloud[:, 0] + LIDAR_FORWARD * np.cos(yaw)
     oy = cloud[:, 1] + LIDAR_FORWARD * np.sin(yaw)
@@ -153,7 +222,7 @@ def likelihood(cloud, sensors, field, m):
     valid = (ix >= 0) & (ix < m.width) & (iy >= 0) & (iy < m.height)
     d = field[np.clip(iy, 0, m.height - 1), np.clip(ix, 0, m.width - 1)]
     d = np.where(valid, d, 2.4)
-    pz = np.exp(-0.5 * (np.minimum(d, 2.2) / SIGMA) ** 2) + 0.09
+    pz = np.exp(-0.5 * (np.minimum(d, 2.2) / sigma) ** 2) + 0.09
     logw = np.sum(np.log(pz), axis=1)
     logw -= np.max(logw)
     w = np.exp(logw)
