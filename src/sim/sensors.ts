@@ -103,6 +103,7 @@ export class SensorSuite {
       },
       imu,
       camera: { available: false, width: 0, height: 0 },
+      task: { path: [] },
     };
   }
 

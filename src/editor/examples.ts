@@ -80,17 +80,34 @@ const avoid = `# Lidar avoid
 # still in the bumper's path at speed.
 #
 # If that nearest return is inside about 1.3 m, the bumper is there
-# (the lidar sits ~0.7 m behind it). Back up and steer toward the clearer
-# side. A zero throttle does not stop a car that is already at speed, so
-# a close return also commands a real brake. A stopped car does not yaw,
-# so if the nose is blocked and a side is open the car creeps into that
-# opening instead of sitting.
+# (the lidar sits ~0.7 m behind it). Back up a short way and steer
+# toward the clearer side.
+#
+# A corner is different from a close cone. If the car has barely moved
+# for a couple of seconds, the way out is the widest gap in the whole
+# scan, often beside the nose rather than ahead of it. Reverse with the
+# opposite steer (yaw rate flips with speed) so the nose swings toward
+# that gap, then drive into it. Twitching in place is not exploring.
+#
+# Among trees the forward ranges are chopped up, and the score then
+# prefers the current heading plus a slow wander. That is a bias, not
+# a recorded path, so the car weaves through gaps instead of lapping
+# one fence. An open avenue does not look like that, and it stays in lane.
 
+import math
 import numpy as np
 
 HALF = 1.35
 aim = 0.0
 reverse = 0
+phase = "run"
+phase_ticks = 0
+cooldown = 0
+held_sign = 1.0
+anchor_x = 0.0
+anchor_y = 0.0
+anchor_t = 0.0
+saw_anchor = False
 
 def inflate(ranges, angles):
     # A return at range r blocks beams within atan(HALF / r) of it.
@@ -102,22 +119,39 @@ def inflate(ranges, angles):
     return wide
 
 def control(sensors):
-    global aim, reverse
+    global aim, reverse, phase, phase_ticks, cooldown, held_sign
+    global anchor_x, anchor_y, anchor_t, saw_anchor
     ranges = np.asarray(sensors.lidar.ranges, dtype=float)
     angles = np.asarray(sensors.lidar.angles, dtype=float)
     wide = inflate(ranges, angles)
 
     front = np.abs(angles) < 0.95
     front_range = float(np.min(ranges[front])) if np.any(front) else sensors.lidar.max_range
-    # Stay pointed down the open lane. Look out to the sides only once
-    # something is actually in front, otherwise the car dives into a
-    # side gap (the trees, a sidewalk) while the lane is still clear.
-    window = 1.15 if front_range < 6.0 else 0.5
+    # Trees chop the forward ranges up. A wall or an empty road does not.
+    fwd = np.abs(angles) < 1.05
+    fwd_ranges = ranges[fwd]
+    # Trunks chop the scan into many range jumps. A wall is one flat return.
+    if fwd_ranges.size > 20:
+        jumps = int(np.sum(np.abs(np.diff(fwd_ranges)) > 1.5))
+    else:
+        jumps = 0
+    weave = jumps > 8 and float(np.mean(fwd_ranges)) < 10.0
+    if weave:
+        # A long fence beside the car would win on raw width. Weight gaps
+        # near a slowly wandering heading so the car threads trunks instead.
+        desired = 0.35 * math.sin(sensors.time * 0.09)
+        window = 1.25
+        pref = np.exp(-0.5 * ((angles - desired) / 0.75) ** 2)
+    else:
+        window = 1.15 if front_range < 6.0 else 0.5
+        pref = np.cos(angles * 0.9)
     forward = np.abs(angles) < window
-
-    score = np.where(forward, wide * np.cos(angles * 0.9), -1.0)
+    score = np.where(forward, wide * pref, -1.0)
     gap = float(angles[int(np.argmax(score))])
     aim = 0.6 * aim + 0.4 * gap
+    # Widest opening anywhere in the scan. A corner's exit is often beside
+    # the nose, outside the forward window the gap follower uses.
+    exit_angle = float(angles[int(np.argmax(wide))])
 
     left = (angles > 0.15) & (angles < 1.2)
     right = (angles < -0.15) & (angles > -1.2)
@@ -126,22 +160,63 @@ def control(sensors):
     turn = 0.5 if left_clear >= right_clear else -0.5
 
     speed = float(sensors.odometry.speed)
+    pose = sensors.odometry.pose
+    if not saw_anchor:
+        anchor_x, anchor_y, anchor_t = pose.x, pose.y, sensors.time
+        saw_anchor = True
+    if sensors.time - anchor_t > 2.5:
+        moved = math.hypot(pose.x - anchor_x, pose.y - anchor_y)
+        stalled = moved < 1.2 and abs(speed) < 0.55
+        anchor_x, anchor_y, anchor_t = pose.x, pose.y, sensors.time
+    else:
+        stalled = False
+    if cooldown > 0:
+        cooldown -= 1
+
+    # Back out of a stall, yaw toward the widest gap while still reversing
+    # (steer sign flips with speed), then drive into that gap. The gap is
+    # re-read each tick because a body angle goes stale as the car yaws.
+    if phase == "back":
+        phase_ticks += 1
+        rear = np.abs(angles) > 2.0
+        rear_range = float(np.min(ranges[rear])) if np.any(rear) else sensors.lidar.max_range
+        # Give the reverse time to clear the corner before trusting a
+        # side-rear beam, which is the wall we are leaving.
+        if phase_ticks > 40 or (phase_ticks > 14 and rear_range < 1.05 and speed < -0.2):
+            phase = "spin" if abs(exit_angle) > 0.8 else "go"
+            phase_ticks = 0
+        return float(np.clip(0.22 * held_sign, -0.3, 0.3)), -0.4
+    if phase == "spin":
+        phase_ticks += 1
+        if abs(exit_angle) < 0.6 or phase_ticks > 50:
+            phase = "go"
+            phase_ticks = 0
+        else:
+            return float(np.clip(-exit_angle, -0.52, 0.52)), -0.4
+    if phase == "go":
+        phase_ticks += 1
+        if phase_ticks > 50:
+            phase = "run"
+            phase_ticks = 0
+            cooldown = 30
+        return float(np.clip(exit_angle * 0.9, -0.5, 0.5)), 0.26
+    if (stalled or (front_range < 2.0 and left_clear < 3.0 and right_clear < 3.0 and abs(speed) < 1.0)) and cooldown == 0:
+        held_sign = 1.0 if left_clear < right_clear else -1.0
+        phase = "back"
+        phase_ticks = 0
+        return float(np.clip(0.22 * held_sign, -0.3, 0.3)), -0.36
+
     if reverse > 0:
         reverse -= 1
         return turn, -0.28
-    # Bumper distance. Reverse before the contact, and keep reversing long
-    # enough to yaw the nose into the opening.
     if front_range < 1.55:
         reverse = 8
         return turn, -0.28
-    # A stopped car does not yaw. If a side is open, roll into it. Reversing
-    # here just rocks the car against the same obstacle.
+    # A stopped car does not yaw. If a side is open, roll into it.
     if abs(speed) < 0.35 and max(left_clear, right_clear) > front_range + 0.8:
         return turn, 0.2
 
     steering = float(np.clip(aim * 1.15, -0.5, 0.5))
-    # Throttle near 0 only holds a light brake. Shed speed with a negative
-    # command while a return is still several metres out.
     if front_range < 8.0 and speed > 3.0:
         throttle = -0.55
     elif front_range < 5.0 and speed > 1.8:
@@ -174,6 +249,12 @@ const wall = `# Wall follow
 # the radius has to match the standoff (steer = atan(wheelbase / gap)).
 # Turning earlier, or with a wider radius, cuts the corner. The -45 deg
 # beam going long is the cue to slow down so that turn starts from a creep.
+#
+# Speed is scheduled on front clearance and curvature. A parallel wall
+# and a long forward beam is a straight, and the car runs. The same beams
+# going long, or a return a few metres ahead, is a corner: brake to a
+# creep, then take the arc. Creeping the straights as well does not
+# finish an oval lap.
 #
 # If the forward beam is inside about a metre, the bumper is already
 # there (the lidar sits ~0.7 m behind it). Back up with the wheels
@@ -297,37 +378,180 @@ def control(sensors):
     # after it has actually been on the wall.
     if settled and preview < 10.5:
         saw_preview = True
-    corner_soon = locked and settled and side < 5.5 and (
-        diag > max(6.2, side * 1.7) or (saw_preview and preview > min(11.2, parallel_preview + 1.6))
-    )
+    # A fast car cannot wait until it is perfectly settled to start braking.
+    # Steering stays at zero either way: a half-lost beam turns the nose in.
+    speed = float(sensors.odometry.speed)
+    ending = diag > max(6.2, side * 1.7) or (saw_preview and preview > min(11.2, parallel_preview + 1.6))
+    corner_soon = locked and side < 5.5 and ending and (settled or speed > 3.0)
     if corner_soon:
-        speed = float(sensors.odometry.speed)
-        # Brake down to a creep. Holding the brake past that drives in reverse
-        # and the car never reaches the corner. Steering here, off a beam that
-        # is already leaving the wall, turns the nose into the corner.
-        throttle = -0.45 if speed > 2.4 else (0.0 if speed > 1.7 else 0.14)
+        # The straight may be near 5 m/s. The shallow beam sees the wall end
+        # several metres early. Shed that before the arc. Holding the brake
+        # once the car is already slow drives it in reverse.
+        if speed > 3.6:
+            throttle = -0.72
+        elif speed > 2.3:
+            throttle = -0.5
+        elif speed > 1.55:
+            throttle = 0.0
+        else:
+            throttle = 0.14
         return 0.0, throttle
 
     if side < 9.0 and diag < 11.0:
         steering = KP * (TARGET - future) - KD * alpha
-        throttle = 0.2
     else:
         steering = 0.0
-        throttle = 0.1
     if dist > TARGET + 1.0:
         steering = max(steering, -0.16)
     steering = float(np.clip(steering, -0.4, 0.4))
-    if front < 4.5:
-        throttle = min(throttle, 0.16)
-    if front < 2.2:
-        throttle = 0.08
+    # Open straight: run. A bend, or a return inside a few metres: slow.
+    curvature = abs(alpha) + 0.55 * abs(steering)
+    if front > 8.0 and curvature < 0.14:
+        target = 5.4
+    elif front > 5.5 and curvature < 0.28:
+        target = 3.0
+    else:
+        target = 2.0
+    if front < 4.0:
+        target = min(target, 1.7)
+    if speed < target - 0.4:
+        throttle = 0.46
+    elif speed > target + 0.5:
+        throttle = -0.3
+    else:
+        throttle = 0.2
     return steering, throttle
+`;
+
+/**
+ * Pure pursuit on the path the world publishes.
+ * Steering is the curvature that reaches a lookahead point; speed is a
+ * small PID. Drawings are the student's own estimate, not the true pose.
+ */
+const pursuit = `# Pure pursuit
+#
+# The world hands you a route the way a planner would hand a real robot a
+# lane: sensors.task.path is a list of waypoints in the same frame as
+# sensors.odometry.pose. That pose is dead reckoning. Wheel-speed bias
+# scales the distance, and the gyro bias walks the heading. Neither is
+# corrected here, so the estimate drifts off the car. Cross-track error
+# against the true trail grows with time. The path plot in the eval shows
+# that gap. A later lesson localizes; this one does not.
+#
+# Wheelbase is ${wheelbase} m. Positive steering is a left turn.
+# draw.* posts shapes back to the view. It does not return information.
+
+import math
+
+WHEELBASE = ${wheelbase}
+LOOKAHEAD = 3.2
+
+def control(sensors):
+    path = sensors.task.path
+    if len(path) < 2:
+        return 0.0, 0.0
+
+    pose = sensors.odometry.pose
+    # The pose never feels a contact. If the bumper is in a trunk, hold a
+    # short reverse instead of driving the same point into it every tick.
+    ahead = np.abs(sensors.lidar.angles) < 0.6
+    front = float(np.min(sensors.lidar.ranges[ahead])) if np.any(ahead) else sensors.lidar.max_range
+    if control.escape > 0:
+        control.escape -= 1
+        draw.path([{"x": point.x, "y": point.y} for point in path], "#7dcea0")
+        return control.escape_steer, -0.28
+    if front < 0.95 and abs(sensors.odometry.speed) < 0.35:
+        left = float(np.mean(sensors.lidar.ranges[sensors.lidar.angles > 0.3]))
+        right = float(np.mean(sensors.lidar.ranges[sensors.lidar.angles < -0.3]))
+        control.escape = 16
+        control.escape_steer = 0.4 if left >= right else -0.4
+        draw.path([{"x": point.x, "y": point.y} for point in path], "#7dcea0")
+        return control.escape_steer, -0.28
+
+    n = len(path)
+    # Search forward from the last progress index so a loop that folds
+    # back on itself is not jumped onto the return leg.
+    best = control.index % n
+    best_d = 1e9
+    for step in range(min(n, 50)):
+        i = (control.index + step) % n
+        point = path[i]
+        dist = math.hypot(point.x - pose.x, point.y - pose.y)
+        if dist < best_d:
+            best_d = dist
+            best = i
+    control.index = best
+
+    target = path[best]
+    for step in range(1, n):
+        point = path[(best + step) % n]
+        if math.hypot(point.x - pose.x, point.y - pose.y) >= LOOKAHEAD:
+            target = point
+            break
+
+    dx = target.x - pose.x
+    dy = target.y - pose.y
+    # Body frame: +x forward, +y left. Yaw is the integral of the gyro.
+    forward = math.cos(pose.yaw) * dx + math.sin(pose.yaw) * dy
+    left = -math.sin(pose.yaw) * dx + math.cos(pose.yaw) * dy
+    ld = max(math.hypot(forward, left), 0.4)
+    alpha = math.atan2(left, forward)
+    curvature = 2.0 * math.sin(alpha) / ld
+    steer = math.atan(WHEELBASE * curvature)
+    steer = max(-${maxSteer}, min(${maxSteer}, steer))
+
+    # Slower into a bend. The integral is clamped so a long straight
+    # does not wind up and then overshoot the corner.
+    speed = sensors.odometry.speed
+    if abs(steer) > 0.4:
+        target_speed = 1.7
+    elif abs(steer) > 0.15:
+        target_speed = 2.6
+    else:
+        target_speed = 4.4
+    error = target_speed - speed
+    control.integral = max(-2.0, min(2.0, control.integral + error * sensors.dt))
+    throttle = 0.34 * error + 0.05 * control.integral
+    throttle = max(-0.55, min(0.75, throttle))
+
+    # The path, the lookahead, and the arc the steering command would drive.
+    # All three are in the odometry frame. As the gyro drifts, the lookahead
+    # drawn on the ground walks off the real car.
+    draw.path([{"x": point.x, "y": point.y} for point in path], "#7dcea0")
+    draw.points([{"x": target.x, "y": target.y}], "#f4d03f")
+    draw.path(command_arc(pose, curvature, ld), "#f5b041")
+    draw.text(target.x, target.y, "lookahead", "#f4f1ea")
+    return steer, throttle
+
+def command_arc(pose, curvature, length):
+    points = []
+    steps = 10
+    for i in range(steps + 1):
+        s = length * i / steps
+        if abs(curvature) < 1e-3:
+            fx, ly = s, 0.0
+        else:
+            fx = math.sin(curvature * s) / curvature
+            ly = (1.0 - math.cos(curvature * s)) / curvature
+        c = math.cos(pose.yaw)
+        sy = math.sin(pose.yaw)
+        points.append({
+            "x": pose.x + c * fx - sy * ly,
+            "y": pose.y + sy * fx + c * ly,
+        })
+    return points
+
+control.index = 0
+control.integral = 0.0
+control.escape = 0
+control.escape_steer = 0.0
 `;
 
 export const EXAMPLES: CodeExample[] = [
   { id: "circle", label: "Circle drive", source: circle },
   { id: "avoid", label: "Lidar avoid", source: avoid },
   { id: "wall", label: "Wall follow", source: wall },
+  { id: "pursuit", label: "Pure pursuit", source: pursuit },
 ];
 
 export const DEFAULT_EXAMPLE = EXAMPLES[0]!;

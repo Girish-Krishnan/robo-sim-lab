@@ -1,4 +1,4 @@
-import { clampCommand, type RobotLimits, type SensorFrame } from "../api";
+import { clampCommand, parseDrawOps, type RobotLimits, type SensorFrame } from "../api";
 import type { HostToWorker, WorkerToHost } from "./messages";
 import { STUDENT_PRELUDE } from "./prelude";
 
@@ -127,9 +127,10 @@ function tick(id: number, sensors: SensorFrame): void {
     const output = pyodide.runPython("_robo_call(_robo_raw)") as PyProxy;
     const steering = Number(output.get?.(0));
     const throttle = Number(output.get?.(1));
+    const draw = parseDrawOps(output.get?.(2));
     output.destroy?.();
     const command = clampCommand({ steering, throttle }, limits);
-    post({ type: "result", id, command, logs: bucket });
+    post({ type: "result", id, command, draw, logs: bucket });
   } catch (error) {
     post({ type: "error", id, message: errorText(error), logs: bucket });
   }

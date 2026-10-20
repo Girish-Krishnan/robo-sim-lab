@@ -1,6 +1,12 @@
 import * as THREE from "three";
-import type { LidarScan } from "../api";
+import type { DrawOp, LidarScan } from "../api";
 import type { LidarDebug } from "../robots/types";
+
+/** Drawings the student posted, in the odometry frame, plus the pose they estimated. */
+export interface StudentOverlay {
+  ops: readonly DrawOp[];
+  pose: { x: number; y: number; yaw: number };
+}
 
 const MAX_POINTS = 360;
 
@@ -78,10 +84,10 @@ export class LidarView {
     return this.enabled;
   }
 
-  update(debug: LidarDebug, scan: LidarScan): void {
+  update(debug: LidarDebug, scan: LidarScan, overlay?: StudentOverlay): void {
     if (!this.enabled) return;
     this.drawWorld(debug);
-    this.drawRadar(scan);
+    this.drawRadar(scan, overlay);
   }
 
   private drawWorld(debug: LidarDebug): void {
@@ -137,7 +143,7 @@ export class LidarView {
     this.points.geometry.getAttribute("color").needsUpdate = true;
   }
 
-  private drawRadar(scan: LidarScan): void {
+  private drawRadar(scan: LidarScan, overlay?: StudentOverlay): void {
     const ctx = this.radarCtx;
     const w = this.radar.width;
     const h = this.radar.height;
@@ -181,6 +187,8 @@ export class LidarView {
       ctx.fillRect(x - size / 2, y - size / 2, size, size);
     }
 
+    if (overlay) drawStudentOverlay(ctx, overlay, cx, cy, radius);
+
     ctx.fillStyle = "#2fbfa8";
     ctx.beginPath();
     ctx.moveTo(cx, cy - 7);
@@ -188,6 +196,51 @@ export class LidarView {
     ctx.lineTo(cx + 4.5, cy + 5);
     ctx.closePath();
     ctx.fill();
+  }
+}
+
+/** Odometry-frame drawings, relative to the pose the program believes it has. */
+function drawStudentOverlay(
+  ctx: CanvasRenderingContext2D,
+  overlay: StudentOverlay,
+  cx: number,
+  cy: number,
+  radius: number,
+): void {
+  const range = 12;
+  const project = (x: number, y: number): [number, number] => {
+    const dx = x - overlay.pose.x;
+    const dy = y - overlay.pose.y;
+    const forward = Math.cos(overlay.pose.yaw) * dx + Math.sin(overlay.pose.yaw) * dy;
+    const left = -Math.sin(overlay.pose.yaw) * dx + Math.cos(overlay.pose.yaw) * dy;
+    const scale = radius / range;
+    return [cx - left * scale, cy - forward * scale];
+  };
+  for (const op of overlay.ops) {
+    ctx.strokeStyle = op.color;
+    ctx.fillStyle = op.color;
+    if (op.kind === "path" && op.points.length >= 2) {
+      ctx.beginPath();
+      ctx.lineWidth = 2;
+      op.points.forEach((point, index) => {
+        const [x, y] = project(point.x, point.y);
+        if (index === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+    } else if (op.kind === "points") {
+      for (const point of op.points) {
+        const [x, y] = project(point.x, point.y);
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    } else if (op.kind === "text") {
+      const [x, y] = project(op.x, op.y);
+      ctx.font = "10px IBM Plex Mono, ui-monospace, monospace";
+      ctx.textAlign = "left";
+      ctx.fillText(op.text, x + 6, y - 6);
+    }
   }
 }
 

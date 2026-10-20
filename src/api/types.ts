@@ -48,6 +48,20 @@ export interface ImuSample {
   accel: { x: number; y: number; z: number };
 }
 
+/** A map waypoint in the odometry frame at reset. Not a measured pose. */
+export interface MapPoint {
+  x: number;
+  y: number;
+}
+
+/**
+ * A goal the world is allowed to give the program, the way a real robot
+ * is given a lane or a route. This is not ground-truth state.
+ */
+export interface TaskInfo {
+  path: MapPoint[];
+}
+
 /** Placeholder so a real camera can be added without changing the call shape. */
 export interface CameraStub {
   available: false;
@@ -64,6 +78,11 @@ export interface SensorFrame {
   odometry: WheelOdometry;
   imu: ImuSample;
   camera: CameraStub;
+  /**
+   * Reference path in the odometry frame at reset. A map the world gives
+   * the program. It is not the car's pose.
+   */
+  task: TaskInfo;
 }
 
 export interface ControlCommand {

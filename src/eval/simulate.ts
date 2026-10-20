@@ -8,9 +8,11 @@ import {
   PHYSICS_HZ,
   assertNoBannedKeys,
   publishSensorFrame,
+  worldToOdom,
   type SensorFrame,
 } from "../api";
 import { solidQuaternion, type Solid } from "../sim/course";
+import { referenceRoute, type RoutePoint } from "../sim/routes";
 import { AckermannBuggy, type SpawnPose } from "../sim/vehicle";
 import type { EvalExample, EvalWorld } from "./scenarios";
 
@@ -54,6 +56,11 @@ export interface RunMetrics {
   laps: number;
   lapTimes: number[];
   odomDrift: number;
+  /** Metres from the true pose to the reference polyline. Zero outside pure pursuit. */
+  crossTrackMean: number;
+  crossTrackMax: number;
+  crossTrackEarly: number;
+  crossTrackLate: number;
   final: { x: number; z: number; yaw: number };
   shots: ShotPose[];
 }
@@ -108,6 +115,45 @@ function countLaps(spawnZ: number, trail: TrailSample[]): { laps: number; lapTim
   return { laps, lapTimes };
 }
 
+/** A lap is leaving the start and coming back to it, along the true trail. */
+function countRouteLaps(route: RoutePoint[], trail: TrailSample[]): { laps: number; lapTimes: number[] } {
+  const start = route[0];
+  if (!start) return { laps: 0, lapTimes: [] };
+  let away = false;
+  let laps = 0;
+  let last = 0;
+  const lapTimes: number[] = [];
+  for (const sample of trail) {
+    const distance = Math.hypot(sample.x - start.x, sample.z - start.z);
+    if (distance > 8) away = true;
+    if (away && distance < 6) {
+      laps += 1;
+      lapTimes.push(round(sample.t - last));
+      last = sample.t;
+      away = false;
+    }
+  }
+  return { laps, lapTimes };
+}
+
+function distanceToRoute(route: RoutePoint[], x: number, z: number): number {
+  if (route.length === 0) return 0;
+  let best = Infinity;
+  const count = route.length;
+  const closed = count > 2 && Math.hypot(route[0]!.x - route[count - 1]!.x, route[0]!.z - route[count - 1]!.z) < 1;
+  const segments = closed ? count : count - 1;
+  for (let i = 0; i < segments; i++) {
+    const a = route[i]!;
+    const b = route[(i + 1) % count]!;
+    const dx = b.x - a.x;
+    const dz = b.z - a.z;
+    const len2 = dx * dx + dz * dz;
+    const t = len2 > 1e-8 ? Math.max(0, Math.min(1, ((x - a.x) * dx + (z - a.z) * dz) / len2)) : 0;
+    best = Math.min(best, Math.hypot(x - (a.x + dx * t), z - (a.z + dz * t)));
+  }
+  return best;
+}
+
 /**
  * One seeded episode. Physics steps at PHYSICS_DT. The policy sees only the
  * published sensor frame, at CONTROL_HZ, the same gate the worker uses.
@@ -135,6 +181,8 @@ export function runEpisode(
   const robot = new AckermannBuggy(RAPIER, world, scene);
   robot.setNoiseSeed(options.seed);
   robot.reset(options.spawn);
+  const route = referenceRoute(options.world);
+  const taskPath = route.map((point) => worldToOdom(options.spawn, point));
 
   const steps = Math.round(options.seconds * PHYSICS_HZ);
   let sensorAccumulator = 0;
@@ -196,6 +244,7 @@ export function runEpisode(
       sensorAccumulator = 0;
       const raw = robot.sampleSensors(sampleDt);
       raw.time = simTime;
+      raw.task = { path: taskPath };
       const frame = publishSensorFrame(raw);
       assertNoBannedKeys(frame);
       for (const range of frame.lidar.ranges) minLidar = Math.min(minLidar, range);
@@ -228,7 +277,33 @@ export function runEpisode(
   }
 
   if (slowFor > STUCK_HOLD) stuckTime += slowFor;
-  const laps = options.world === "track" ? countLaps(options.spawn.z, trail) : { laps: 0, lapTimes: [] };
+  const laps =
+    options.example === "pursuit"
+      ? countRouteLaps(route, trail)
+      : options.world === "track"
+        ? countLaps(options.spawn.z, trail)
+        : { laps: 0, lapTimes: [] };
+  let crossSum = 0;
+  let crossMax = 0;
+  let earlySum = 0;
+  let earlyCount = 0;
+  let lateSum = 0;
+  let lateCount = 0;
+  if (options.example === "pursuit") {
+    for (const sample of trail) {
+      const error = distanceToRoute(route, sample.x, sample.z);
+      crossSum += error;
+      crossMax = Math.max(crossMax, error);
+      if (sample.t <= 15) {
+        earlySum += error;
+        earlyCount += 1;
+      }
+      if (sample.t >= 45) {
+        lateSum += error;
+        lateCount += 1;
+      }
+    }
+  }
   const end = robot.focus();
   const odomDrift = Math.hypot(end.x - lastOdom.x, end.z - lastOdom.z);
   robot.dispose();
@@ -254,6 +329,10 @@ export function runEpisode(
     laps: laps.laps,
     lapTimes: laps.lapTimes,
     odomDrift: round(odomDrift),
+    crossTrackMean: round(trail.length > 0 && options.example === "pursuit" ? crossSum / trail.length : 0),
+    crossTrackMax: round(crossMax),
+    crossTrackEarly: round(earlyCount > 0 ? earlySum / earlyCount : 0),
+    crossTrackLate: round(lateCount > 0 ? lateSum / lateCount : 0),
     final: { x: round(end.x), z: round(end.z), yaw: round(end.yaw) },
     shots,
   };

@@ -5,6 +5,7 @@ import RAPIER from "@dimforge/rapier3d-compat";
 import { EXAMPLES } from "../editor/examples";
 import { paintPathPlot, rasterToPng, renderContactSheet } from "./plot";
 import { loadStudentPolicy, loadStudentRuntime } from "./python";
+import { referenceRoute } from "../sim/routes";
 import { EVAL_EXAMPLES, EVAL_WORLDS, solidsFor, spawnFor, type EvalExample, type EvalWorld } from "./scenarios";
 import { runEpisode, type RunMetrics } from "./simulate";
 import { regressionErrors, renderSummary, type Compared } from "./summary";
@@ -47,17 +48,18 @@ async function main(): Promise<void> {
     const dir = path.join(outDir, world, example);
     mkdirSync(dir, { recursive: true });
     writeFileSync(path.join(dir, "metrics.json"), JSON.stringify(episode.metrics, null, 2));
-    const raster = paintPathPlot(episode.solids, episode.trail, `${world} / ${example}`, world);
+    const planned = example === "pursuit" ? referenceRoute(world) : [];
+    const raster = paintPathPlot(episode.solids, episode.trail, `${world} / ${example}`, world, planned);
     writeFileSync(path.join(dir, "path.png"), rasterToPng(raster));
     rasters.push({ world, example, rgba: raster.rgba });
     rows.push(episode.metrics);
     const m = episode.metrics;
     const driftPct = m.distance > 1 ? (100 * m.odomDrift) / m.distance : 0;
     process.stdout.write(
-      `${world}/${example}  dist ${m.distance.toFixed(1)}  coll ${m.collisionCount}  stuck ${m.stuckTime.toFixed(1)}  drift ${m.odomDrift.toFixed(2)} (${driftPct.toFixed(1)}%)  laps ${m.laps}  ${(Date.now() - started) / 1000}s\n`,
+      `${world}/${example}  dist ${m.distance.toFixed(1)}  coll ${m.collisionCount}  stuck ${m.stuckTime.toFixed(1)}  drift ${m.odomDrift.toFixed(2)} (${driftPct.toFixed(1)}%)  laps ${m.laps}  xt ${m.crossTrackMean.toFixed(2)}/${m.crossTrackMax.toFixed(2)} early ${m.crossTrackEarly.toFixed(2)} late ${m.crossTrackLate.toFixed(2)}  ${(Date.now() - started) / 1000}s\n`,
     );
   }
-  if (rasters.length === 12) {
+  if (rasters.length === 16) {
     writeFileSync(path.join(outDir, "contact-sheet.png"), renderContactSheet(rasters));
   }
 

@@ -24,6 +24,22 @@ export function odomToWorld(
   };
 }
 
+export function worldToOdom(
+  spawn: { x: number; z: number; yaw: number },
+  point: { x: number; z: number },
+): { x: number; y: number } {
+  const dx = point.x - spawn.x;
+  const dz = point.z - spawn.z;
+  const forwardX = -Math.sin(spawn.yaw);
+  const forwardZ = Math.cos(spawn.yaw);
+  const leftX = Math.cos(spawn.yaw);
+  const leftZ = Math.sin(spawn.yaw);
+  return {
+    x: forwardX * dx + forwardZ * dz,
+    y: leftX * dx + leftZ * dz,
+  };
+}
+
 /**
  * Dead reckoning from wheel speed and gyro yaw rate.
  * Heading used to come from the bicycle model, `(speed / wheelbase) * tan(steer)`.

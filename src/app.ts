@@ -1,5 +1,5 @@
 import RAPIER from "@dimforge/rapier3d-compat";
-import { ACKERMANN_BUGGY, CONTROL_DT, PHYSICS_DT, clampCommand, odomToWorld } from "./api";
+import { ACKERMANN_BUGGY, CONTROL_DT, PHYSICS_DT, clampCommand, odomToWorld, worldToOdom, type DrawOp } from "./api";
 import { spawnFor, type EvalExample } from "./eval/scenarios";
 import { EXAMPLES, DEFAULT_EXAMPLE } from "./editor/examples";
 import { createEditor, type CodeEditor } from "./editor/editor";
@@ -8,7 +8,9 @@ import { LidarView } from "./sim/lidar-view";
 import { addPhysicsGround, SimView, type GraphicsQuality } from "./sim/scene";
 import { bindPropLoader } from "./sim/props";
 import { bindTextureLoader } from "./sim/surfaces";
+import { DebugDraw } from "./sim/debug-draw";
 import { PathOverlay } from "./sim/path-overlay";
+import { referenceRoute } from "./sim/routes";
 import { AckermannBuggy, SERVICE_BRAKE, STOP_BRAKE, type SpawnPose } from "./sim/vehicle";
 import {
   QUALITY_STORAGE_KEY,
@@ -79,6 +81,9 @@ export async function mountApp(): Promise<void> {
     view.setAtmosphere(yard.atmosphere);
     const robot = new AckermannBuggy(RAPIER, world, view.scene);
     const paths = new PathOverlay(view.scene);
+    const drawings = new DebugDraw(view.scene);
+    let drawOps: DrawOp[] = [];
+    let studentPose = { x: 0, y: 0, yaw: 0 };
     const seedInput = mustGet<HTMLInputElement>("seed");
     let noiseSeed = readSeed(seedInput);
     robot.setNoiseSeed(noiseSeed);
@@ -96,6 +101,10 @@ export async function mountApp(): Promise<void> {
     sandbox = new CodeSandbox({
       onCommand: (command) => {
         if (mode === "code" && code.current === "running") robot.setCommand(command, 0);
+      },
+      onDraw: (ops) => {
+        drawOps = ops;
+        drawings.set(ops, activeSpawn);
       },
       onLog: (line, level) => consolePanel.log(line, level),
       onState: (state) => {
@@ -142,6 +151,8 @@ export async function mountApp(): Promise<void> {
       if (mode === "code") stopProgram();
       activeSpawn = currentSpawn();
       paths.clear();
+      drawOps = [];
+      drawings.clear();
       robot.reset(activeSpawn);
       if (mode === "drive") applyDrive();
     };
@@ -161,6 +172,8 @@ export async function mountApp(): Promise<void> {
 
     const stopProgram = () => {
       code.stop();
+      drawOps = [];
+      drawings.clear();
       robot.setCommand(clampCommand({ steering: 0, throttle: 0 }, ACKERMANN_BUGGY.limits), STOP_BRAKE);
     };
 
@@ -211,6 +224,8 @@ export async function mountApp(): Promise<void> {
         view.setAtmosphere(yard.atmosphere);
         activeSpawn = currentSpawn();
         paths.clear();
+        drawOps = [];
+        drawings.clear();
         robot.reset(activeSpawn);
         camera.reset();
         localStorage.setItem(WORLD_STORAGE_KEY, id);
@@ -352,8 +367,16 @@ export async function mountApp(): Promise<void> {
               sensorAccumulator = 0;
               const sensors = robot.sampleSensors(sampleDt);
               sensors.time = simTime;
+              sensors.task = {
+                path: referenceRoute(yard.id).map((point) => worldToOdom(activeSpawn, point)),
+              };
+              studentPose = sensors.odometry.pose;
               if (mode === "code") code.offer(sensors);
-              lidar.update(robot.lidarDebug(), sensors.lidar);
+              lidar.update(
+                robot.lidarDebug(),
+                sensors.lidar,
+                mode === "code" ? { ops: drawOps, pose: studentPose } : undefined,
+              );
               const focusNow = robot.focus();
               paths.push(focusNow, robot.telemetry().trueSpeed, odomToWorld(activeSpawn, sensors.odometry.pose));
             }
@@ -390,7 +413,7 @@ function readSeed(input: HTMLInputElement): number {
 }
 
 function isExample(id: string): id is EvalExample {
-  return id === "circle" || id === "avoid" || id === "wall";
+  return id === "circle" || id === "avoid" || id === "wall" || id === "pursuit";
 }
 
 function isTypingTarget(target: EventTarget | null): boolean {

@@ -116,25 +116,24 @@ function wallCommand(
   const parallelPreview = Math.max(side, 0.5) / Math.sin(0.35);
   const settled = Math.abs(side - WALL_TARGET) < 0.35 && Math.abs(alpha) < 0.12;
   if (settled && preview < 10.5) state.sawPreview = true;
-  const cornerSoon =
-    state.locked &&
-    settled &&
-    side < 5.5 &&
-    (diag > Math.max(6.2, side * 1.7) || (state.sawPreview && preview > Math.min(11.2, parallelPreview + 1.6)));
+  const ending = diag > Math.max(6.2, side * 1.7) || (state.sawPreview && preview > Math.min(11.2, parallelPreview + 1.6));
+  const cornerSoon = state.locked && side < 5.5 && ending && (settled || speed > 3);
   if (cornerSoon) {
-    const throttle = speed > 2.4 ? -0.45 : speed > 1.7 ? 0 : 0.14;
+    const throttle = speed > 3.6 ? -0.72 : speed > 2.3 ? -0.5 : speed > 1.55 ? 0 : 0.14;
     return { steering: 0, throttle };
   }
   let steering = 0;
-  let throttle = 0.1;
-  if (side < 9 && diag < 11) {
-    steering = 0.16 * (WALL_TARGET - future) - 0.55 * alpha;
-    throttle = 0.2;
-  }
+  if (side < 9 && diag < 11) steering = 0.16 * (WALL_TARGET - future) - 0.55 * alpha;
   if (dist > WALL_TARGET + 1) steering = Math.max(steering, -0.16);
   steering = clamp(steering, -0.4, 0.4);
-  if (front < 4.5) throttle = Math.min(throttle, 0.16);
-  if (front < 2.2) throttle = 0.08;
+  const curvature = Math.abs(alpha) + 0.55 * Math.abs(steering);
+  let target = 2;
+  if (front > 8 && curvature < 0.14) target = 5.4;
+  else if (front > 5.5 && curvature < 0.28) target = 3;
+  if (front < 4) target = Math.min(target, 1.7);
+  let throttle = 0.2;
+  if (speed < target - 0.4) throttle = 0.46;
+  else if (speed > target + 0.5) throttle = -0.3;
   return { steering, throttle };
 }
 

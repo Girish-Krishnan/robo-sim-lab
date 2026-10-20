@@ -83,12 +83,14 @@ def control(sensors):
     # sensors.lidar.ranges, sensors.lidar.angles, sensors.lidar.max_range
     # sensors.odometry.speed, sensors.odometry.steering_angle, sensors.odometry.pose
     # sensors.imu.yaw_rate, sensors.imu.accel.x / .y / .z
+    # sensors.task.path          waypoints in the odometry frame
     # sensors.time, sensors.dt
     nearest = float(np.min(sensors.lidar.ranges))
+    draw.path(sensors.task.path, "#7dcea0")
     return 0.34, 0.5
 ```
 
-There is no ground-truth pose channel and no velocity channel. The host copies the sample through `publishSensorFrame` before `postMessage`, then the worker builds the Python objects from that JSON only.
+There is no ground-truth pose channel and no velocity channel. The host copies the sample through `publishSensorFrame` before `postMessage`, then the worker builds the Python objects from that JSON only. `draw` is the other direction: the worker posts a list of shapes with the command, and the view renders them. Those shapes are not read back into Python.
 
 ### Sensors
 
@@ -100,19 +102,36 @@ All of these are noisy. None of them is the body's true pose.
 | Wheel odometry | Rear-wheel speed, the actuator steering angle, and a pose. Physics already slips the tires. Each reset draws a speed bias (1.2% one-sigma) and a steering bias (0.004 rad one-sigma), plus white noise of 2 cm/s and 0.003 rad. Heading is the integral of the gyro yaw rate, not `(speed / wheelbase) * tan(steer)`. The steering bias is reported on `steering_angle` and is not integrated. A bicycle-model heading turned that small steer bias into a curvature bias, which walked one oval lap about 50 m off the car. The gyro bias is 0.0012 rad/s one-sigma (about 0.07 deg/s); over 60 s that is a few degrees and a few metres of cross-track, under 5% of distance, and still visible on the amber trail. The speed bias is what scales distance. `pose` starts at the origin on reset. It is not where the car is in the world. |
 | IMU | Yaw rate about body +z, and specific force in the robot frame (about +9.81 m/s² on +z when level and still). Gyro white noise is 0.002 rad/s with a 0.0015 rad/s bias chosen at reset. Accelerometer white noise is 0.04 m/s² with a 0.02 m/s² bias. |
 | Camera | Stub, `{ available: false }`. A later version can attach pixels here without changing the call shape. |
+| Task | `sensors.task.path`, a list of `{x, y}` waypoints in the odometry frame. Each world publishes one: the oval centerline, the city roundabout, the forest trail (out through the trunks, back on the west lane), and the warehouse loop on the open floor south of the bay rack. This is a map the robot is given. It is not the car's pose. |
 
 The numbers live in `src/api/descriptor.ts` (`ACKERMANN_BUGGY.sensors`). That is the only sensor config. A Hokuyo UST-10LX, the usual F1TENTH lidar, is 270°, 1081 beams (0.25°), 10 m, ±40 mm, and 40 Hz. This sandbox keeps the 270° field and a 12 m range, publishes one scan per 20 Hz control tick, and keeps every fourth hardware angle (about 1°) so the raycasts stay interactive. Range noise of 2 cm sits inside the 1–3 cm band of that sensor. On a real F1TENTH car, wheel odometry plus a gyro is typically 1–5% of distance, a few metres per lap, not tens of metres. The pose here is built the same way: distance from the biased wheel speed, heading from the biased gyro. **Reset seed** replays the same noise. **Paths** draws the true trail (coloured by speed) and the odometry trail (amber) in the view. Both are render-only: they are not fields on the sensor frame and they are not posted to the worker.
 
 The HUD shows true forward speed next to odometry speed, and commanded steering next to the slewed actuator angle. True speed is for the person watching. It is not sent to the program.
 
+### Debug drawings
+
+`draw` is in scope inside `control`. Coordinates are the odometry frame, the same one as `sensors.odometry.pose` and `sensors.task.path`. The host places them with the spawn transform, so a path the student was given stays on the map, and a point computed from a drifting pose walks away from the car. That picture is rendering only. It is not a sensor.
+
+```python
+draw.path(points, "#7dcea0")    # points are {x, y} or (x, y), at least two
+draw.points(points, "#f4d03f")
+draw.text(x, y, "lookahead", "#f4f1ea")
+```
+
+Colors are `#rrggbb`. The 3D view and the lidar inset both draw the list. The inset is centered on the pose the program estimates, not on the true pose.
+
+### Pure pursuit
+
+The **Pure pursuit** example tracks `sensors.task.path` with a lookahead and a small speed PID. It draws the path, the lookahead point, and the arc implied by the steering command. Because the pose is odometry, cross-track error against the true trail grows over the minute. The eval records mean and max cross-track, lap time, and contacts, and the path plot draws the planned path against the driven one.
+
 `npm run eval` runs every example in every world for 60 s of simulated time, headless, with the same physics, the same sensor code, and the same Python prelude as the browser. It writes `eval/out/<world>/<example>/metrics.json`, a top-down `path.png` (legend, metre scale bar, roads, curbs, and the trail outline), `eval/out/contact-sheet.png`, and `eval/out/summary.md`. `npm run eval:ci` is that same 60 s suite with gates on contacts, stuck time, and drift as a percent of distance. GitHub Actions runs it on every push to `main`.
 
-The editor examples are **Circle drive** (open-loop steer and throttle, turning left, on an open pad in each world), **Lidar avoid** (aim at the widest forward gap the car fits through, and slow down when the nose is close), and **Wall follow** (PD on the distance to the right-hand wall from the −90° and −45° beams, with a creep into outside corners and a reverse when the bumper is in). Each world starts that example beside a real wall: the oval, a lot fence, the forest corridor, or a warehouse rack. Ctrl or ⌘ Enter runs the buffer from anywhere on the page, including inside the editor.
+The editor examples are **Circle drive** (open-loop steer and throttle, turning left, on an open pad in each world), **Lidar avoid** (aim at the widest forward gap the car fits through, and slow down when the nose is close), **Wall follow** (PD on the distance to the right-hand wall from the −90° and −45° beams, with a creep into outside corners and a reverse when the bumper is in), and **Pure pursuit** (lookahead tracking of the world's reference path). Wall follow starts beside a real wall: the oval, a lot fence, the forest corridor, or a warehouse rack. Pure pursuit starts on the path, headed along the first segment. Ctrl or ⌘ Enter runs the buffer from anywhere on the page, including inside the editor.
 
 ## Adding a robot or a lesson
 
 - **Another robot.** Implement `SimRobot` in `src/robots/types.ts`. Build its collider in `src/sim/`, and keep returning a `SensorFrame`. The sandbox does not change.
-- **Lessons.** Add an entry beside the examples in `src/editor/examples.ts` (id, label, source). A lesson runner can later load those by id. A second language can be another worker that speaks the same tick and result messages.
+- **Lessons.** Add an entry beside the examples in `src/editor/examples.ts` (id, label, source). A world path is `referenceRoute` in `src/sim/routes.ts`, published on `sensors.task.path`. A second language can be another worker that speaks the same tick and result messages.
 
 ## Deploy
 

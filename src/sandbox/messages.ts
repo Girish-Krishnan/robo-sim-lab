@@ -1,4 +1,4 @@
-import type { ControlCommand, RobotLimits, SensorFrame } from "../api";
+import type { ControlCommand, DrawOp, RobotLimits, SensorFrame } from "../api";
 
 export type HostToWorker =
   | { type: "boot" }
@@ -9,5 +9,5 @@ export type HostToWorker =
 export type WorkerToHost =
   | { type: "runtime"; logs: string[] }
   | { type: "ready"; id: number; logs: string[] }
-  | { type: "result"; id: number; command: ControlCommand; logs: string[] }
+  | { type: "result"; id: number; command: ControlCommand; draw?: DrawOp[]; logs: string[] }
   | { type: "error"; id?: number; message: string; logs: string[] };

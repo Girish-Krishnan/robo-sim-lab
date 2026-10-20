@@ -1,4 +1,4 @@
-import { ACKERMANN_BUGGY, assertNoBannedKeys, publishSensorFrame, type ControlCommand, type SensorFrame } from "../api";
+import { ACKERMANN_BUGGY, assertNoBannedKeys, publishSensorFrame, type ControlCommand, type DrawOp, type SensorFrame } from "../api";
 import type { HostToWorker, WorkerToHost } from "./messages";
 
 export type SandboxState = "idle" | "loading" | "running" | "stopped" | "error";
@@ -9,6 +9,7 @@ const BOOT_TIMEOUT_MS = 45000;
 
 export interface SandboxCallbacks {
   onCommand: (command: ControlCommand) => void;
+  onDraw?: (ops: DrawOp[]) => void;
   onLog: (line: string, level: "log" | "error") => void;
   onState: (state: SandboxState) => void;
 }
@@ -205,6 +206,7 @@ export class CodeSandbox {
       this.clearTimer();
       if (this.ignoreCommands || this.state !== "running") return;
       this.callbacks.onCommand(message.command);
+      this.callbacks.onDraw?.(message.draw ?? []);
       return;
     }
     this.waiting = null;

@@ -1,5 +1,5 @@
 import { clamp } from "./math";
-import type { ControlCommand, RobotLimits, SensorFrame } from "./types";
+import type { ControlCommand, RobotLimits, SensorFrame, TaskInfo } from "./types";
 
 /**
  * Keys that must never appear anywhere in a message posted to user code.
@@ -23,6 +23,37 @@ export const BANNED_SENSOR_KEYS = [
   "image",
   "pixels",
   "origin",
+] as const;
+
+/**
+ * Keys a published frame is allowed to carry. `task` and `path` are a map
+ * the world gives the program, like a lane centerline. They are not a pose.
+ * Ground-truth pose, velocity, and pixels are absent on purpose.
+ */
+export const ALLOWED_SENSOR_KEYS = [
+  "time",
+  "dt",
+  "lidar",
+  "angles",
+  "ranges",
+  "maxRange",
+  "odometry",
+  "speed",
+  "steeringAngle",
+  "pose",
+  "x",
+  "y",
+  "yaw",
+  "imu",
+  "yawRate",
+  "accel",
+  "z",
+  "camera",
+  "available",
+  "width",
+  "height",
+  "task",
+  "path",
 ] as const;
 
 const BANNED = new Set<string>(BANNED_SENSOR_KEYS.map((key) => key.toLowerCase()));
@@ -68,7 +99,19 @@ export function publishSensorFrame(frame: SensorFrame): SensorFrame {
       },
     },
     camera: { available: false, width: 0, height: 0 },
+    task: copyTask(frame.task),
   };
+}
+
+function copyTask(task: TaskInfo | undefined): TaskInfo {
+  const source = task?.path ?? [];
+  const path = [];
+  const count = Math.min(source.length, 400);
+  for (let i = 0; i < count; i++) {
+    const point = source[i];
+    path.push({ x: finite(point?.x ?? 0, 0), y: finite(point?.y ?? 0, 0) });
+  }
+  return { path };
 }
 
 export function assertNoBannedKeys(value: unknown, path = "sensors"): void {

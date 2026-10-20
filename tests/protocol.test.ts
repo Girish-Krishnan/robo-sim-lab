@@ -4,6 +4,7 @@ import { ackermannAngles } from "../src/api/ackermann";
 import { beamDirection, quatRotate, worldToBody, yawFromQuaternion } from "../src/api/math";
 import { createOdometry } from "../src/api/odometry";
 import {
+  ALLOWED_SENSOR_KEYS,
   assertNoBannedKeys,
   clampCommand,
   publishSensorFrame,
@@ -35,7 +36,8 @@ describe("publishSensorFrame", () => {
     } as SensorFrame;
 
     const published = publishSensorFrame(dirty);
-    expect(Object.keys(published).sort()).toEqual(["camera", "dt", "imu", "lidar", "odometry", "time"]);
+    expect(Object.keys(published).sort()).toEqual(["camera", "dt", "imu", "lidar", "odometry", "task", "time"]);
+    expect(published.task).toEqual({ path: [] });
     expect(Object.keys(published.odometry).sort()).toEqual(["pose", "speed", "steeringAngle"]);
     expect(Object.keys(published.odometry.pose).sort()).toEqual(["x", "y", "yaw"]);
     expect(Object.keys(published.lidar).sort()).toEqual(["angles", "maxRange", "ranges"]);
@@ -47,6 +49,38 @@ describe("publishSensorFrame", () => {
     for (const banned of ["groundTruth", "truePose", "translation", "velocity", "pixels", "origin", "worldVelocity"]) {
       expect(text.includes(`"${banned}"`)).toBe(false);
     }
+  });
+
+  it("publishes a task path and drops a pose hidden on a waypoint", () => {
+    const frame = {
+      time: 0,
+      dt: 0.05,
+      lidar: { angles: [0], ranges: [4], maxRange: 12 },
+      odometry: { speed: 0, steeringAngle: 0, pose: { x: 0, y: 0, yaw: 0 } },
+      imu: { yawRate: 0, accel: { x: 0, y: 0, z: 9.8 } },
+      camera: { available: false, width: 0, height: 0 },
+      task: {
+        path: [{ x: 1.5, y: -2, groundTruth: { x: 9, z: 4 }, truePose: { x: 1 } }],
+      },
+    } as SensorFrame;
+    const published = publishSensorFrame(frame);
+    expect(published.task.path).toEqual([{ x: 1.5, y: -2 }]);
+    expect(JSON.stringify(published).includes("groundTruth")).toBe(false);
+    expect(JSON.stringify(published).includes("truePose")).toBe(false);
+    expect(() => assertNoBannedKeys(published)).not.toThrow();
+    const allowed = new Set<string>(ALLOWED_SENSOR_KEYS);
+    const walk = (value: unknown): void => {
+      if (Array.isArray(value)) {
+        for (const item of value) walk(item);
+        return;
+      }
+      if (!value || typeof value !== "object") return;
+      for (const key of Object.keys(value)) {
+        expect(allowed.has(key), key).toBe(true);
+        walk((value as Record<string, unknown>)[key]);
+      }
+    };
+    walk(published);
   });
 
   it("rejects a frame that still carries a banned key", () => {
@@ -136,6 +170,6 @@ describe("sandbox source", () => {
   it("ships Python examples that define control(sensors)", () => {
     const examples = readFileSync("src/editor/examples.ts", "utf8");
     expect(examples.includes("function update")).toBe(false);
-    expect(examples.match(/def control\(sensors\)/g)?.length).toBe(3);
+    expect(examples.match(/def control\(sensors\)/g)?.length).toBe(4);
   });
 });

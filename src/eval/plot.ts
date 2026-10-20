@@ -32,6 +32,7 @@ export function paintPathPlot(
   trail: readonly TrailSample[],
   title: string,
   world: EvalWorld,
+  planned: readonly { x: number; z: number }[] = [],
 ): PathRaster {
   const width = 960;
   const height = 960;
@@ -54,6 +55,7 @@ export function paintPathPlot(
     grow(sample.x, sample.z, 8);
     grow(sample.odomX, sample.odomZ, 8);
   }
+  for (const point of planned) grow(point.x, point.z, 4);
   if (trail.length === 0) {
     for (const solid of solids) grow(solid.x, solid.z, Math.hypot(solid.hx, solid.hz) + 1);
   }
@@ -83,6 +85,20 @@ export function paintPathPlot(
   for (const solid of solids) {
     const corners = footprint(solid).map(([x, z]) => project(x, z));
     fillPoly(rgba, width, height, corners, solid.look === "foam" || solid.look === "concrete" ? 70 : 92, 98, 104, 255);
+  }
+
+  if (planned.length >= 2) {
+    strokeTrail(
+      rgba,
+      width,
+      height,
+      planned.map((point) => project(point.x, point.z)),
+      90,
+      210,
+      214,
+      255,
+      3,
+    );
   }
 
   let maxSpeed = 0.5;
@@ -118,19 +134,19 @@ export function paintPathPlot(
     disc(rgba, width, height, sx, sy, 6, 80, 210, 170, 255);
   }
 
-  drawLegend(rgba, width, height, maxSpeed);
+  drawLegend(rgba, width, height, maxSpeed, planned.length >= 2);
   drawScaleBar(rgba, width, height, maxX - minX);
   stamp(rgba, width, height, title);
   return { width, height, rgba };
 }
 
-/** 4 columns of worlds, 3 rows of examples, each cell a half-size path plot. */
+/** 4 columns of worlds, 4 rows of examples, each cell a half-size path plot. */
 export function renderContactSheet(panels: { world: EvalWorld; example: string; rgba: Uint8Array }[]): Buffer {
   const worlds: EvalWorld[] = ["city", "track", "forest", "warehouse"];
-  const examples = ["circle", "avoid", "wall"];
+  const examples = ["circle", "avoid", "wall", "pursuit"];
   const cell = 480;
   const gap = 8;
-  const labelW = 88;
+  const labelW = 112;
   const labelH = 32;
   const width = labelW + worlds.length * cell + (worlds.length - 1) * gap;
   const height = labelH + examples.length * cell + (examples.length - 1) * gap;
@@ -260,8 +276,8 @@ function lerp(a: number, b: number, t: number): number {
   return Math.round(a + (b - a) * t);
 }
 
-function drawLegend(rgba: Uint8Array, width: number, height: number, maxSpeed: number): void {
-  fillRectScreen(rgba, width, 14, 14, 210, 108, 12, 18, 16, 220);
+function drawLegend(rgba: Uint8Array, width: number, height: number, maxSpeed: number, planned: boolean): void {
+  fillRectScreen(rgba, width, 14, 14, 210, planned ? 128 : 108, 12, 18, 16, 220);
   for (let i = 0; i < 150; i++) {
     const tint = speedColor(i / 149);
     for (let y = 0; y < 12; y++) set(rgba, width, 24 + i, 24 + y, tint[0], tint[1], tint[2], 255);
@@ -278,6 +294,10 @@ function drawLegend(rgba: Uint8Array, width: number, height: number, maxSpeed: n
   text(rgba, width, height, 58, 70, "odometry", 2);
   disc(rgba, width, height, 32, 96, 5, 220, 70, 60, 255);
   text(rgba, width, height, 44, 88, "contact", 2);
+  if (planned) {
+    line(rgba, width, height, 24, 118, 52, 118, 90, 210, 214, 255, 3);
+    text(rgba, width, height, 58, 110, "planned", 2);
+  }
 }
 
 function drawScaleBar(rgba: Uint8Array, width: number, height: number, span: number): void {
