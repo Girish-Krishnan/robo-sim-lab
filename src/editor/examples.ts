@@ -36,7 +36,9 @@ const circle = `# Circle drive
 #
 # Code above control() runs once per Run. Names there persist across ticks.
 # Wheelbase is ${wheelbase} m, so this steer is a circle of roughly
-# ${wheelbase} / tan(0.34) metres.
+# ${wheelbase} / tan(0.34) metres (about 5.4 m). The car is placed on an
+# open pad for this example: the south lawn, the oval infield, the meadow
+# south of the trees, or the open bay in the warehouse.
 
 import numpy as np
 
@@ -62,8 +64,8 @@ def control(sensors):
 `;
 
 /**
- * Gap follower for the yard: steer toward the most open forward beam.
- * Positive angle and positive steering are both the driver's left.
+ * Gap follower. Positive angle and positive steering are the driver's left.
+ * The TypeScript copy in tests/avoid.test.ts must stay in step with this.
  */
 const avoid = `# Lidar avoid
 #
@@ -71,102 +73,144 @@ const avoid = `# Lidar avoid
 # steering uses the same sign, so a positive number also turns left.
 # A range of ${maxRange} m means no return.
 #
-# Each tick, aim at the most open beam in front of the car and slow down
-# when that gap gets close. If something is near, commit to whichever
-# half of the scan is clearer. This is still a teaching sketch — tight
-# corners can trap it — but it will weave the avenue and go around the
-# roundabout.
+# Aim at the most open beam in front of the car. When the nose gets close,
+# commit to whichever side is clearer. If the bumper is still against
+# something, reverse for a short stretch and try again. That keeps the
+# car moving instead of stopping with the throttle at zero.
 
 import numpy as np
 
 aim = 0.0
-ticks = 0
+mode = "go"
+reverse_ticks = 0
+prefer_left = True
+
+def widen(ranges):
+    # A one-beam hole between two cones is not wide enough for the car.
+    wide = np.array(ranges, dtype=float, copy=True)
+    for shift in range(1, 9):
+        wide[:-shift] = np.minimum(wide[:-shift], ranges[shift:])
+        wide[shift:] = np.minimum(wide[shift:], ranges[:-shift])
+    return wide
 
 def control(sensors):
-    global aim, ticks
+    global aim, mode, reverse_ticks, prefer_left
     ranges = np.asarray(sensors.lidar.ranges, dtype=float)
     angles = np.asarray(sensors.lidar.angles, dtype=float)
+    wide = widen(ranges)
 
-    forward = np.abs(angles) < 1.2
-    # Prefer open space, with a gentle pull back toward straight ahead.
-    score = ranges * (1.0 - 0.28 * np.abs(angles))
+    forward = np.abs(angles) < 1.15
+    front = np.abs(angles) < 0.4
+    front_range = float(np.min(ranges[front])) if np.any(front) else sensors.lidar.max_range
+
+    score = wide * (1.0 - 0.35 * np.abs(angles))
     score = np.where(forward, score, -1.0)
-    index = int(np.argmax(score))
-    gap_angle = float(angles[index])
-    gap_range = float(ranges[index])
-    aim = 0.72 * aim + 0.28 * gap_angle
+    gap_angle = float(angles[int(np.argmax(score))])
+    aim = 0.84 * aim + 0.16 * gap_angle
 
-    left = (angles > 0.12) & (angles < 1.5)
-    right = (angles < -0.12) & (angles > -1.5)
-    left_clear = float(np.mean(ranges[left])) if np.any(left) else 0.0
-    right_clear = float(np.mean(ranges[right])) if np.any(right) else 0.0
+    left = (angles > 0.3) & (angles < 1.35)
+    right = (angles < -0.3) & (angles > -1.35)
+    left_clear = float(np.percentile(wide[left], 20)) if np.any(left) else 0.0
+    right_clear = float(np.percentile(wide[right], 20)) if np.any(right) else 0.0
+    prefer_left = left_clear >= right_clear
+    turn = 0.4 if prefer_left else -0.4
 
-    steering = float(np.clip(aim * 0.95, -0.48, 0.48))
-    if gap_range < 7.0:
-        prefer = 0.42 if left_clear >= right_clear else -0.42
-        blend = float(np.clip((7.0 - gap_range) / 7.0, 0.0, 1.0))
-        steering = float(np.clip((1.0 - blend) * steering + blend * prefer, -0.5, 0.5))
+    steering = float(np.clip(aim * 0.75, -0.38, 0.38))
+    # A completely empty forward view gets a small left arc so the car
+    # meets the yard boundary and turns, instead of holding a straight line.
+    forward_min = float(np.min(wide[forward])) if np.any(forward) else 0.0
+    if front_range > 10.0 and forward_min > 9.0:
+        steering = float(np.clip(steering + 0.06, -0.4, 0.4))
+    throttle = 0.4
+    if front_range < 8.0:
+        blend = float(np.clip((8.0 - front_range) / 5.0, 0.0, 1.0))
+        steering = float(np.clip((1.0 - blend) * steering + blend * turn, -0.46, 0.46))
+        throttle = 0.24
 
-    throttle = 0.52
-    if gap_range < 9.0:
-        throttle = 0.36
-    if gap_range < 5.0:
-        throttle = 0.2
-    if gap_range < 2.4:
-        throttle = 0.0
-
-    ticks += 1
-    if ticks % 20 == 0:
-        pose = sensors.odometry.pose
-        print(
-            f"gap {gap_range:.1f} m at {gap_angle:.2f} rad",
-            f"steer {steering:.2f}",
-            f"odom {pose.x:.1f} {pose.y:.1f}",
-        )
+    if mode == "go" and front_range < 1.8:
+        mode = "reverse"
+        reverse_ticks = 0
+    elif mode == "reverse":
+        reverse_ticks += 1
+        steering = 0.46 if prefer_left else -0.46
+        throttle = -0.34
+        if reverse_ticks == 14:
+            prefer_left = not prefer_left
+        if front_range > 3.6 or reverse_ticks > 30:
+            mode = "go"
     return steering, throttle
 `;
 
 /**
- * Right-biased follow-the-gap. Useful on the racetrack, where a wall sits
- * on the driver's right along the straight and obstacles leave a gap.
- * Negative lidar angles are the driver's right. Positive steering is left.
+ * Right-wall follower. Negative lidar angles are the driver's right.
+ * The TypeScript copy in tests/worlds.test.ts must stay in step with this.
  */
 const wall = `# Wall follow
 #
-# Follow the gap, with a preference for keeping space on the driver's right.
-# On the F1TENTH track that laps the oval: the inner wall starts out on the
-# right, and cones on the racing line are something to pass rather than hit.
-# It also runs in the other yards.
+# Hold a distance to the wall on the driver's right. Negative angles are
+# that side. Positive steering turns left, away from the wall.
 #
-# angles: 0 is straight ahead, positive is the driver's left.
-# steering uses the same sign.
+# On the oval the inner wall starts out on the right, so this laps clockwise.
+# The car is started beside that wall. A continuous wall is the case this
+# is built for. A single cone or tree trunk is a poor wall: the side beam
+# misses it, and the backup below is only there for a nose-in.
 
 import numpy as np
 
-aim = 0.0
+had_wall = False
+creep = 0
+backup = 0
+
+def sector(ranges, angles, center, width):
+    mask = np.abs(angles - center) < width
+    if not np.any(mask):
+        return float(ranges.max()) if ranges.size else 12.0
+    return float(np.percentile(ranges[mask], 30))
 
 def control(sensors):
-    global aim
+    global had_wall, creep, backup
     ranges = np.asarray(sensors.lidar.ranges, dtype=float)
     angles = np.asarray(sensors.lidar.angles, dtype=float)
-    window = np.abs(angles) < 1.55
-    # Prefer open space near straight ahead, with a small pull to the right
-    # so an oval is lapped with the inner wall on that side.
-    score = ranges * (1.0 - 0.18 * np.abs(angles))
-    score = score + np.where(angles < -0.05, 0.6, 0.0)
-    score = np.where(window, score, -1.0)
-    index = int(np.argmax(score))
-    gap_angle = float(angles[index])
-    gap_range = float(ranges[index])
-    aim = 0.65 * aim + 0.35 * gap_angle
-    steering = float(np.clip(aim * 0.85, -0.48, 0.48))
-    throttle = 0.46
-    if gap_range < 8.0:
+    side = sector(ranges, angles, -1.45, 0.3)
+    diag = sector(ranges, angles, -0.75, 0.25)
+    front = sector(ranges, angles, 0.0, 0.3)
+    if side < 5.5:
+        had_wall = True
+
+    # diag is shorter than a parallel wall would allow: the nose is aimed at it.
+    yawing_in = side < 8.0 and diag < side * 1.2
+    if side < 1.9 or yawing_in:
+        steering = 0.26
+        throttle = 0.22
+    elif had_wall and side > 6.5:
+        # The wall we were following ended. Turn right to pick it up again.
+        steering = -0.36
+        throttle = 0.2
+    elif side > 8.0:
+        # No wall in view. Drive straight instead of hunting into a pole.
+        steering = 0.0
+        throttle = 0.36
+    elif side > 4.0:
+        steering = -0.05
+        throttle = 0.34
+    else:
+        steering = float(np.clip(-0.16 * (side - 2.8), -0.2, 0.2))
         throttle = 0.32
-    if gap_range < 4.0:
-        throttle = 0.18
-    if gap_range < 2.0:
-        throttle = 0.0
+    if front < 2.4 and side < 4.0:
+        steering = 0.3
+        throttle = 0.16
+    steering = float(np.clip(steering, -0.4, 0.4))
+    if backup > 0:
+        backup -= 1
+        return 0.36, -0.32
+    if sensors.time > 1.5 and abs(sensors.odometry.speed) < 0.1 and front < 2.8:
+        creep += 1
+    else:
+        creep = 0
+    if creep > 8:
+        backup = 16
+        creep = 0
+        return 0.36, -0.32
     return steering, throttle
 `;
 

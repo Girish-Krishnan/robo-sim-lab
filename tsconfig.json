@@ -15,5 +15,6 @@
     "noFallthroughCasesInSwitch": true,
     "types": ["vite/client"]
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": ["src/eval/main.ts", "src/eval/plot.ts", "src/eval/python.ts"]
 }

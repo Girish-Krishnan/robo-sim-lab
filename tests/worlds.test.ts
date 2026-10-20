@@ -38,35 +38,77 @@ function top(solid: Solid): number {
   return solid.y + solid.hy;
 }
 
-function wallCommand(ranges: number[], angles: number[], aim: { v: number }): { steering: number; throttle: number } {
-  let best = -1;
-  let gapAngle = 0;
-  let gapRange = 25;
-  for (let i = 0; i < ranges.length; i++) {
-    const angle = angles[i] ?? 0;
-    const dist = ranges[i] ?? gapRange;
-    if (Math.abs(angle) >= 1.55) continue;
-    const score = dist * (1 - 0.18 * Math.abs(angle)) + (angle < -0.05 ? 0.6 : 0);
-    if (score > best) {
-      best = score;
-      gapAngle = angle;
-      gapRange = dist;
-    }
+/** Same rule as the Wall follow example. */
+function wallCommand(
+  ranges: number[],
+  angles: number[],
+  aim: { had: boolean; creep: number; backup: number },
+  time: number,
+  speed: number,
+): { steering: number; throttle: number } {
+  const side = sector(ranges, angles, -1.45, 0.3);
+  const diag = sector(ranges, angles, -0.75, 0.25);
+  const front = sector(ranges, angles, 0, 0.3);
+  if (side < 5.5) aim.had = true;
+  const yawingIn = side < 8 && diag < side * 1.2;
+  let steering = 0;
+  let throttle = 0.32;
+  if (side < 1.9 || yawingIn) {
+    steering = 0.26;
+    throttle = 0.22;
+  } else if (aim.had && side > 6.5) {
+    steering = -0.36;
+    throttle = 0.2;
+  } else if (side > 8) {
+    steering = 0;
+    throttle = 0.36;
+  } else if (side > 4) {
+    steering = -0.05;
+    throttle = 0.34;
+  } else {
+    steering = clamp(-0.16 * (side - 2.8), -0.2, 0.2);
+    throttle = 0.32;
   }
-  aim.v = 0.65 * aim.v + 0.35 * gapAngle;
-  const steering = clamp(aim.v * 0.85, -0.48, 0.48);
-  let throttle = 0.46;
-  if (gapRange < 8) throttle = 0.32;
-  if (gapRange < 4) throttle = 0.18;
-  if (gapRange < 2) throttle = 0;
+  if (front < 2.4 && side < 4) {
+    steering = 0.3;
+    throttle = 0.16;
+  }
+  steering = clamp(steering, -0.4, 0.4);
+  if (aim.backup > 0) {
+    aim.backup -= 1;
+    return { steering: 0.36, throttle: -0.32 };
+  }
+  if (time > 1.5 && Math.abs(speed) < 0.1 && front < 2.8) aim.creep += 1;
+  else aim.creep = 0;
+  if (aim.creep > 8) {
+    aim.backup = 16;
+    aim.creep = 0;
+    return { steering: 0.36, throttle: -0.32 };
+  }
   return { steering, throttle };
+}
+
+function sector(ranges: number[], angles: number[], target: number, width: number): number {
+  const values: number[] = [];
+  for (let i = 0; i < ranges.length; i++) {
+    if (Math.abs((angles[i] ?? 0) - target) < width) values.push(ranges[i] ?? 0);
+  }
+  if (values.length === 0) return Math.max(...ranges, 0);
+  values.sort((a, b) => a - b);
+  return values[Math.min(values.length - 1, Math.floor(0.3 * (values.length - 1)))] ?? 0;
 }
 
 async function drive(
   solids: Solid[],
   spawn: SpawnPose,
   seconds: number,
-  command: (ranges: number[], angles: number[], aim: { v: number }) => { steering: number; throttle: number },
+  command: (
+    ranges: number[],
+    angles: number[],
+    aim: { had: boolean; creep: number; backup: number },
+    time: number,
+    speed: number,
+  ) => { steering: number; throttle: number },
 ): Promise<{ travelled: number; minUp: number; end: { x: number; z: number }; nearest: number }> {
   const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
   world.timestep = DT;
@@ -76,7 +118,7 @@ async function drive(
   const scene = new THREE.Scene();
   const robot = new AckermannBuggy(RAPIER, world, scene);
   robot.reset(spawn);
-  const aim = { v: 0 };
+  const aim = { had: false, creep: 0, backup: 0 };
   let sensorAccumulator = 0;
   let nearest = 25;
   const start = robot.focus();
@@ -87,7 +129,10 @@ async function drive(
       const sensors = robot.sampleSensors(sensorAccumulator);
       sensorAccumulator = 0;
       nearest = Math.min(nearest, ...sensors.lidar.ranges);
-      robot.setCommand(command(sensors.lidar.ranges, sensors.lidar.angles, aim), 0);
+      robot.setCommand(
+        command(sensors.lidar.ranges, sensors.lidar.angles, aim, sensors.time, sensors.odometry.speed),
+        0,
+      );
     }
     robot.preStep(DT);
     world.step();

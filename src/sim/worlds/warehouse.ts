@@ -34,25 +34,28 @@ export function buildWarehouseSolids(): Solid[] {
   const shelf = (x: number, z: number, length: number) => {
     solids.push(cuboid(x, z, 1.35, 2.35, length, "shelf"));
   };
-  shelf(-6.2, 14, 26);
-  shelf(6.2, 14, 26);
-  shelf(-11.4, 14, 26);
-  shelf(11.4, 14, 26);
-  solids.push(cuboid(0, 33.2, 12, 2.35, 1.2, "shelf"));
+  // Main aisle is about 16 m between shelf faces so a teaching circle
+  // (radius ~5.4 m, body out to ~6.4 m) fits in the south bay.
+  // Side aisles stay wide enough for the car.
+  shelf(-9.4, 14, 26);
+  shelf(9.4, 14, 26);
+  shelf(-15, 14, 26);
+  shelf(15, 14, 26);
+  solids.push(cuboid(0, 33.2, 16.2, 2.35, 1.2, "shelf"));
 
-  // Perimeter walls.
-  solids.push(cuboid(0, 36, 28, 3.2, 0.4, "concrete"));
-  solids.push(cuboid(0, -16, 28, 3.2, 0.4, "concrete"));
-  solids.push(cuboid(-14.2, 10, 0.4, 3.2, 52, "concrete"));
-  solids.push(cuboid(14.2, 10, 0.4, 3.2, 52, "concrete"));
+  // Perimeter walls. The south wall sits behind the open bay.
+  solids.push(cuboid(0, 36, 36, 3.2, 0.4, "concrete"));
+  solids.push(cuboid(0, -20, 36, 3.2, 0.4, "concrete"));
+  solids.push(cuboid(-17.8, 8, 0.4, 3.2, 56, "concrete"));
+  solids.push(cuboid(17.8, 8, 0.4, 3.2, 56, "concrete"));
 
   // Pallets in the main aisle. Each leaves a gap wider than the car.
   solids.push(cuboid(2.15, 6, 1.2, 1.35, 1.05, "pallet", 0.08));
   solids.push(cuboid(-2.05, 14, 1.15, 1.4, 1.1, "pallet", -0.12));
   solids.push(cuboid(1.9, 22, 1.2, 1.3, 1.15, "pallet", 0.2));
   solids.push(cuboid(-1.7, 28, 1.05, 1.45, 1.05, "crate", -0.05));
-  solids.push(cuboid(-8.8, 8, 1.1, 1.35, 1.0, "pallet", 0.4));
-  solids.push(cuboid(8.6, 18, 1.15, 1.4, 1.05, "barrel"));
+  solids.push(cuboid(-12.2, 8, 1.1, 1.35, 1.0, "pallet", 0.4));
+  solids.push(cuboid(12.2, 18, 1.15, 1.4, 1.05, "barrel"));
   return solids;
 }
 
@@ -79,7 +82,7 @@ export async function mountWarehouse(
   group.add(floor);
 
   const ceiling = new THREE.Mesh(
-    new THREE.PlaneGeometry(30, 54),
+    new THREE.PlaneGeometry(40, 60),
     new THREE.MeshStandardMaterial({ color: 0x3c434a, roughness: 0.9, side: THREE.DoubleSide }),
   );
   ceiling.rotation.x = Math.PI / 2;
@@ -108,7 +111,7 @@ export async function mountWarehouse(
 
   if (kit) {
     const railMat = new THREE.MeshStandardMaterial({ color: 0xd2a03a, roughness: 0.4, metalness: 0.65 });
-    for (const x of [-3.5, 3.5, -8.8, 8.8]) {
+    for (const x of [-3.5, 3.5, -11.8, 11.8]) {
       const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 24, 12), railMat);
       rail.rotation.x = Math.PI / 2;
       rail.position.set(x, 0.16, 14);

@@ -68,6 +68,13 @@ export function buildForestSolids(): Solid[] {
   solids.push(ballSolid(8.2, 31, 0.95, "rock", 0x7a756e));
   solids.push(logSolid(-7.2, 29, 0.7, 2.4, 0.2));
   solids.push(logSolid(7.4, 24.5, 0.7, 2.4, -0.2));
+
+  // Yard boundary, tall enough for the lidar. Keeps an open-space
+  // follower from driving off the ground plane.
+  solids.push(cuboid(0, 50, 78, 1.45, 0.25, "fence"));
+  solids.push(cuboid(0, -48, 78, 1.45, 0.25, "fence"));
+  solids.push(cuboid(40, 1, 0.25, 1.45, 98, "fence"));
+  solids.push(cuboid(-40, 1, 0.25, 1.45, 98, "fence"));
   return solids;
 }
 

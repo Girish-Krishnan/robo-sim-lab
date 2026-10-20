@@ -137,13 +137,24 @@ header {
   font-size: 12px;
 }
 
-.header-select select {
+.header-select select,
+.header-select input {
   width: auto;
   max-width: 148px;
   padding: 5px 8px;
   background: var(--panel-2);
   border: 1px solid var(--line);
   border-radius: 8px;
+  color: inherit;
+}
+
+.header-select input { width: 64px; }
+
+#paths-toggle.is-on {
+  background: var(--amber);
+  color: #2a1c08;
+  border-color: transparent;
+  font-weight: 620;
 }
 
 main {

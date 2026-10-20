@@ -76,6 +76,8 @@ export class AckermannBuggy implements SimRobot {
   private readonly axle = new THREE.Vector3(-1, 0, 0);
   private readonly up = new THREE.Vector3(0, 1, 0);
   private spawn: SpawnPose = DEFAULT_SPAWN;
+  private noiseSeed: number | null = null;
+  private readonly chassisCollider: InstanceType<Rapier["Collider"]>;
 
   private command: ControlCommand = { steering: 0, throttle: 0 };
   private brake = 0;
@@ -94,11 +96,12 @@ export class AckermannBuggy implements SimRobot {
         .setLinearDamping(0.12)
         .setAngularDamping(0.4),
     );
-    world.createCollider(
+    this.chassisCollider = world.createCollider(
       RAPIER.ColliderDesc.cuboid(HALF.x, HALF.y, HALF.z)
         .setDensity(0)
         .setFriction(0.4)
-        .setRestitution(0.02),
+        .setRestitution(0.02)
+        .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),
       this.body,
     );
     this.body.setAdditionalMassProperties(
@@ -153,11 +156,37 @@ export class AckermannBuggy implements SimRobot {
     this.sensors = new SensorSuite(RAPIER, world, this.body, this.vehicle, WHEEL_RADIUS);
   }
 
+  /**
+   * Arm a noise seed. The next `reset` (and every reset after it) replays
+   * the same lidar, odometry, and IMU noise. Evaluation and the Reset seed
+   * button both use this. It does not change the sensor fields themselves.
+   */
+  setNoiseSeed(seed: number): void {
+    this.noiseSeed = seed >>> 0;
+  }
+
+  /** Collider used to count obstacle contacts. Not part of the student API. */
+  collider(): InstanceType<Rapier["Collider"]> {
+    return this.chassisCollider;
+  }
+
+  /** Place the body for a chase-camera still. Physics stays in charge after unpause. */
+  teleport(pose: SpawnPose): void {
+    this.spawn = pose;
+    this.body.setTranslation({ x: pose.x, y: pose.y, z: pose.z }, true);
+    const heading = new THREE.Quaternion().setFromAxisAngle(this.up, -pose.yaw);
+    this.body.setRotation({ x: heading.x, y: heading.y, z: heading.z, w: heading.w }, true);
+    this.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    this.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+    this.syncVisuals();
+  }
+
   reset(pose?: SpawnPose): void {
     if (pose) this.spawn = pose;
     this.command = { steering: 0, throttle: 0 };
     this.brake = 0;
     this.steer = 0;
+    if (this.noiseSeed != null) this.sensors.armSeed(this.noiseSeed);
     this.body.setTranslation({ x: this.spawn.x, y: this.spawn.y, z: this.spawn.z }, true);
     const heading = new THREE.Quaternion().setFromAxisAngle(this.up, -this.spawn.yaw);
     this.body.setRotation({ x: heading.x, y: heading.y, z: heading.z, w: heading.w }, true);
@@ -292,6 +321,16 @@ export class AckermannBuggy implements SimRobot {
       z: translation.z,
       yaw: yawFromQuaternion({ x: rotation.x, y: rotation.y, z: rotation.z, w: rotation.w }),
     };
+  }
+
+  /** World-up component of the chassis up axis. Below 0.5 the car has flipped. */
+  upright(): number {
+    const rotation = this.body.rotation();
+    const up = quatRotate(
+      { x: rotation.x, y: rotation.y, z: rotation.z, w: rotation.w },
+      { x: 0, y: 1, z: 0 },
+    );
+    return up.y;
   }
 
   dispose(): void {

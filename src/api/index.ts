@@ -1,7 +1,7 @@
-export { ACKERMANN_BUGGY, CONTROL_DT, CONTROL_HZ } from "./descriptor";
+export { ACKERMANN_BUGGY, CONTROL_DT, CONTROL_HZ, PHYSICS_DT, PHYSICS_HZ } from "./descriptor";
 export { ackermannAngles } from "./ackermann";
-export { clamp, gaussian, yawFromQuaternion } from "./math";
-export { createOdometry } from "./odometry";
+export { clamp, createSeededRandom, gaussian, yawFromQuaternion } from "./math";
+export { createOdometry, odomToWorld } from "./odometry";
 export {
   BANNED_SENSOR_KEYS,
   assertNoBannedKeys,

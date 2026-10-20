@@ -1,5 +1,6 @@
 import RAPIER from "@dimforge/rapier3d-compat";
-import { ACKERMANN_BUGGY, CONTROL_DT, clampCommand } from "./api";
+import { ACKERMANN_BUGGY, CONTROL_DT, PHYSICS_DT, clampCommand, odomToWorld } from "./api";
+import { spawnFor, type EvalExample } from "./eval/scenarios";
 import { EXAMPLES, DEFAULT_EXAMPLE } from "./editor/examples";
 import { createEditor, type CodeEditor } from "./editor/editor";
 import { ChaseCamera } from "./sim/camera";
@@ -7,7 +8,8 @@ import { LidarView } from "./sim/lidar-view";
 import { addPhysicsGround, SimView, type GraphicsQuality } from "./sim/scene";
 import { bindPropLoader } from "./sim/props";
 import { bindTextureLoader } from "./sim/surfaces";
-import { AckermannBuggy, SERVICE_BRAKE, STOP_BRAKE } from "./sim/vehicle";
+import { PathOverlay } from "./sim/path-overlay";
+import { AckermannBuggy, SERVICE_BRAKE, STOP_BRAKE, type SpawnPose } from "./sim/vehicle";
 import {
   QUALITY_STORAGE_KEY,
   WORLD_STORAGE_KEY,
@@ -22,8 +24,6 @@ import { CodeSandbox, type SandboxState } from "./sandbox/controller";
 import { ConsolePanel } from "./ui/console-panel";
 import { Hud, type AppMode } from "./ui/hud";
 import { mountSplitter } from "./ui/splitter";
-
-const PHYSICS_DT = 1 / 60;
 
 export async function mountApp(): Promise<void> {
   const viewport = mustGet<HTMLElement>("viewport");
@@ -78,7 +78,13 @@ export async function mountApp(): Promise<void> {
     let yard: SimWorld = await mountWorld(initialWorld, RAPIER, world, view.scene, graphics);
     view.setAtmosphere(yard.atmosphere);
     const robot = new AckermannBuggy(RAPIER, world, view.scene);
-    robot.reset(yard.spawn);
+    const paths = new PathOverlay(view.scene);
+    const seedInput = mustGet<HTMLInputElement>("seed");
+    let noiseSeed = readSeed(seedInput);
+    robot.setNoiseSeed(noiseSeed);
+    let activeSpawn: SpawnPose = yard.spawn;
+    robot.reset(activeSpawn);
+    let paused = false;
     const lidar = new LidarView(view.scene, viewport);
     const camera = new ChaseCamera(view.camera, viewport);
 
@@ -126,10 +132,25 @@ export async function mountApp(): Promise<void> {
       );
     };
 
+    const currentSpawn = (): SpawnPose => {
+      const example = exampleSelect.value;
+      if (mode === "code" && isExample(example)) return spawnFor(yard.id, example, "scenario");
+      return yard.spawn;
+    };
+
     const resetWorld = () => {
       if (mode === "code") stopProgram();
-      robot.reset();
+      activeSpawn = currentSpawn();
+      paths.clear();
+      robot.reset(activeSpawn);
       if (mode === "drive") applyDrive();
+    };
+
+    const resetToSeed = (seed = readSeed(seedInput)) => {
+      noiseSeed = seed >>> 0;
+      seedInput.value = String(noiseSeed);
+      robot.setNoiseSeed(noiseSeed);
+      resetWorld();
     };
 
     const runProgram = () => {
@@ -188,7 +209,9 @@ export async function mountApp(): Promise<void> {
         disposeWorld(world, yard);
         yard = await mountWorld(id, RAPIER, world, view.scene, graphics);
         view.setAtmosphere(yard.atmosphere);
-        robot.reset(yard.spawn);
+        activeSpawn = currentSpawn();
+        paths.clear();
+        robot.reset(activeSpawn);
         camera.reset();
         localStorage.setItem(WORLD_STORAGE_KEY, id);
         if (mode === "drive") applyDrive();
@@ -203,17 +226,17 @@ export async function mountApp(): Promise<void> {
     });
     const qualitySelect = mustGet<HTMLSelectElement>("quality");
     qualitySelect.value = graphics;
-    qualitySelect.addEventListener("change", () => {
-      const next: GraphicsQuality = qualitySelect.value === "low" ? "low" : "high";
-      if (next === graphics || switchingWorld) {
-        qualitySelect.value = graphics;
-        return;
-      }
+    const applyQuality = async (next: GraphicsQuality) => {
+      qualitySelect.value = next;
+      if (next === graphics || switchingWorld) return;
       graphics = next;
       view.setQuality(next);
       view.resize(viewport.clientWidth, viewport.clientHeight);
       localStorage.setItem(QUALITY_STORAGE_KEY, next);
-      void switchWorld(yard.id, true);
+      await switchWorld(yard.id, true);
+    };
+    qualitySelect.addEventListener("change", () => {
+      void applyQuality(qualitySelect.value === "low" ? "low" : "high");
     });
     const lidarButton = mustGet<HTMLButtonElement>("lidar-toggle");
     const setLidarButton = (enabled: boolean) => {
@@ -233,7 +256,18 @@ export async function mountApp(): Promise<void> {
       if (!example) return;
       if (code.current === "running") stopProgram();
       codeEditor.setValue(example.source);
+      if (mode === "code") resetWorld();
     });
+    const pathsButton = mustGet<HTMLButtonElement>("paths-toggle");
+    const setPaths = (enabled: boolean) => {
+      paths.setVisible(enabled);
+      pathsButton.setAttribute("aria-pressed", String(enabled));
+      pathsButton.classList.toggle("is-on", enabled);
+      pathsButton.textContent = enabled ? "Paths on" : "Paths";
+    };
+    setPaths(false);
+    pathsButton.addEventListener("click", () => setPaths(!paths.visible));
+    mustGet("reset-seed").addEventListener("click", () => resetToSeed());
 
     window.addEventListener(
       "keydown",
@@ -266,6 +300,31 @@ export async function mountApp(): Promise<void> {
     setMode("drive");
     loading.hidden = true;
 
+    window.roboSim = {
+      ready: true,
+      resetToSeed,
+      setPathOverlay: setPaths,
+      pause: (next) => {
+        paused = next;
+      },
+      teleport: (pose) => {
+        activeSpawn = pose;
+        robot.teleport(pose);
+        camera.update(1, robot.focus());
+      },
+      setWorld: async (id) => {
+        if (!isWorldId(id)) return;
+        await switchWorld(id, true);
+      },
+      setExample: (id) => {
+        if (!isExample(id)) return;
+        exampleSelect.value = id;
+        exampleSelect.dispatchEvent(new Event("change"));
+      },
+      setQuality: (next) => applyQuality(next === "low" ? "low" : "high"),
+      focus: () => robot.focus(),
+    };
+
     view.renderer.domElement.focus({ preventScroll: true });
 
     let last = performance.now();
@@ -277,23 +336,27 @@ export async function mountApp(): Promise<void> {
       try {
         const frameDt = Math.min(0.05, (now - last) / 1000);
         last = now;
-        accumulator = Math.min(accumulator + frameDt, PHYSICS_DT * 5);
-        let steps = 0;
-        while (accumulator >= PHYSICS_DT && steps < 5) {
-          if (mode === "drive") applyDrive();
-          robot.preStep(PHYSICS_DT);
-          world.step();
-          simTime += PHYSICS_DT;
-          sensorAccumulator += PHYSICS_DT;
-          accumulator -= PHYSICS_DT;
-          steps += 1;
-          if (sensorAccumulator >= CONTROL_DT - 1e-4) {
-            const sampleDt = sensorAccumulator;
-            sensorAccumulator = 0;
-            const sensors = robot.sampleSensors(sampleDt);
-            sensors.time = simTime;
-            if (mode === "code") code.offer(sensors);
-            lidar.update(robot.lidarDebug(), sensors.lidar);
+        if (!paused) {
+          accumulator = Math.min(accumulator + frameDt, PHYSICS_DT * 5);
+          let steps = 0;
+          while (accumulator >= PHYSICS_DT && steps < 5) {
+            if (mode === "drive") applyDrive();
+            robot.preStep(PHYSICS_DT);
+            world.step();
+            simTime += PHYSICS_DT;
+            sensorAccumulator += PHYSICS_DT;
+            accumulator -= PHYSICS_DT;
+            steps += 1;
+            if (sensorAccumulator >= CONTROL_DT - 1e-4) {
+              const sampleDt = sensorAccumulator;
+              sensorAccumulator = 0;
+              const sensors = robot.sampleSensors(sampleDt);
+              sensors.time = simTime;
+              if (mode === "code") code.offer(sensors);
+              lidar.update(robot.lidarDebug(), sensors.lidar);
+              const focusNow = robot.focus();
+              paths.push(focusNow, robot.telemetry().trueSpeed, odomToWorld(activeSpawn, sensors.odometry.pose));
+            }
           }
         }
         robot.syncVisuals();
@@ -319,6 +382,15 @@ function mustGet<T extends HTMLElement>(id: string): T {
   const element = document.getElementById(id);
   if (!element) throw new Error(`Missing #${id}`);
   return element as T;
+}
+
+function readSeed(input: HTMLInputElement): number {
+  const value = Number(input.value);
+  return Number.isFinite(value) ? value >>> 0 : 1;
+}
+
+function isExample(id: string): id is EvalExample {
+  return id === "circle" || id === "avoid" || id === "wall";
 }
 
 function isTypingTarget(target: EventTarget | null): boolean {

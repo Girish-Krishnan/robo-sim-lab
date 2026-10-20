@@ -81,8 +81,12 @@ export interface RobotLimits {
 }
 
 export interface LidarSpec {
+  /** Number of beams across `fov`. A downsample of a 0.25° Hokuyo scan. */
   beams: number;
+  /** Total field of view, radians, centered on forward. */
+  fov: number;
   maxRange: number;
+  /** One-sigma range noise, metres. */
   rangeStdDev: number;
 }
 
@@ -97,7 +101,16 @@ export interface RobotDescriptor {
   limits: RobotLimits;
   sensors: {
     lidar: LidarSpec;
-    odometry: { speedStdDev: number; steeringStdDev: number };
+    odometry: {
+      /** White noise on wheel speed, m/s. */
+      speedStdDev: number;
+      /** One-sigma fractional speed bias, sampled once per reset. 0.01 is 1%. */
+      speedBiasStdDev: number;
+      /** White noise on steering, radians. */
+      steeringStdDev: number;
+      /** One-sigma steering bias, radians, sampled once per reset. */
+      steeringBiasStdDev: number;
+    };
     imu: {
       yawRateStdDev: number;
       yawRateBiasStdDev: number;

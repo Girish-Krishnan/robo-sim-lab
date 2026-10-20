@@ -1,5 +1,5 @@
 import type RAPIER from "@dimforge/rapier3d-compat";
-import { ACKERMANN_BUGGY, createOdometry, type SensorFrame } from "../api";
+import { ACKERMANN_BUGGY, createOdometry, createSeededRandom, type SensorFrame } from "../api";
 import {
   beamDirection,
   dot,
@@ -36,10 +36,12 @@ export class SensorSuite {
   private wheelReady = false;
   private prevVel: Vec3 | null = null;
   private smoothAccel: Vec3 = { x: 0, y: 0, z: 9.81 };
-  private bias = { yaw: 0, ax: 0, ay: 0, az: 0 };
+  private bias = { yaw: 0, ax: 0, ay: 0, az: 0, speed: 0, steer: 0 };
   private debugPoints: LidarDebugPoint[] = [];
   private debugOrigin = { x: 0, y: 0, z: 0 };
   private lastOdomSpeed = 0;
+  private random: () => number = Math.random;
+  private seed: number | null = null;
 
   constructor(
     private readonly RAPIER: Rapier,
@@ -51,7 +53,13 @@ export class SensorSuite {
     this.resampleBias();
   }
 
+  /** The next `reset` replays noise from this seed. */
+  armSeed(seed: number): void {
+    this.seed = seed >>> 0;
+  }
+
   reset(): void {
+    if (this.seed != null) this.random = createSeededRandom(this.seed);
     this.odom.reset();
     this.wheelRot = [0, 0, 0, 0];
     this.wheelReady = false;
@@ -76,8 +84,8 @@ export class SensorSuite {
     const rotation = this.body.rotation();
     const q: Quat = { x: rotation.x, y: rotation.y, z: rotation.z, w: rotation.w };
     const speed = this.wheelSpeed(dt);
-    const noisySpeed = speed + gaussian(this.spec.odometry.speedStdDev);
-    const noisySteer = actuatorSteering + gaussian(this.spec.odometry.steeringStdDev);
+    const noisySpeed = speed * (1 + this.bias.speed) + gaussian(this.spec.odometry.speedStdDev, this.random);
+    const noisySteer = actuatorSteering + this.bias.steer + gaussian(this.spec.odometry.steeringStdDev, this.random);
     this.lastOdomSpeed = noisySpeed;
     const pose = this.odom.integrate(noisySpeed, noisySteer, dt);
 
@@ -97,11 +105,14 @@ export class SensorSuite {
 
   private resampleBias(): void {
     const imu = this.spec.imu;
+    const odom = this.spec.odometry;
     this.bias = {
-      yaw: gaussian(imu.yawRateBiasStdDev),
-      ax: gaussian(imu.accelBiasStdDev),
-      ay: gaussian(imu.accelBiasStdDev),
-      az: gaussian(imu.accelBiasStdDev),
+      yaw: gaussian(imu.yawRateBiasStdDev, this.random),
+      ax: gaussian(imu.accelBiasStdDev, this.random),
+      ay: gaussian(imu.accelBiasStdDev, this.random),
+      az: gaussian(imu.accelBiasStdDev, this.random),
+      speed: gaussian(odom.speedBiasStdDev, this.random),
+      steer: gaussian(odom.steeringBiasStdDev, this.random),
     };
   }
 
@@ -140,25 +151,26 @@ export class SensorSuite {
     const bodyRate = worldToBody(q, { x: angular.x, y: angular.y, z: angular.z });
     const imu = this.spec.imu;
     return {
-      yawRate: bodyRate.z + this.bias.yaw + gaussian(imu.yawRateStdDev),
+      yawRate: bodyRate.z + this.bias.yaw + gaussian(imu.yawRateStdDev, this.random),
       accel: {
-        x: this.smoothAccel.x + this.bias.ax + gaussian(imu.accelStdDev),
-        y: this.smoothAccel.y + this.bias.ay + gaussian(imu.accelStdDev),
-        z: this.smoothAccel.z + this.bias.az + gaussian(imu.accelStdDev),
+        x: this.smoothAccel.x + this.bias.ax + gaussian(imu.accelStdDev, this.random),
+        y: this.smoothAccel.y + this.bias.ay + gaussian(imu.accelStdDev, this.random),
+        z: this.smoothAccel.z + this.bias.az + gaussian(imu.accelStdDev, this.random),
       },
     };
   }
 
   private castLidar(q: Quat): SensorFrame["lidar"] {
-    const { beams, maxRange, rangeStdDev } = this.spec.lidar;
+    const { beams, fov, maxRange, rangeStdDev } = this.spec.lidar;
     const origin = this.lidarOrigin(q);
     this.debugOrigin = origin;
     const angles: number[] = [];
     const ranges: number[] = [];
     const debug: LidarDebugPoint[] = [];
+    const span = fov > 0 ? fov : Math.PI * 2;
 
     for (let i = 0; i < beams; i++) {
-      const angle = (i / beams) * Math.PI * 2 - Math.PI;
+      const angle = beams === 1 ? 0 : -span / 2 + (i / (beams - 1)) * span;
       const dir = beamDirection(q, angle);
       const length = Math.hypot(dir.x, dir.y, dir.z) || 1;
       const hit = this.world.castRay(
@@ -173,7 +185,7 @@ export class SensorSuite {
       let range = maxRange;
       let returned = false;
       if (hit && hit.timeOfImpact < maxRange) {
-        const noisy = hit.timeOfImpact + gaussian(rangeStdDev);
+        const noisy = hit.timeOfImpact + gaussian(rangeStdDev, this.random);
         range = Math.min(maxRange, Math.max(0.05, noisy));
         returned = range < maxRange - 1e-3;
       }

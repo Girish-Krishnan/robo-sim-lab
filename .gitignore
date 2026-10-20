@@ -5,3 +5,6 @@ public/pyodide/
 *.local
 .vite
 coverage
+eval/out
+eval/before
+eval/ci

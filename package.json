@@ -9,7 +9,9 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "eval": "vite-node src/eval/main.ts",
+    "eval:ci": "vite-node src/eval/main.ts -- --ci"
   },
   "dependencies": {
     "@codemirror/lang-python": "^6.2.1",
@@ -23,6 +25,7 @@
     "three": "^0.180.0"
   },
   "devDependencies": {
+    "@types/node": "^22.20.5",
     "@types/three": "^0.180.0",
     "typescript": "^5.9.3",
     "vite": "^7.1.10",

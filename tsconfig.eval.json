@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node", "vite/client"],
+    "lib": ["ES2022", "DOM"]
+  },
+  "include": ["src/eval/main.ts", "src/eval/plot.ts", "src/eval/python.ts", "src/eval/simulate.ts", "src/eval/scenarios.ts", "src/eval/summary.ts"],
+  "exclude": []
+}

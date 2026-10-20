@@ -5,6 +5,13 @@ export const CONTROL_HZ = 20;
 export const CONTROL_DT = 1 / CONTROL_HZ;
 
 /**
+ * Fixed physics rate. The live view accumulates real time and steps in
+ * multiples of this; it never feeds a variable frame delta into the vehicle.
+ */
+export const PHYSICS_HZ = 60;
+export const PHYSICS_DT = 1 / PHYSICS_HZ;
+
+/**
  * The only robot in this prototype. Static description: no pose, no velocity.
  * Add another descriptor (and a `SimRobot` implementation) for a new platform.
  */
@@ -21,19 +28,26 @@ export const ACKERMANN_BUGGY: RobotDescriptor = {
   },
   sensors: {
     lidar: {
-      beams: 360,
-      maxRange: 25,
-      rangeStdDev: 0.035,
+      // Hokuyo UST-10LX: 270°, 0.25° steps, 10 m, ±40 mm, 40 Hz.
+      // The sandbox publishes one scan per 20 Hz control tick and keeps
+      // every fourth hardware step (about 1°) so raycasts stay interactive.
+      beams: 270,
+      fov: (270 * Math.PI) / 180,
+      maxRange: 12,
+      rangeStdDev: 0.02,
     },
     odometry: {
-      speedStdDev: 0.04,
-      steeringStdDev: 0.008,
+      speedStdDev: 0.02,
+      speedBiasStdDev: 0.012,
+      steeringStdDev: 0.003,
+      steeringBiasStdDev: 0.004,
     },
     imu: {
-      yawRateStdDev: 0.012,
-      yawRateBiasStdDev: 0.008,
-      accelStdDev: 0.06,
-      accelBiasStdDev: 0.03,
+      // MEMS gyro, published at the control rate. Bias is chosen once per reset.
+      yawRateStdDev: 0.002,
+      yawRateBiasStdDev: 0.0015,
+      accelStdDev: 0.04,
+      accelBiasStdDev: 0.02,
     },
     camera: { available: false },
   },

@@ -96,12 +96,16 @@ All of these are noisy. None of them is the body's true pose.
 
 | Channel | Contents |
 | --- | --- |
-| Lidar | 360 planar beams, 25 m max range, about 3.5 cm of range noise. Angle 0 is forward, positive is left. `max_range` means no return. The ray starts at the roof puck and does not hit the chassis. In Python this is `sensors.lidar.ranges` and `sensors.lidar.angles`. |
-| Wheel odometry | Rear-wheel speed and the actuator steering angle, plus noise. `pose` is a bicycle-model integral of those noisy readings. It starts at the origin on reset and drifts. It is not where the car is in the world. |
-| IMU | Yaw rate about body +z, and specific force in the robot frame (about +9.81 m/s² on +z when level and still), with a bias chosen at reset and white noise. |
+| Lidar | 270 planar beams over 270°, 12 m max range, 2 cm one-sigma range noise. Angle 0 is forward, positive is left. `max_range` means no return. The ray starts at the roof puck and does not hit the chassis. In Python this is `sensors.lidar.ranges` and `sensors.lidar.angles`. |
+| Wheel odometry | Rear-wheel speed and the actuator steering angle. Physics already slips the tires. On top of that, each reset draws a speed bias (1.2% one-sigma) and a steering bias (0.004 rad one-sigma), plus white noise of 2 cm/s and 0.003 rad. `pose` is a bicycle-model integral of those noisy readings. It starts at the origin on reset and drifts by a few metres over a minute. It is not where the car is in the world. |
+| IMU | Yaw rate about body +z, and specific force in the robot frame (about +9.81 m/s² on +z when level and still). Gyro white noise is 0.002 rad/s with a 0.0015 rad/s bias chosen at reset. Accelerometer white noise is 0.04 m/s² with a 0.02 m/s² bias. |
 | Camera | Stub, `{ available: false }`. A later version can attach pixels here without changing the call shape. |
 
+The numbers live in `src/api/descriptor.ts` (`ACKERMANN_BUGGY.sensors`). That is the only sensor config. A Hokuyo UST-10LX, the usual F1TENTH lidar, is 270°, 1081 beams (0.25°), 10 m, ±40 mm, and 40 Hz. This sandbox keeps the 270° field and a 12 m range, publishes one scan per 20 Hz control tick, and keeps every fourth hardware angle (about 1°) so the raycasts stay interactive. Range noise of 2 cm sits inside the 1–3 cm band of that sensor. Wheel-speed bias of about one percent is enough that the amber odometry trail separates from the true path over 60 s without wandering off the map. **Reset seed** replays the same noise. **Paths** draws the true trail (coloured by speed) and the odometry trail (amber) in the view. Both are render-only: they are not fields on the sensor frame and they are not posted to the worker.
+
 The HUD shows true forward speed next to odometry speed, and commanded steering next to the slewed actuator angle. True speed is for the person watching. It is not sent to the program.
+
+`npm run eval` runs every example in every world for 60 s of simulated time, headless, with the same physics, the same sensor code, and the same Python prelude as the browser. It writes `eval/out/<world>/<example>/metrics.json`, a top-down `path.png`, and `eval/out/summary.md`. `npm run eval:ci` is the short regression (8 s) used by GitHub Actions.
 
 The editor examples are **Circle drive** (open-loop steer and throttle, turning left), **Lidar avoid** (aim at the most open forward beam, same sign as the driver), and **Wall follow** (the same idea with a bias toward the driver's right, which laps the oval). Ctrl or ⌘ Enter runs the buffer from anywhere on the page, including inside the editor.
 

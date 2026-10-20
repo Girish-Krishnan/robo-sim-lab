@@ -24,48 +24,79 @@ function addSolid(RAPIER: typeof import("@dimforge/rapier3d-compat").default, wo
 }
 
 /** Same rule as the Lidar avoid example: positive angle and positive steer are left. */
-function avoidCommand(ranges: number[], angles: number[], aim: { v: number }): { steering: number; throttle: number } {
+function avoidCommand(
+  ranges: number[],
+  angles: number[],
+  state: { v: number; mode: string; reverse: number; left: boolean },
+): { steering: number; throttle: number } {
+  const wide = widen(ranges);
+  const maxRange = Math.max(...ranges, 0);
   let best = -1;
   let gapAngle = 0;
-  let gapRange = 25;
-  let leftSum = 0;
-  let leftCount = 0;
-  let rightSum = 0;
-  let rightCount = 0;
+  const left: number[] = [];
+  const right: number[] = [];
+  let front = maxRange;
   for (let i = 0; i < ranges.length; i++) {
     const angle = angles[i] ?? 0;
-    const dist = ranges[i] ?? gapRange;
-    if (Math.abs(angle) < 1.2) {
-      const score = dist * (1 - 0.28 * Math.abs(angle));
+    const dist = ranges[i] ?? maxRange;
+    const opened = wide[i] ?? dist;
+    if (Math.abs(angle) < 0.4) front = Math.min(front, dist);
+    if (Math.abs(angle) < 1.15) {
+      const score = opened * (1 - 0.35 * Math.abs(angle));
       if (score > best) {
         best = score;
         gapAngle = angle;
-        gapRange = dist;
       }
     }
-    if (angle > 0.12 && angle < 1.5) {
-      leftSum += dist;
-      leftCount += 1;
-    }
-    if (angle < -0.12 && angle > -1.5) {
-      rightSum += dist;
-      rightCount += 1;
-    }
+    if (angle > 0.3 && angle < 1.35) left.push(opened);
+    if (angle < -0.3 && angle > -1.35) right.push(opened);
   }
-  aim.v = 0.72 * aim.v + 0.28 * gapAngle;
-  let steering = clamp(aim.v * 0.95, -0.48, 0.48);
-  if (gapRange < 7) {
-    const leftClear = leftCount ? leftSum / leftCount : 0;
-    const rightClear = rightCount ? rightSum / rightCount : 0;
-    const prefer = leftClear >= rightClear ? 0.42 : -0.42;
-    const blend = clamp((7 - gapRange) / 7, 0, 1);
-    steering = clamp((1 - blend) * steering + blend * prefer, -0.5, 0.5);
+  state.v = 0.84 * state.v + 0.16 * gapAngle;
+  state.left = percentile(left, 0.2) >= percentile(right, 0.2);
+  const turn = state.left ? 0.4 : -0.4;
+  let steering = clamp(state.v * 0.75, -0.38, 0.38);
+  const forwardMin = wide.reduce((best, value, index) => {
+    const angle = angles[index] ?? 0;
+    return Math.abs(angle) < 1.15 ? Math.min(best, value ?? best) : best;
+  }, Infinity);
+  if (front > 10 && forwardMin > 9) steering = clamp(steering + 0.06, -0.4, 0.4);
+  let throttle = 0.4;
+  if (front < 7) {
+    const blend = clamp((7 - front) / 4, 0, 1);
+    steering = clamp((1 - blend) * steering + blend * turn, -0.46, 0.46);
+    throttle = 0.26;
   }
-  let throttle = 0.52;
-  if (gapRange < 9) throttle = 0.36;
-  if (gapRange < 5) throttle = 0.2;
-  if (gapRange < 2.4) throttle = 0;
+  if (state.mode === "go" && front < 1.8) {
+    state.mode = "reverse";
+    state.reverse = 0;
+  } else if (state.mode === "reverse") {
+    state.reverse += 1;
+    steering = state.left ? 0.46 : -0.46;
+    throttle = -0.34;
+    if (state.reverse === 14) state.left = !state.left;
+    if (front > 3.6 || state.reverse > 30) state.mode = "go";
+  }
   return { steering, throttle };
+}
+
+function widen(ranges: number[]): number[] {
+  const wide = [...ranges];
+  for (let shift = 1; shift < 7; shift++) {
+    for (let i = 0; i < wide.length; i++) {
+      const a = ranges[i + shift];
+      const b = ranges[i - shift];
+      if (a != null) wide[i] = Math.min(wide[i] ?? a, a);
+      if (b != null) wide[i] = Math.min(wide[i] ?? b, b);
+    }
+  }
+  return wide;
+}
+
+function percentile(values: number[], p: number): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const index = Math.min(sorted.length - 1, Math.max(0, Math.floor(p * (sorted.length - 1))));
+  return sorted[index] ?? 0;
 }
 
 describe("yard", () => {
@@ -92,7 +123,7 @@ describe("yard", () => {
     for (const solid of buildCourseSolids()) addSolid(RAPIER, world, solid);
     const scene = new THREE.Scene();
     const robot = new AckermannBuggy(RAPIER, world, scene);
-    const aim = { v: 0 };
+    const aim = { v: 0, mode: "go", reverse: 0, left: true };
     let sensorAccumulator = 0;
     const start = robot.focus();
     let minUp = 1;
