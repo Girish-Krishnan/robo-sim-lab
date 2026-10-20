@@ -84,7 +84,7 @@ export async function mountApp(): Promise<void> {
     view.setAtmosphere(yard.atmosphere);
     const robot = new AckermannBuggy(RAPIER, world, view.scene);
     const paths = new PathOverlay(view.scene);
-    const drawings = new DebugDraw(view.scene);
+    const drawings = new DebugDraw(view.overlay);
     let drawOps: DrawOp[] = [];
     let studentPose = { x: 0, y: 0, yaw: 0 };
     const seedInput = mustGet<HTMLInputElement>("seed");
@@ -93,6 +93,10 @@ export async function mountApp(): Promise<void> {
     let activeSpawn: SpawnPose = yard.spawn;
     robot.reset(activeSpawn);
     let paused = false;
+    let simTime = 0;
+    let accumulator = 0;
+    let sensorAccumulator = 0;
+    let kidnappedDistance = -1;
     const lidar = new LidarView(view.scene, viewport);
     const camera = new ChaseCamera(view.camera, viewport);
 
@@ -108,6 +112,7 @@ export async function mountApp(): Promise<void> {
       onDraw: (ops) => {
         drawOps = ops;
         drawings.set(ops, activeSpawn);
+        frameKidnappedCloud();
       },
       onLog: (line, level) => consolePanel.log(line, level),
       onState: (state) => {
@@ -166,13 +171,43 @@ export async function mountApp(): Promise<void> {
       return yard.spawn;
     };
 
+    const frameKidnappedCloud = (force = false) => {
+      if (!codeEditor.getValue().includes("UNKNOWN_START = True")) {
+        if (kidnappedDistance >= 0) {
+          kidnappedDistance = -1;
+          camera.reset();
+          view.frameFog(null);
+        }
+        return;
+      }
+      const map = taskMap();
+      const span = Math.max(map.width, map.height) * map.resolution;
+      // Vertical fov is 48°. Sit high enough that the longer map side,
+      // plus a margin, lands inside the frame.
+      const wide = Math.min(190, Math.max(48, span / 0.55));
+      const ellipse = [...drawOps].reverse().find((op) => op.kind === "ellipse");
+      const spread = ellipse ? Math.max(ellipse.rx, ellipse.ry) : 1e9;
+      // A free-space prior is tens of metres. A collapsed 2-sigma ring is about a metre,
+      // and the swarm is only readable if the camera comes back in.
+      const distance = spread > 6 ? wide : Math.min(26, Math.max(14, spread * 8 + 12));
+      const fogDistance = spread > 6 ? wide : null;
+      if (!force && Math.abs(distance - kidnappedDistance) < 0.5) return;
+      kidnappedDistance = distance;
+      camera.overhead(distance);
+      view.frameFog(fogDistance);
+    };
+
     const resetWorld = () => {
       if (mode === "code") stopProgram();
       activeSpawn = currentSpawn();
       paths.clear();
       drawOps = [];
       drawings.clear();
+      simTime = 0;
+      accumulator = 0;
+      sensorAccumulator = 0;
       robot.reset(activeSpawn);
+      frameKidnappedCloud(true);
       camera.snap(robot.focus());
       if (mode === "drive") applyDrive();
     };
@@ -249,6 +284,7 @@ export async function mountApp(): Promise<void> {
         drawings.clear();
         robot.reset(activeSpawn);
         camera.reset();
+        frameKidnappedCloud(true);
         camera.snap(robot.focus());
         localStorage.setItem(WORLD_STORAGE_KEY, id);
         if (mode === "drive") applyDrive();
@@ -350,7 +386,11 @@ export async function mountApp(): Promise<void> {
         lessonWorld = worldId;
       },
       resetWorld,
-      setCode: (source) => codeEditor.setValue(source),
+      setCode: (source) => {
+        codeEditor.setValue(source);
+        frameKidnappedCloud(true);
+        camera.snap(robot.focus());
+      },
       onCodeChange: (listener) => {
         onCodeChange = listener;
       },
@@ -389,9 +429,6 @@ export async function mountApp(): Promise<void> {
     view.renderer.domElement.focus({ preventScroll: true });
 
     let last = performance.now();
-    let accumulator = 0;
-    let sensorAccumulator = 0;
-    let simTime = 0;
     if (window.roboSim) window.roboSim.time = () => simTime;
 
     const frame = (now: number) => {

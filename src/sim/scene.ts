@@ -56,6 +56,8 @@ type Rapier = typeof RAPIER;
 export class SimView {
   readonly renderer: THREE.WebGLRenderer;
   readonly scene = new THREE.Scene();
+  /** Student drawings. Rendered after tone mapping so marker colors stay saturated. */
+  readonly overlay = new THREE.Scene();
   readonly camera: THREE.PerspectiveCamera;
   private readonly sun: THREE.DirectionalLight;
   private readonly hemi: THREE.HemisphereLight;
@@ -198,9 +200,38 @@ export class SimView {
     this.sunTarget.updateMatrixWorld();
   }
 
+  /**
+   * While a kidnapped cloud fills the yard, push fog out so the overview is
+   * not a gray ball. `null` restores the world's atmosphere.
+   */
+  frameFog(distance: number | null): void {
+    const fog = this.scene.fog;
+    if (!(fog instanceof THREE.Fog)) return;
+    if (distance == null) {
+      fog.near = this.atmosphere.fogNear;
+      fog.far = this.atmosphere.fogFar;
+      return;
+    }
+    fog.near = Math.max(this.atmosphere.fogNear, distance * 0.55);
+    fog.far = Math.max(this.atmosphere.fogFar, distance * 2.8);
+  }
+
   render(): void {
     if (this.quality === "high" && this.composer) this.composer.render();
     else this.renderer.render(this.scene, this.camera);
+    this.renderOverlay();
+  }
+
+  private renderOverlay(): void {
+    if (this.overlay.children.length === 0) return;
+    const tone = this.renderer.toneMapping;
+    this.renderer.toneMapping = THREE.NoToneMapping;
+    this.renderer.setRenderTarget(null);
+    this.renderer.autoClear = false;
+    this.renderer.clearDepth();
+    this.renderer.render(this.overlay, this.camera);
+    this.renderer.autoClear = true;
+    this.renderer.toneMapping = tone;
   }
 
   private ensureComposer(): void {

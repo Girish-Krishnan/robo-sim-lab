@@ -15,21 +15,23 @@ Monte Carlo localization represents the belief with $N$ poses, the particles. Ea
 
 The starter uses a few hundred particles, a few dozen lidar beams, and the precomputed distance field. That is the budget that fits in a 20 Hz Pyodide tick. Using all 270 beams and a few thousand particles will miss the deadline and the car will stutter. The geometry does not need it. Walls are large compared with a 0.5 m cell.
 
-Each particle is a small dot a few centimetres off the ground, plus a short heading tick. Brighter dots earned more weight. The weighted-mean estimate is a yellow heading mark, and the trail of that mean is drawn in red. The green path is the route. The same marks are in the lidar inset. None of these drawings are fed back into the next tick. If you want the estimate, keep it in a variable. Do not read it off the screen.
+Each particle is a saturated magenta dot a few centimetres off the ground, about 8 px across, with a dark outline so it stays visible on asphalt, grass, and dirt. The marks are drawn after the scene's color grade, so the magenta is not washed into the ground. A short tick, about 28 cm, shows its heading. Brighter dots earned more weight. The weighted-mean estimate is a yellow heading mark. A yellow ellipse around that mean is the 2-sigma contour of the cloud's covariance. The trail of the mean is drawn in red. The green path is the route. The same marks are in the lidar inset. None of these drawings are fed back into the next tick. If you want the estimate, keep it in a variable. Do not read it off the screen.
 
 <svg viewBox="0 0 460 230" role="img" aria-label="Particles against a wall">
   <rect width="460" height="230" rx="12" fill="#10161a"/>
   <line x1="40" y1="36" x2="420" y2="36" stroke="#9aa7a0" stroke-width="6"/>
-  <g fill="#8eb8ff">
-    <circle cx="160" cy="100" r="3"/><circle cx="175" cy="114" r="3"/><circle cx="190" cy="98" r="3"/>
-    <circle cx="200" cy="120" r="3"/><circle cx="214" cy="106" r="3"/><circle cx="228" cy="118" r="3"/>
-    <circle cx="180" cy="130" r="3"/><circle cx="210" cy="138" r="3"/>
+  <ellipse cx="198" cy="116" rx="78" ry="46" fill="none" stroke="#ffd400" stroke-width="3"/>
+  <g fill="#ff2bd6" stroke="#140014" stroke-width="2">
+    <circle cx="160" cy="100" r="5"/><circle cx="175" cy="114" r="5"/><circle cx="190" cy="98" r="5"/>
+    <circle cx="200" cy="120" r="5"/><circle cx="214" cy="106" r="5"/><circle cx="228" cy="118" r="5"/>
+    <circle cx="180" cy="130" r="5"/><circle cx="210" cy="138" r="5"/>
   </g>
   <circle cx="200" cy="110" r="5" fill="#ff5d73"/>
   <line x1="200" y1="110" x2="200" y2="70" stroke="#ffe08a" stroke-width="2"/>
-  <text x="16" y="186" fill="#8eb8ff" font-size="13" font-family="sans-serif">particles</text>
+  <text x="16" y="186" fill="#ff2bd6" font-size="13" font-family="sans-serif">particles</text>
   <text x="110" y="186" fill="#ff5d73" font-size="13" font-family="sans-serif">weighted mean</text>
   <text x="250" y="186" fill="#ffe08a" font-size="13" font-family="sans-serif">heading</text>
+  <text x="330" y="186" fill="#ffd400" font-size="13" font-family="sans-serif">2σ</text>
   <text x="16" y="214" fill="#9aa7a0" font-size="13" font-family="sans-serif">wall from the known map</text>
 </svg>
 
@@ -65,12 +67,12 @@ $$\bar\theta = \operatorname{atan2}\left(\sum_i w^{[i]}\sin\theta^{[i]},\; \sum_
 
 Resampling every tick, with no motion noise, makes every particle a copy of one survivor. That is sample impoverishment. The starter adds a little noise even when the odometry delta is small, and it resamples only when $N_{\mathrm{eff}}$ drops.
 
-The mean is not a particle. It can sit inside a wall if two modes disagree. On these maps one corridor usually wins. If the blue cloud splits into two blobs, do not trust the red mean until one blob dies.
+The mean is not a particle. It can sit inside a wall if two modes disagree. On these maps one corridor usually wins. If the magenta cloud splits into two blobs, the yellow ellipse grows to cover both, and the red mean sits between them until one blob dies.
 
 Global localization (the kidnapped starter) is the same filter with a different initial cloud. Tracking from the origin is easier and is what flattens the oval. Do not confuse a cloud that started on the answer with a cloud that found the answer.
 
 ## Try it
 
-1. Run the starter on the oval. You should see a blue cloud on the car and a red trail that stays with it while the amber odometry trail, if Paths is on, walks away.
+1. Run the starter on the oval. You should see a magenta cloud on the car, a yellow ellipse tight around it, and a red trail that stays with it while the amber odometry trail, if Paths is on, walks away.
 2. Cut `N` to `40` and run again. The mean should jump more. Put `360` back.
 3. Force a resample every tick by ignoring $N_{\mathrm{eff}}$. The cloud should look thinner and, after a bad scan, it may not recover. Restore the threshold.

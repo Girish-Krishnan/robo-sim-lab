@@ -37,6 +37,7 @@ export class DebugDraw {
       if (op.kind === "path" && op.points.length >= 2) {
         this.group.add(ribbon(op.points.map((point) => place(spawn, point.x, point.y, 0.46)), op.color));
       }
+      if (op.kind === "ellipse") this.group.add(ellipseRing(spawn, op));
       if (op.kind === "points" && op.points.length > 0) this.group.add(markers(spawn, op.points, op.color));
     }
   }
@@ -47,8 +48,7 @@ function place(spawn: SpawnPose, x: number, y: number, height: number): THREE.Ve
   return new THREE.Vector3(world.x, height, world.z);
 }
 
-function ribbon(points: THREE.Vector3[], color: string): THREE.Mesh {
-  const half = 0.08;
+function ribbon(points: THREE.Vector3[], color: string, half = 0.08): THREE.Mesh {
   const positions: number[] = [];
   const indices: number[] = [];
   for (let i = 0; i < points.length; i++) {
@@ -74,15 +74,27 @@ function ribbon(points: THREE.Vector3[], color: string): THREE.Mesh {
 }
 
 /** A few centimetres off the floor. Pixel size, so a cloud stays a cloud. */
-const DOT_Y = 0.035;
-const TICK_Y = 0.05;
-const TICK_LENGTH = 0.12;
+const DOT_Y = 0.04;
+const TICK_Y = 0.06;
+const TICK_LENGTH = 0.28;
 
 function particleColor(base: THREE.Color, hot: THREE.Color, weight: number, target: THREE.Color): THREE.Color {
-  // Weight only tints toward white. Darkening by weight hid the low-weight
-  // majority of a spread cloud against the ground.
-  target.copy(base).lerp(hot, weight * 0.45);
+  // Stay in the magenta. Lightening toward white is what disappeared into dirt.
+  target.copy(base).lerp(hot, 0.12 * weight);
   return target;
+}
+
+function pointCloud(
+  positions: Float32Array,
+  material: THREE.PointsMaterial,
+  order: number,
+): THREE.Points {
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  const dots = new THREE.Points(geometry, material);
+  dots.frustumCulled = false;
+  dots.renderOrder = order;
+  return dots;
 }
 
 function markers(spawn: SpawnPose, points: { x: number; y: number; yaw?: number; w?: number }[], color: string): THREE.Group {
@@ -92,7 +104,7 @@ function markers(spawn: SpawnPose, points: { x: number; y: number; yaw?: number;
   const positions = new Float32Array(count * 3);
   const colors = new Float32Array(count * 3);
   const base = new THREE.Color(color);
-  const hot = new THREE.Color("#f7fbff");
+  const hot = new THREE.Color("#ff7ae8");
   let maxWeight = 0;
   for (const point of points) if (point.w !== undefined) maxWeight = Math.max(maxWeight, point.w);
   const weighted = maxWeight > 0;
@@ -109,13 +121,29 @@ function markers(spawn: SpawnPose, points: { x: number; y: number; yaw?: number;
     colors[i * 3 + 1] = scratch.g;
     colors[i * 3 + 2] = scratch.b;
   }
+  const halo = pointCloud(
+    positions,
+    new THREE.PointsMaterial({
+      size: count >= 24 ? 14 : 16,
+      sizeAttenuation: false,
+      color: "#140014",
+      transparent: true,
+      opacity: 1,
+      depthTest: false,
+      depthWrite: false,
+      toneMapped: false,
+      fog: false,
+    }),
+    4,
+  );
+  group.add(halo);
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
   geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
   const dots = new THREE.Points(
     geometry,
     new THREE.PointsMaterial({
-      size: count >= 24 ? 5 : 7,
+      size: count >= 24 ? 8 : 10,
       sizeAttenuation: false,
       vertexColors: true,
       transparent: true,
@@ -127,41 +155,105 @@ function markers(spawn: SpawnPose, points: { x: number; y: number; yaw?: number;
     }),
   );
   dots.frustumCulled = false;
-  dots.renderOrder = 8;
+  dots.renderOrder = 6;
   group.add(dots);
 
-  const ticks: number[] = [];
-  const tickColors: number[] = [];
-  for (let i = 0; i < count; i++) {
-    const point = points[i]!;
+  const tick = headingTicks(spawn, points, base, hot, weighted, maxWeight);
+  if (tick) group.add(tick);
+  return group;
+}
+
+/** 28 cm heading marks. A few centimetres wide so the tick survives a far camera. */
+function headingTicks(
+  spawn: SpawnPose,
+  points: { x: number; y: number; yaw?: number; w?: number }[],
+  base: THREE.Color,
+  hot: THREE.Color,
+  weighted: boolean,
+  maxWeight: number,
+): THREE.Mesh | null {
+  const positions: number[] = [];
+  const colors: number[] = [];
+  const half = 0.045;
+  const scratch = new THREE.Color();
+  for (const point of points) {
     if (point.yaw === undefined || !Number.isFinite(point.yaw)) continue;
-    const at = place(spawn, point.x, point.y, TICK_Y);
     const weight = weighted ? Math.min(1, Math.max(0, (point.w ?? 0) / maxWeight)) : 1;
     particleColor(base, hot, weight, scratch);
     const dx = Math.cos(point.yaw) * TICK_LENGTH;
     const dy = Math.sin(point.yaw) * TICK_LENGTH;
+    const at = place(spawn, point.x, point.y, TICK_Y);
     const tip = place(spawn, point.x + dx, point.y + dy, TICK_Y);
-    ticks.push(at.x, at.y, at.z, tip.x, tip.y, tip.z);
-    tickColors.push(scratch.r, scratch.g, scratch.b, scratch.r, scratch.g, scratch.b);
+    const len = Math.hypot(tip.x - at.x, tip.z - at.z) || 1;
+    const nx = (-(tip.z - at.z) / len) * half;
+    const nz = ((tip.x - at.x) / len) * half;
+    const quad = [
+      at.x + nx, at.y, at.z + nz,
+      at.x - nx, at.y, at.z - nz,
+      tip.x + nx, tip.y, tip.z + nz,
+      at.x - nx, at.y, at.z - nz,
+      tip.x - nx, tip.y, tip.z - nz,
+      tip.x + nx, tip.y, tip.z + nz,
+    ];
+    positions.push(...quad);
+    for (let i = 0; i < 6; i++) colors.push(scratch.r, scratch.g, scratch.b);
   }
-  if (ticks.length >= 6) {
-    const lines = new THREE.BufferGeometry();
-    lines.setAttribute("position", new THREE.BufferAttribute(new Float32Array(ticks), 3));
-    lines.setAttribute("color", new THREE.BufferAttribute(new Float32Array(tickColors), 3));
-    const mesh = new THREE.LineSegments(
-      lines,
-      new THREE.LineBasicMaterial({
-        vertexColors: true,
-        transparent: true,
-        opacity: 0.95,
-        depthTest: false,
-        depthWrite: false,
-        toneMapped: false,
-        fog: false,
-      }),
-    );
+  if (positions.length < 9) return null;
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(positions), 3));
+  geometry.setAttribute("color", new THREE.BufferAttribute(new Float32Array(colors), 3));
+  const mesh = new THREE.Mesh(
+    geometry,
+    new THREE.MeshBasicMaterial({
+      vertexColors: true,
+      transparent: true,
+      opacity: 1,
+      depthTest: false,
+      depthWrite: false,
+      toneMapped: false,
+      fog: false,
+      side: THREE.DoubleSide,
+    }),
+  );
+  mesh.frustumCulled = false;
+  mesh.renderOrder = 5;
+  return mesh;
+}
+
+/** 2-sigma ring. A wide band when the cloud is large, a tight ring when it has collapsed. */
+function ellipseRing(
+  spawn: SpawnPose,
+  op: { x: number; y: number; yaw: number; rx: number; ry: number; color: string },
+): THREE.Group {
+  const group = new THREE.Group();
+  group.frustumCulled = false;
+  const steps = 56;
+  const upper: THREE.Vector3[] = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = (i / steps) * Math.PI * 2;
+    const localX = Math.cos(t) * op.rx;
+    const localY = Math.sin(t) * op.ry;
+    const cos = Math.cos(op.yaw);
+    const sin = Math.sin(op.yaw);
+    upper.push(place(spawn, op.x + cos * localX - sin * localY, op.y + sin * localX + cos * localY, 0.09));
+  }
+  const minor = Math.min(op.rx, op.ry);
+  // A yard-sized ring needs a wide band. A collapsed ring must stay a ring,
+  // not a disc that covers the swarm.
+  const half = minor > 4 ? Math.min(1.6, Math.max(0.45, minor * 0.04)) : Math.min(0.12, Math.max(0.055, minor * 0.1));
+  const shade = ribbon(upper, "#1a1200", half + (minor > 4 ? 0.55 : 0.06));
+  const ring = ribbon(upper, op.color, half);
+  for (const [mesh, order] of [
+    [shade, 2],
+    [ring, 3],
+  ] as const) {
     mesh.frustumCulled = false;
-    mesh.renderOrder = 8;
+    mesh.renderOrder = order;
+    const material = mesh.material as THREE.MeshBasicMaterial;
+    material.depthTest = false;
+    material.toneMapped = false;
+    material.fog = false;
+    material.opacity = 1;
     group.add(mesh);
   }
   return group;

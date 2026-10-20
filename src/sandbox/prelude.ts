@@ -90,6 +90,17 @@ class _RoboDraw:
             "color": str(color),
         })
 
+    def ellipse(self, x, y, yaw, rx, ry, color="#ffd400"):
+        self._remember({
+            "kind": "ellipse",
+            "x": float(x),
+            "y": float(y),
+            "yaw": float(yaw),
+            "rx": float(rx),
+            "ry": float(ry),
+            "color": str(color),
+        })
+
 def _robo_points(points):
     arr = None
     try:
@@ -97,7 +108,7 @@ def _robo_points(points):
     except (TypeError, ValueError):
         arr = None
     if isinstance(arr, np.ndarray) and arr.ndim == 2 and arr.shape[1] >= 2:
-        n = min(int(arr.shape[0]), 500)
+        n = min(int(arr.shape[0]), 1000)
         cols = int(arr.shape[1])
         out = []
         for i in range(n):
@@ -109,7 +120,7 @@ def _robo_points(points):
             out.append(item)
         return out
     out = []
-    for point in list(points)[:500]:
+    for point in list(points)[:1000]:
         if isinstance(point, dict):
             item = {"x": float(point.get("x", 0.0)), "y": float(point.get("y", 0.0))}
             if "yaw" in point:

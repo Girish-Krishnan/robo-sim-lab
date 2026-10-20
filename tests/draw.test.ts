@@ -17,4 +17,11 @@ describe("parseDrawOps", () => {
       },
     ]);
   });
+
+  it("keeps a 2-sigma ellipse and caps a huge radius", () => {
+    const ops = parseDrawOps(
+      JSON.stringify([{ kind: "ellipse", x: 1.5, y: -2, yaw: 0.3, rx: 4, ry: 200, color: "#ffd400" }]),
+    );
+    expect(ops).toEqual([{ kind: "ellipse", x: 1.5, y: -2, yaw: 0.3, rx: 4, ry: 80, color: "#ffd400" }]);
+  });
 });

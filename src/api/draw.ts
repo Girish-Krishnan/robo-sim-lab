@@ -15,7 +15,8 @@ export interface DrawPoint {
 export type DrawOp =
   | { kind: "path"; points: DrawPoint[]; color: string }
   | { kind: "points"; points: DrawPoint[]; color: string }
-  | { kind: "text"; x: number; y: number; text: string; color: string };
+  | { kind: "text"; x: number; y: number; text: string; color: string }
+  | { kind: "ellipse"; x: number; y: number; yaw: number; rx: number; ry: number; color: string };
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
 
@@ -26,7 +27,7 @@ function color(value: unknown, fallback: string): string {
 function points(value: unknown): DrawPoint[] {
   if (!Array.isArray(value)) return [];
   const out: DrawPoint[] = [];
-  for (const item of value.slice(0, 500)) {
+  for (const item of value.slice(0, 1000)) {
     if (!item || typeof item !== "object") continue;
     const point = item as { x?: unknown; y?: unknown; yaw?: unknown; w?: unknown };
     const x = Number(point.x);
@@ -56,13 +57,40 @@ export function parseDrawOps(raw: unknown): DrawOp[] {
   const ops: DrawOp[] = [];
   for (const item of parsed.slice(0, 12)) {
     if (!item || typeof item !== "object") continue;
-    const op = item as { kind?: unknown; points?: unknown; color?: unknown; x?: unknown; y?: unknown; text?: unknown };
+    const op = item as {
+      kind?: unknown;
+      points?: unknown;
+      color?: unknown;
+      x?: unknown;
+      y?: unknown;
+      yaw?: unknown;
+      rx?: unknown;
+      ry?: unknown;
+      text?: unknown;
+    };
     if (op.kind === "path") {
       const path = points(op.points);
       if (path.length >= 2) ops.push({ kind: "path", points: path, color: color(op.color, "#7dcea0") });
     } else if (op.kind === "points") {
       const marks = points(op.points);
       if (marks.length > 0) ops.push({ kind: "points", points: marks, color: color(op.color, "#f4d03f") });
+    } else if (op.kind === "ellipse") {
+      const x = Number(op.x);
+      const y = Number(op.y);
+      const yaw = Number(op.yaw);
+      const rx = Number(op.rx);
+      const ry = Number(op.ry);
+      if ([x, y, yaw, rx, ry].every(Number.isFinite) && rx > 0 && ry > 0) {
+        ops.push({
+          kind: "ellipse",
+          x,
+          y,
+          yaw,
+          rx: Math.min(rx, 80),
+          ry: Math.min(ry, 80),
+          color: color(op.color, "#ffd400"),
+        });
+      }
     } else if (op.kind === "text") {
       const x = Number(op.x);
       const y = Number(op.y);

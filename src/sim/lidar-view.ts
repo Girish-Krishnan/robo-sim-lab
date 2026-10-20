@@ -209,12 +209,16 @@ function drawStudentOverlay(
 ): void {
   let reach = 12;
   for (const op of overlay.ops) {
+    if (op.kind === "ellipse") {
+      reach = Math.max(reach, Math.hypot(op.x - overlay.pose.x, op.y - overlay.pose.y) + Math.max(op.rx, op.ry));
+      continue;
+    }
     if (op.kind !== "points") continue;
     for (const point of op.points) {
       reach = Math.max(reach, Math.hypot(point.x - overlay.pose.x, point.y - overlay.pose.y));
     }
   }
-  const range = Math.min(48, reach * 1.08);
+  const range = Math.min(90, reach * 1.08);
   const project = (x: number, y: number): [number, number] => {
     const dx = x - overlay.pose.x;
     const dy = y - overlay.pose.y;
@@ -239,17 +243,20 @@ function drawStudentOverlay(
       let maxWeight = 0;
       for (const point of op.points) if (point.w !== undefined) maxWeight = Math.max(maxWeight, point.w);
       const weighted = maxWeight > 0;
-      const dot = op.points.length >= 24 ? 2.4 : 3.4;
+      const dot = op.points.length >= 24 ? 6 : 8;
       for (const point of op.points) {
         const [x, y] = project(point.x, point.y);
         const weight = weighted ? Math.min(1, Math.max(0, (point.w ?? 0) / maxWeight)) : 1;
-        ctx.globalAlpha = 0.55 + 0.45 * weight;
+        ctx.globalAlpha = 0.9;
+        ctx.fillStyle = "#140014";
+        ctx.fillRect(x - (dot + 2) / 2, y - (dot + 2) / 2, dot + 2, dot + 2);
+        ctx.globalAlpha = 0.75 + 0.25 * weight;
         ctx.fillStyle = op.color;
         ctx.fillRect(x - dot / 2, y - dot / 2, dot, dot);
         if (point.yaw !== undefined && Number.isFinite(point.yaw)) {
-          const tip = project(point.x + Math.cos(point.yaw) * 0.35, point.y + Math.sin(point.yaw) * 0.35);
+          const tip = project(point.x + Math.cos(point.yaw) * 0.28, point.y + Math.sin(point.yaw) * 0.28);
           ctx.strokeStyle = op.color;
-          ctx.lineWidth = 1;
+          ctx.lineWidth = 1.5;
           ctx.beginPath();
           ctx.moveTo(x, y);
           ctx.lineTo(tip[0], tip[1]);
@@ -257,6 +264,21 @@ function drawStudentOverlay(
         }
       }
       ctx.globalAlpha = 1;
+    } else if (op.kind === "ellipse") {
+      ctx.beginPath();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = op.color;
+      for (let i = 0; i <= 40; i++) {
+        const t = (i / 40) * Math.PI * 2;
+        const localX = Math.cos(t) * op.rx;
+        const localY = Math.sin(t) * op.ry;
+        const cos = Math.cos(op.yaw);
+        const sin = Math.sin(op.yaw);
+        const [x, y] = project(op.x + cos * localX - sin * localY, op.y + sin * localX + cos * localY);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
     } else if (op.kind === "text") {
       const [x, y] = project(op.x, op.y);
       ctx.font = "10px IBM Plex Mono, ui-monospace, monospace";

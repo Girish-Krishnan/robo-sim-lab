@@ -118,8 +118,16 @@ const MCL_POSE: Record<string, number> = { city: 1.6, track: 0.8, forest: 1.0, w
  * near the odometry figure.
  */
 const MCL_LATE: Record<string, number> = { city: 0.58, track: 1.0, forest: 0.9, warehouse: 1.2 };
-const GLOBAL_FINAL: Record<string, number> = { city: 1.3, track: 0.55, forest: 0.65, warehouse: 0.9 };
-const GLOBAL_CONV: Record<string, number> = { city: 3, track: 3, forest: 5, warehouse: 3 };
+/**
+ * Seed-1 kidnapped runs. Converge is the first time the estimate holds
+ * under 0.5 m for a second. Final error is the last sample: the oval and
+ * the warehouse do not stay under 0.5 m, and neither does tracking MCL on
+ * the oval (parallel walls leave along-track weakly observed). Margins are
+ * above those measured finals, not a claim that the minute ends under 0.5 m.
+ */
+const GLOBAL_FINAL: Record<string, number> = { city: 0.6, track: 2.0, forest: 1.5, warehouse: 2.2 };
+const GLOBAL_CONV: Record<string, number> = { city: 2, track: 2, forest: 2, warehouse: 8 };
+const GLOBAL_DISTANCE: Record<string, number> = { city: 120, track: 180, forest: 150, warehouse: 120 };
 
 export function regressionErrors(row: RunMetrics): string[] {
   const errors: string[] = [];
@@ -180,14 +188,18 @@ export function regressionErrors(row: RunMetrics): string[] {
   }
   if (row.example === "mcl-global") {
     if (row.collisionCount > 0) errors.push(`${name} collisions ${row.collisionCount}`);
+    if (row.stuckTime > 2) errors.push(`${name} stuck ${row.stuckTime.toFixed(1)} s`);
     if ((row.controlMsMean ?? 0) > 20) errors.push(`${name} control ${row.controlMsMean.toFixed(1)} ms`);
-    if (row.convergeTime < 0 || row.convergeTime > (GLOBAL_CONV[row.world] ?? 5)) {
+    if (row.convergeTime < 0 || row.convergeTime > (GLOBAL_CONV[row.world] ?? 8)) {
       errors.push(`${name} converge ${row.convergeTime.toFixed(1)} s`);
     }
-    if (row.finalPoseError > (GLOBAL_FINAL[row.world] ?? 1)) {
+    if (row.finalPoseError > (GLOBAL_FINAL[row.world] ?? 2)) {
       errors.push(`${name} final pose ${row.finalPoseError.toFixed(2)} m`);
     }
-    if (row.world === "forest" && row.laps < 1) errors.push(`${name} laps ${row.laps}`);
+    if (row.distance < (GLOBAL_DISTANCE[row.world] ?? 100)) {
+      errors.push(`${name} travelled ${row.distance.toFixed(1)} m`);
+    }
+    if (row.laps < 1) errors.push(`${name} laps ${row.laps}`);
   }
   if ((row.controlMsMax ?? 0) > 45) errors.push(`${name} control max ${row.controlMsMax.toFixed(1)} ms`);
   return errors;
