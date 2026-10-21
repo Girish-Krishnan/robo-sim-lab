@@ -56,7 +56,7 @@ async function main(): Promise<void> {
     const m = episode.metrics;
     const driftPct = m.distance > 1 ? (100 * m.odomDrift) / m.distance : 0;
     process.stdout.write(
-      `${world}/${example}  dist ${m.distance.toFixed(1)}  real ${m.collisionCount}  pred ${m.predictedCount}  stuck ${m.stuckTime.toFixed(1)}  drift ${m.odomDrift.toFixed(2)} (${driftPct.toFixed(1)}%)  laps ${m.laps}  xt ${m.crossTrackMean.toFixed(2)}/${m.crossTrackMax.toFixed(2)} early ${m.crossTrackEarly.toFixed(2)} late ${m.crossTrackLate.toFixed(2)}  pose ${m.poseErrorMean.toFixed(2)}/${m.poseErrorMax.toFixed(2)}  head ${m.headingErrorMean.toFixed(3)}  conv ${m.convergeTime.toFixed(1)}  final ${m.finalPoseError.toFixed(2)}  ctrl ${m.controlMsMean.toFixed(1)}/${m.controlMsMax.toFixed(1)} ms  ground ${m.chaseGround ? "yes" : "NO"}  ${(Date.now() - started) / 1000}s\n`,
+      `${world}/${example}  dist ${m.distance.toFixed(1)}  real ${m.collisionCount}  pred ${m.predictedCount}  stuck ${m.stuckTime.toFixed(1)}  drift ${m.odomDrift.toFixed(2)} (${driftPct.toFixed(1)}%)  laps ${m.laps}  xt ${m.crossTrackMean.toFixed(2)}/${m.crossTrackMax.toFixed(2)} early ${m.crossTrackEarly.toFixed(2)} late ${m.crossTrackLate.toFixed(2)}  pose ${m.poseErrorMean.toFixed(2)}/${m.poseErrorMax.toFixed(2)}  head ${m.headingErrorMean.toFixed(3)}  conv ${m.convergeTime.toFixed(1)}  final ${m.finalPoseError.toFixed(2)}  cloud ${m.finalCloudRadius.toFixed(2)}  hsig ${(m.finalHeadingSigma * 180 / Math.PI).toFixed(1)}  ctrl ${m.controlMsMean.toFixed(1)}/${m.controlMsMax.toFixed(1)} ms  ground ${m.chaseGround ? "yes" : "NO"}  ${(Date.now() - started) / 1000}s\n`,
     );
   }
   if (rasters.length === EVAL_WORLDS.length * EVAL_EXAMPLES.length) {
@@ -82,11 +82,15 @@ async function main(): Promise<void> {
 
 function pairsFrom(only: string | undefined): [EvalWorld, EvalExample][] {
   if (!only) return EVAL_WORLDS.flatMap((world) => EVAL_EXAMPLES.map((example) => [world, example] as [EvalWorld, EvalExample]));
-  const [world, example] = only.split("/");
-  if (!EVAL_WORLDS.includes(world as EvalWorld) || !EVAL_EXAMPLES.includes(example as EvalExample)) {
-    throw new Error(`--only expects world/example, got ${only}`);
+  const pairs: [EvalWorld, EvalExample][] = [];
+  for (const item of only.split(",")) {
+    const [world, example] = item.split("/");
+    if (!EVAL_WORLDS.includes(world as EvalWorld) || !EVAL_EXAMPLES.includes(example as EvalExample)) {
+      throw new Error(`--only expects world/example, got ${item}`);
+    }
+    pairs.push([world as EvalWorld, example as EvalExample]);
   }
-  return [[world as EvalWorld, example as EvalExample]];
+  return pairs;
 }
 
 void main().catch((error: unknown) => {

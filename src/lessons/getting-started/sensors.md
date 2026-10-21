@@ -27,6 +27,9 @@ The Python side is a sandbox. NumPy is there. `print` and tracebacks show up in 
 - `sensors.imu.yaw_rate` is rad/s about body +z. `accel` is specific force. Standing still on flat ground, z is about $+9.81$, because the accelerometer feels the normal force, not gravity as a signed acceleration.
 - `sensors.time` and `sensors.dt` are seconds.
 - `sensors.task.path` is a list of waypoints in the odometry frame. `sensors.task.map` is a known floor plan in that same frame. Neither is a measurement of the car.
+- `sensors.camera.available` is false. The field is on the sample so a later lesson can add an image without changing the call. There is no picture, and the camera is not modeled yet.
+
+The noise on the sensors that do exist is not a mystery number. Lidar range is a Gaussian of 2 cm. Wheel speed carries a 1.2% scale bias. The gyro carries a 0.0012 rad/s bias. The noise lesson writes each of those as an equation, and shows why the biases become odometry drift while the white noise mostly averages away.
 
 Return `(steering, throttle)` or a dict with those keys. Steering is radians, positive left, clamped near $\pm 0.5$. Throttle is $-1$ to $1$.
 

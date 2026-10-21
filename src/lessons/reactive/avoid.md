@@ -31,7 +31,7 @@ Throttle is a function of the nearest forward range $r_{\min}$. Far away, thrott
 
 ## Intuition and pitfalls
 
-Reactive avoidance does not know the way out of a maze. In the warehouse it explores and still bumps. In the city it leaves the start and still finds a planter. The eval allows a couple of real contacts there and none on the oval or in the forest. "None" means manifolds that actually contain a contact point, not a broadphase pair with an empty manifold.
+Reactive avoidance does not know the way out of a maze. In the warehouse it explores and still bumps twice on seed 1, once creeping into the end shelf and once backing into a pallet. In the city it leaves the start and still finds one corner. The eval allows that one city contact and those two warehouse contacts, and none on the oval or in the forest. "None" means manifolds that actually contain a contact point, not a broadphase pair with an empty manifold. A wider "back up whenever something is close" rule also reverses next to a cone or a trunk, and that version collects contacts on the oval and in the forest. The starter only backs up for a short forward return, or when the tail is already at a wall.
 
 Do not steer toward the longest single beam if you have just inflated obstacles. The longest beam might be the one you already marked blocked.
 

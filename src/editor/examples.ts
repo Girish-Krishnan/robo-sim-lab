@@ -181,9 +181,10 @@ def control(sensors):
         phase_ticks += 1
         rear = np.abs(angles) > 2.0
         rear_range = float(np.min(ranges[rear])) if np.any(rear) else sensors.lidar.max_range
-        # Give the reverse time to clear the corner before trusting a
-        # side-rear beam, which is the wall we are leaving.
-        if phase_ticks > 40 or (phase_ticks > 14 and rear_range < 1.05 and speed < -0.2):
+        # The tail is about 1.6 m behind the lidar, and the rear 90 deg is
+        # not scanned. A side-rear beam inside 1.7 m means that corner is
+        # already at the bumper. Stop backing before the second contact.
+        if phase_ticks > 40 or (phase_ticks > 10 and rear_range < 1.7):
             phase = "spin" if abs(exit_angle) > 0.8 else "go"
             phase_ticks = 0
         return float(np.clip(0.22 * held_sign, -0.3, 0.3)), -0.4
@@ -208,10 +209,18 @@ def control(sensors):
         return float(np.clip(0.22 * held_sign, -0.3, 0.3)), -0.36
 
     if reverse > 0:
-        reverse -= 1
-        return turn, -0.28
-    if front_range < 1.55:
-        reverse = 8
+        rear = np.abs(angles) > 2.0
+        rear_range = float(np.min(ranges[rear])) if np.any(rear) else sensors.lidar.max_range
+        if rear_range < 1.7:
+            reverse = 0
+        else:
+            reverse -= 1
+            return turn, -0.28
+    # Creep into a dead end is a contact the 1.55 m check still allows,
+    # because the bumper arrives while the car is already slow. Back up
+    # sooner, and only then: a fast straight (the oval) does not reverse.
+    if front_range < 1.55 or ((not weave) and abs(speed) < 0.8 and front_range < 2.15):
+        reverse = 12
         return turn, -0.28
     # A stopped car does not yaw. If a side is open, roll into it.
     if abs(speed) < 0.35 and max(left_clear, right_clear) > front_range + 0.8:

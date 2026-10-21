@@ -19,11 +19,39 @@ The plots look noisy, and they also look biased. Those are different, and only o
 
 The eval fixes the seed at 1 so a push to the course can be compared with the last one. **Reset seed** in the header replays the draw. A different seed is a different car, in the sensor sense, on the same track.
 
+## Sensor noise models
+
+Each sensor has a white-noise term, redrawn every sample, and some have a bias drawn once per reset from the seed. The camera is not one of them. `sensors.camera.available` is false, and there is no image model yet.
+
+**Lidar.** A hit at true range $r$ is reported as
+
+$$z = \mathrm{clip}(r + \mathcal{N}(0, \sigma_r^2),\; 0.05,\; r_{\max}),\quad \sigma_r = 0.02\,\mathrm{m}.$$
+
+That is a 2 cm Gaussian. Beams that miss are left at $r_{\max} = 12$ m and are not given a fake hit. The noise does not grow with range in this model.
+
+**Wheel speed.** The true rear-wheel speed $v$ is published as
+
+$$v_{\mathrm{odom}} = v(1 + b_v) + \mathcal{N}(0, \sigma_v^2)$$
+
+with $\sigma_v = 0.02$ m/s and $b_v \sim \mathcal{N}(0, 0.012^2)$. The 0.012 is a 1.2% scale bias. It is drawn once and then held, so it stretches every metre by the same fraction.
+
+**Gyro.** The true yaw rate $\omega$ is published as
+
+$$\omega_{\mathrm{imu}} = \omega + b_\omega + \mathcal{N}(0, \sigma_\omega^2)$$
+
+with $\sigma_\omega = 0.002$ rad/s and $b_\omega \sim \mathcal{N}(0, 0.0012^2)$ rad/s. The bias is about 0.07 deg/s, one sigma.
+
+**Odometry** integrates those two samples and nothing else:
+
+$$x \leftarrow x + v_{\mathrm{odom}}\cos\theta\,\Delta t,\quad y \leftarrow y + v_{\mathrm{odom}}\sin\theta\,\Delta t,\quad \theta \leftarrow \theta + \omega_{\mathrm{imu}}\,\Delta t.$$
+
+Steering noise ($\sigma = 0.003$ rad, bias standard deviation 0.004 rad) is added to `steering_angle` only. It is not inside this integral. Accelerometer noise (0.04 m/s², bias 0.02 m/s²) is on `sensors.imu.accel` and is not integrated either.
+
 ## The math
 
-A speed bias $b_v$ on a true distance $s$ reports about $s(1+b_v)$. The end error is $s b_v$, a fixed fraction. For seed 1 the straight-line fraction is on the order of half a percent to a couple of percent, depending on the draw. The gate used in the eval is 5% of distance, which this model stays under.
+A speed bias $b_v$ on a true distance $s$ reports about $s(1+b_v)$. The end error along the path is about $s b_v$, a fixed fraction. White speed noise averages down as $1/\sqrt{N}$ samples. The bias does not, so after a long run the fraction is $b_v$, not a random walk. For seed 1 the straight-line fraction is on the order of half a percent to a couple of percent, depending on the draw. The gate used in the eval is 5% of distance, which this model stays under.
 
-A gyro bias $b_\omega$ is a random walk of the mean, not of the noise:
+A gyro bias $b_\omega$ shifts every sample by the same amount. Integrated, that is a ramp, not a random walk of the noise:
 
 $$\theta(t) = \theta_{\mathrm{true}}(t) + b_\omega t + \text{averaged noise}.$$
 

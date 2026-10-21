@@ -3,6 +3,7 @@ import path from "node:path";
 import { loadPyodide, type PyodideInterface } from "pyodide";
 import { ACKERMANN_BUGGY, clampCommand, parseDrawOps, type SensorFrame } from "../api";
 import { STUDENT_PRELUDE } from "../sandbox/prelude";
+import { cloudSpread, type CloudSpread } from "./spread";
 import type { Policy } from "./simulate";
 
 /**
@@ -44,23 +45,36 @@ export function loadStudentPolicy(pyodide: PyodideInterface, source: string): Po
     controlMs.push(performance.now() - started);
     const steering = Number(output.get?.(0));
     const throttle = Number(output.get?.(1));
-    const estimate = estimateFromDraw(output.get?.(2));
+    const reading = readingFromDraw(output.get?.(2));
     output.destroy?.();
-    return { ...clampCommand({ steering, throttle }, limits), estimate };
+    return { ...clampCommand({ steering, throttle }, limits), ...reading };
   };
   policy.controlMs = controlMs;
   return policy;
 }
 
-/** The heading tick is the short path drawn in #ffe08a. Its start is the estimate. */
-function estimateFromDraw(raw: unknown): { x: number; y: number; yaw: number } | undefined {
+/**
+ * The heading tick is the short path drawn in #ffe08a. Its start is the estimate.
+ * The magenta cloud is #ff2bd6. Its weighted covariance is the spread.
+ */
+function readingFromDraw(raw: unknown): {
+  estimate?: { x: number; y: number; yaw: number };
+  spread?: CloudSpread;
+} {
   const ops = parseDrawOps(typeof raw === "string" ? raw : "");
+  let estimate: { x: number; y: number; yaw: number } | undefined;
+  let spread: CloudSpread | undefined;
   for (let i = ops.length - 1; i >= 0; i--) {
     const op = ops[i];
-    if (!op || op.kind !== "path" || op.color.toLowerCase() !== "#ffe08a" || op.points.length < 2) continue;
-    const start = op.points[0]!;
-    const end = op.points[1]!;
-    return { x: start.x, y: start.y, yaw: Math.atan2(end.y - start.y, end.x - start.x) };
+    if (!op) continue;
+    if (!estimate && op.kind === "path" && op.color.toLowerCase() === "#ffe08a" && op.points.length >= 2) {
+      const start = op.points[0]!;
+      const end = op.points[1]!;
+      estimate = { x: start.x, y: start.y, yaw: Math.atan2(end.y - start.y, end.x - start.x) };
+    }
+    if (!spread && op.kind === "points" && op.color.toLowerCase() === "#ff2bd6") {
+      spread = cloudSpread(op.points);
+    }
   }
-  return undefined;
+  return { estimate, spread };
 }

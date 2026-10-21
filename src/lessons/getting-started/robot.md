@@ -21,6 +21,8 @@ The **world** is the simulator's ground plane. Three.js uses Y up, so the car's 
 
 **Odometry** is a third frame. On reset it starts at (0, 0), with +x along the direction the car was facing and +y to its left. It is not the world frame. A point on `sensors.task.path` lives here, and so do `draw` coordinates.
 
+The mesh and the lidar ray use one more convention: z forward, x left, y up, which is how the 3D view is built. Forward and left are the same directions as in the bicycle model. The letter that means forward is not. The lidar lesson writes the ray in that mesh frame. Stay in odometry x-forward when you write a controller.
+
 The lidar puck is on the roof, about 0.46 m in front of the body centre, a bit over a metre off the ground. Curbs are too short for it. Walls, trunks, shelves, and cones are not.
 
 ## The math

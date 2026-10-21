@@ -17,6 +17,7 @@ import { buildKnownMap } from "../sim/known-map";
 import { referenceRoute, type RoutePoint } from "../sim/routes";
 import { AckermannBuggy, type SpawnPose } from "../sim/vehicle";
 import type { EvalExample, EvalWorld } from "./scenarios";
+import { CONVERGE_HEADING, CONVERGE_HOLD, CONVERGE_POSITION, CONVERGE_RADIUS } from "./spread";
 
 type World = InstanceType<typeof RAPIER.World>;
 
@@ -79,12 +80,19 @@ export interface RunMetrics {
   controlMsMean: number;
   controlMsMax: number;
   /**
-   * First time the pose error stays under 0.5 m for a full second.
-   * -1 when the policy has no estimate, or the cloud never settles.
+   * First time the weighted cloud is tight and the estimate is close,
+   * held together for a full second. Tight means the 2-sigma position
+   * radius is under 0.5 m and the heading sigma is under 10 degrees.
+   * Close means the estimate is under 0.5 m from the true pose.
+   * -1 when the policy has no cloud, or that window never completes.
    */
   convergeTime: number;
   /** Pose error on the last control sample. Zero when there is no estimate. */
   finalPoseError: number;
+  /** 2-sigma radius of the drawn cloud on the last sample. -1 when there is no cloud. */
+  finalCloudRadius: number;
+  /** Heading sigma of the drawn cloud on the last sample, radians. -1 when there is no cloud. */
+  finalHeadingSigma: number;
   final: { x: number; z: number; yaw: number };
   shots: ShotPose[];
   /** Lower half of the chase frame sees the ground at the spawn and at each still. */
@@ -102,6 +110,8 @@ export type Policy = ((frame: SensorFrame) => {
   throttle: number;
   /** Student estimate in the odometry frame. Not ground truth. */
   estimate?: { x: number; y: number; yaw: number };
+  /** Weighted cloud spread from the drawn particles. Not ground truth. */
+  spread?: { radius: number; headingSigma: number };
 }) & { controlMs?: number[] };
 
 const SHOT_TIMES = [5, 20, 40, 55];
@@ -243,6 +253,8 @@ export function runEpisode(
   let headMax = 0;
   let poseCount = 0;
   let finalPoseError = 0;
+  let finalCloudRadius = -1;
+  let finalHeadingSigma = -1;
   let convergeTime = -1;
   let underStart = -1;
 
@@ -336,10 +348,20 @@ export function runEpisode(
         headMax = Math.max(headMax, heading);
         poseCount += 1;
         finalPoseError = position;
+        const spread = command.spread;
+        const tight =
+          spread !== undefined &&
+          spread.radius < CONVERGE_RADIUS &&
+          spread.headingSigma < CONVERGE_HEADING &&
+          position < CONVERGE_POSITION;
+        if (spread) {
+          finalCloudRadius = spread.radius;
+          finalHeadingSigma = spread.headingSigma;
+        }
         if (convergeTime < 0) {
-          if (position < 0.5) {
+          if (tight) {
             if (underStart < 0) underStart = simTime;
-            else if (simTime - underStart >= 1) convergeTime = underStart;
+            else if (simTime - underStart >= CONVERGE_HOLD) convergeTime = underStart;
           } else {
             underStart = -1;
           }
@@ -426,6 +448,8 @@ export function runEpisode(
     controlMsMax: round(maxOf(options.policy.controlMs)),
     convergeTime: round(convergeTime),
     finalPoseError: round(finalPoseError),
+    finalCloudRadius: round(finalCloudRadius),
+    finalHeadingSigma: round(finalHeadingSigma),
     final: { x: round(end.x), z: round(end.z), yaw: round(end.yaw) },
     shots,
     chaseGround,

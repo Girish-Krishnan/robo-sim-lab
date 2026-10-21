@@ -39,14 +39,24 @@ export function particleFilterSource(mode: "track" | "global"): string {
 # a few hundred uniform poses do not cover x, y, and yaw. The car creeps
 # with the right-wall follower (same gains as the wall lesson, throttle
 # capped) until one particle holds about a tenth of the weight. The cloud
-# then collapses around that pose and pure pursuit takes over. The oval's
-# two straights share that weight; the winner on the first scans is one
-# straight, not a pose known to a decimetre, and along-track error stays
-# on the order of the tracking filter. The warehouse bay is flatter, so
-# the creep continues until a peak appears. If the short-term likelihood
-# average later falls below the long-term one, resample mixes in random
-# free-space particles. A pose that has left the route hands the wheel
-# back to the wall follower.
+# then collapses around that pose and pure pursuit takes over. Cubing the
+# weights is only that peak test. The drawn cloud keeps the raw likelihood,
+# so one sharp particle is not reported as a tight posterior.
+#
+# Parallel walls do not observe distance along a corridor. Short map
+# edges (cones, crates, barrels, trunks, pillars) and the corners of long
+# walls do. Once the cloud has collapsed, the estimate is slid along the
+# route tangent to the shift whose scan best matches those landmarks.
+# Beams near a landmark use a tighter likelihood. A quadratic penalty
+# keeps a uniform corridor from walking. In a trunk row the grid peak is
+# shallow, so a smaller improvement is accepted. A sparse cone still has
+# to beat a clear gap. The whole cloud moves with the estimate, at most
+# half a metre per tick. The search reads map.segments and map.field only.
+# Nothing reads the true pose.
+# The warehouse bay is flatter, so the creep continues until a peak
+# appears. If the short-term likelihood average later falls below the
+# long-term one, resample mixes in random free-space particles. A pose
+# that has left the route hands the wheel back to the wall follower.
 
 import base64
 import math
@@ -56,6 +66,7 @@ UNKNOWN_START = ${unknown}
 N = ${count}
 BEAMS = 40
 SIGMA = 0.5
+LAND_SIGMA = 0.35
 WHEELBASE = ${wheelbase}
 LOOKAHEAD = 3.2
 LIDAR_FORWARD = 0.46
@@ -140,14 +151,15 @@ def control(sensors):
         # until the car has moved, so it is not collapsed yet.
         if explore.ticks >= 9 and peak > 0.07:
             particles = np.column_stack((
-                held_pose[0] + rng.normal(0.0, 0.25, N),
-                held_pose[1] + rng.normal(0.0, 0.25, N),
-                wrap_array(held_pose[2] + rng.normal(0.0, 0.06, N)),
+                held_pose[0] + rng.normal(0.0, 0.12, N),
+                held_pose[1] + rng.normal(0.0, 0.12, N),
+                wrap_array(held_pose[2] + rng.normal(0.0, 0.04, N)),
             ))
             explore.locked = 1
             just_locked = True
-            belief = np.full(N, 1.0 / N)
-        weights = belief
+            weights = np.full(N, 1.0 / N)
+        # belief is the cubed peak test only. Leave weights on the raw
+        # likelihood so the drawn cloud's covariance is the posterior.
     mean = weighted_mean(particles, weights)
     # Before the collapse the posterior can sit on one particle while the
     # drawn cloud still covers the yard. The ellipse is that cloud, equally
@@ -175,6 +187,18 @@ def control(sensors):
                 estimate = (mean[0], mean[1], predicted_yaw)
         if UNKNOWN_START:
             held_pose = estimate
+        # Slide along the route onto the landmark-consistent pose, and
+        # take the cloud with the estimate. Cross-track is left alone:
+        # a jump between the oval's two straights is not a correction.
+        if path_distance(sensors.task.path, estimate[0], estimate[1]) <= 4.0:
+            corrected, delta = pin_along_track(estimate, sensors, field, m, sensors.task.path)
+            if abs(delta[0]) + abs(delta[1]) > 1e-4:
+                particles[:, 0] += delta[0]
+                particles[:, 1] += delta[1]
+                ellipse_at = (float(ellipse_at[0]) + delta[0], float(ellipse_at[1]) + delta[1])
+                estimate = corrected
+                if UNKNOWN_START:
+                    held_pose = estimate
     draw.points(np.column_stack((particles[:, 0], particles[:, 1], particles[:, 2], weights)), "#ff2bd6")
     draw.ellipse(float(ellipse_at[0]), float(ellipse_at[1]), axis, major, minor, "#ffd400")
     neff = 1.0 / max(1e-12, float(np.dot(weights, weights)))
@@ -290,7 +314,6 @@ def likelihood(cloud, sensors, field, m):
     a = a[hit]
     if r.size < 6 or m.width < 2:
         return np.full(N, 1.0 / N), 0.0, 0.0
-    sigma = SIGMA
     yaw = cloud[:, 2]
     ox = cloud[:, 0] + LIDAR_FORWARD * np.cos(yaw)
     oy = cloud[:, 1] + LIDAR_FORWARD * np.sin(yaw)
@@ -302,12 +325,21 @@ def likelihood(cloud, sensors, field, m):
     iy = np.floor((ey - m.corner.y) / m.resolution).astype(np.int32)
     valid = (ix >= 0) & (ix < m.width) & (iy >= 0) & (iy < m.height)
     d = field[np.clip(iy, 0, m.height - 1), np.clip(ix, 0, m.width - 1)]
-    d = np.where(valid, d, 2.4)
-    pz = np.exp(-0.5 * (np.minimum(d, 2.2) / sigma) ** 2) + 0.09
+    d = np.minimum(np.where(valid, d, 2.4), 2.2)
+    # log_mean stays on the wide field so a tight landmark beam is not the
+    # kidnapped-robot failure signal. Weights use the tight width on beams
+    # that land near a short object or a corner, which is what makes an
+    # along-track shift look different from the truth.
+    near = landmark_near(m)[np.clip(iy, 0, m.height - 1), np.clip(ix, 0, m.width - 1)]
+    pz_plain = np.exp(-0.5 * (d / SIGMA) ** 2) + 0.09
+    sigma = np.where(valid & near, LAND_SIGMA, SIGMA)
+    pz = np.exp(-0.5 * (d / sigma) ** 2) + 0.09
+    log_plain = np.sum(np.log(pz_plain), axis=1)
+    peak_plain = float(np.max(log_plain))
+    log_mean = peak_plain + float(np.log(np.mean(np.exp(np.clip(log_plain - peak_plain, -80.0, 0.0)))))
+    log_best = peak_plain
     logw = np.sum(np.log(pz), axis=1)
     peak = float(np.max(logw))
-    log_mean = peak + float(np.log(np.mean(np.exp(np.clip(logw - peak, -80.0, 0.0)))))
-    log_best = peak
     logw = logw - peak
     w = np.exp(logw)
     total = float(np.sum(w))
@@ -345,6 +377,149 @@ def covariance_ellipse(cxx, cyy, cxy):
     minor_var = max(tr / 2.0 - disc, 0.04)
     yaw = 0.5 * math.atan2(2.0 * cxy, cxx - cyy)
     return yaw, 2.0 * math.sqrt(major_var), 2.0 * math.sqrt(minor_var)
+
+def landmark_points(m):
+    # Short edges are cones, crates, barrels, trunks, pillars. Endpoints of
+    # long edges are corners. Both break the shift symmetry of a corridor.
+    # Cached on the map stamp. Nothing here is the true pose.
+    if getattr(landmark_points, "stamp", None) == m.stamp and m.stamp != 0 and getattr(landmark_points, "xy", None) is not None:
+        return landmark_points.xy
+    raw = np.asarray(getattr(m, "segments", []), dtype=float)
+    if raw.size < 4:
+        landmark_points.xy = np.zeros((0, 2))
+        landmark_points.stamp = m.stamp
+        return landmark_points.xy
+    segs = raw.reshape((-1, 4))
+    length = np.hypot(segs[:, 2] - segs[:, 0], segs[:, 3] - segs[:, 1])
+    short = segs[length < 2.8]
+    long = segs[length >= 2.8]
+    # Short objects first. A cap that filled up on wall corners would drop
+    # the cones and trunks that actually observe along-track position.
+    pts = []
+    if short.shape[0] > 0:
+        pts.append(np.column_stack(((short[:, 0] + short[:, 2]) * 0.5, (short[:, 1] + short[:, 3]) * 0.5)))
+        pts.append(short[:, 0:2])
+        pts.append(short[:, 2:4])
+    if long.shape[0] > 0:
+        pts.append(long[:, 0:2])
+        pts.append(long[:, 2:4])
+    if not pts:
+        landmark_points.xy = np.zeros((0, 2))
+        landmark_points.stamp = m.stamp
+        return landmark_points.xy
+    stacked = np.vstack(pts)
+    # One point per 0.8 m cell. Short objects were stacked first, and
+    # unique keeps the first row, so a cone is not dropped for a wall corner.
+    cell = np.floor(stacked / 0.8).astype(np.int64)
+    keys = cell[:, 0] * np.int64(1000003) + cell[:, 1]
+    _, first = np.unique(keys, return_index=True)
+    kept = stacked[np.sort(first)]
+    if kept.shape[0] > 320:
+        kept = kept[:320]
+    landmark_points.xy = np.asarray(kept, dtype=float)
+    landmark_points.stamp = m.stamp
+    return landmark_points.xy
+
+def landmark_near(m):
+    if getattr(landmark_near, "stamp", None) == m.stamp and m.stamp != 0 and getattr(landmark_near, "grid", None) is not None:
+        return landmark_near.grid
+    marks = landmark_points(m)
+    near = np.zeros((m.height, m.width), dtype=bool)
+    if marks.shape[0] == 0 or m.width < 2:
+        landmark_near.grid = near
+        landmark_near.stamp = m.stamp
+        return near
+    res = float(m.resolution) if m.resolution else 0.5
+    rad = int(math.ceil(1.6 / max(res, 0.05)))
+    for x, y in marks:
+        ix = int(math.floor((float(x) - m.corner.x) / res))
+        iy = int(math.floor((float(y) - m.corner.y) / res))
+        x0 = max(0, ix - rad)
+        x1 = min(int(m.width), ix + rad + 1)
+        y0 = max(0, iy - rad)
+        y1 = min(int(m.height), iy + rad + 1)
+        if x1 > x0 and y1 > y0:
+            near[y0:y1, x0:x1] = True
+    landmark_near.grid = near
+    landmark_near.stamp = m.stamp
+    return near
+
+def route_tangent(path, x, y, yaw):
+    best_i = 0
+    best_d = 1e9
+    for i, point in enumerate(path):
+        dist = math.hypot(point.x - x, point.y - y)
+        if dist < best_d:
+            best_d = dist
+            best_i = i
+    n = len(path)
+    prev = path[(best_i - 1) % n]
+    nxt = path[(best_i + 1) % n]
+    tx = nxt.x - prev.x
+    ty = nxt.y - prev.y
+    norm = math.hypot(tx, ty)
+    if norm < 1e-6:
+        return math.cos(yaw), math.sin(yaw)
+    tx /= norm
+    ty /= norm
+    if tx * math.cos(yaw) + ty * math.sin(yaw) < 0.0:
+        tx, ty = -tx, -ty
+    return tx, ty
+
+def pin_along_track(estimate, sensors, field, m, path):
+    # Score the current pose and poses shifted along the route. Every beam
+    # votes, so leaving a landmark is a penalty, not a free move. The
+    # quadratic term keeps a uniform corridor at shift 0. At most 0.5 m/tick.
+    if len(path) < 2 or m.width < 2:
+        return estimate, (0.0, 0.0)
+    tx, ty = route_tangent(path, estimate[0], estimate[1], estimate[2])
+    shifts = np.linspace(-2.4, 2.4, 25)
+    ranges = np.asarray(sensors.lidar.ranges, dtype=float)
+    angles = np.asarray(sensors.lidar.angles, dtype=float)
+    step = max(1, int(ranges.shape[0] // BEAMS))
+    r = ranges[::step][:BEAMS]
+    a = angles[::step][:BEAMS]
+    hit = r < (float(sensors.lidar.max_range) - 0.05)
+    r = r[hit]
+    a = a[hit]
+    if r.size < 6:
+        return estimate, (0.0, 0.0)
+    yaw = float(estimate[2])
+    ox = float(estimate[0]) + LIDAR_FORWARD * math.cos(yaw)
+    oy = float(estimate[1]) + LIDAR_FORWARD * math.sin(yaw)
+    ex = ox + r * np.cos(yaw + a)
+    ey = oy + r * np.sin(yaw + a)
+    sx = ex[None, :] + shifts[:, None] * tx
+    sy = ey[None, :] + shifts[:, None] * ty
+    ix = np.floor((sx - m.corner.x) / m.resolution).astype(np.int32)
+    iy = np.floor((sy - m.corner.y) / m.resolution).astype(np.int32)
+    valid = (ix >= 0) & (ix < m.width) & (iy >= 0) & (iy < m.height)
+    d = field[np.clip(iy, 0, m.height - 1), np.clip(ix, 0, m.width - 1)]
+    d = np.minimum(np.where(valid, d, 2.4), 2.2)
+    near = landmark_near(m)[np.clip(iy, 0, m.height - 1), np.clip(ix, 0, m.width - 1)]
+    sigma = np.where(valid & near, LAND_SIGMA, SIGMA)
+    logw = np.sum(np.log(np.exp(-0.5 * (d / sigma) ** 2) + 0.09), axis=1)
+    score = logw - 0.45 * shifts * shifts
+    zero_i = int(shifts.shape[0] // 2)
+    zero = float(score[zero_i])
+    best_i = int(np.argmax(score))
+    # A trunk row puts most endpoints on a landmark, and the grid peak is
+    # only a little taller than the neighbouring cell. A sparse cone has
+    # to beat a clear gap before the cloud slides.
+    near_frac = float(np.mean(near[zero_i])) if near.size else 0.0
+    need = 0.16 if near_frac > 0.45 else 0.35
+    if float(score[best_i]) < zero + need:
+        return estimate, (0.0, 0.0)
+    shift = float(shifts[best_i])
+    if abs(shift) < 0.18:
+        return estimate, (0.0, 0.0)
+    cap = 0.55
+    if shift > cap:
+        shift = cap
+    elif shift < -cap:
+        shift = -cap
+    moved = (float(estimate[0] + shift * tx), float(estimate[1] + shift * ty), yaw)
+    return moved, (shift * tx, shift * ty)
 
 def path_distance(path, x, y):
     best = 1e9

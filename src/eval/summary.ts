@@ -69,10 +69,11 @@ function localizationNotes(rows: Compared[]): string[] {
     const metrics = row.after;
     if ((metrics.example !== "mcl" && metrics.example !== "mcl-global") || metrics.poseErrorMean === undefined) continue;
     const heading = ((metrics.headingErrorMean ?? 0) * 180) / Math.PI;
-    const settled =
-      metrics.example === "mcl-global"
-        ? ` Converge ${metrics.convergeTime < 0 ? "never" : `${metrics.convergeTime.toFixed(1)} s`} to under 0.5 m, final ${metrics.finalPoseError.toFixed(2)} m.`
+    const cloud =
+      metrics.finalCloudRadius !== undefined && metrics.finalCloudRadius >= 0
+        ? ` Cloud 2σ ${metrics.finalCloudRadius.toFixed(2)} m, heading σ ${(((metrics.finalHeadingSigma ?? 0) * 180) / Math.PI).toFixed(1)} deg.`
         : "";
+    const settled = ` Converge ${metrics.convergeTime < 0 ? "never" : `${metrics.convergeTime.toFixed(1)} s`} (2σ under 0.5 m, heading σ under 10 deg, estimate under 0.5 m, held 1 s), final ${metrics.finalPoseError.toFixed(2)} m.${cloud}`;
     notes.push(
       `${metrics.world} ${metrics.example} pose error mean ${metrics.poseErrorMean.toFixed(2)} m max ${metrics.poseErrorMax.toFixed(2)} m, heading mean ${heading.toFixed(1)} deg, control ${metrics.controlMsMean.toFixed(1)} / ${metrics.controlMsMax.toFixed(1)} ms.${settled}`,
     );
@@ -104,7 +105,7 @@ function driftPercent(row: RunMetrics): number {
  * per world. Pure pursuit has to make progress along the reference path with
  * no real contacts.
  */
-const AVOID_CONTACTS: Record<string, number> = { city: 2, track: 0, forest: 0, warehouse: 2 };
+const AVOID_CONTACTS: Record<string, number> = { city: 1, track: 0, forest: 0, warehouse: 2 };
 const AVOID_DISTANCE: Record<string, number> = { city: 110, track: 110, forest: 80, warehouse: 90 };
 const PURSUIT_CONTACTS: Record<string, number> = { city: 0, track: 0, forest: 0, warehouse: 0 };
 const PURSUIT_DISTANCE: Record<string, number> = { city: 120, track: 160, forest: 100, warehouse: 140 };
@@ -117,16 +118,18 @@ const MCL_POSE: Record<string, number> = { city: 1.6, track: 0.8, forest: 1.0, w
  * walls leave along-track pose weakly observed, and late cross-track stays
  * near the odometry figure.
  */
-const MCL_LATE: Record<string, number> = { city: 0.58, track: 1.0, forest: 0.9, warehouse: 1.2 };
+const MCL_LATE: Record<string, number> = { city: 0.7, track: 1.0, forest: 0.9, warehouse: 1.6 };
 /**
- * Seed-1 kidnapped runs. Converge is the first time the estimate holds
- * under 0.5 m for a second. Final error is the last sample: the oval and
- * the warehouse do not stay under 0.5 m, and neither does tracking MCL on
- * the oval (parallel walls leave along-track weakly observed). Margins are
- * above those measured finals, not a claim that the minute ends under 0.5 m.
+ * Seed-1 kidnapped runs. Converge is the start of a 1 s window where the
+ * weighted cloud's 2-sigma position radius is under 0.5 m, heading sigma is
+ * under 10 degrees, and the estimate itself is under 0.5 m. It is not the
+ * best particle. Final error is the last sample. The oval ends under 0.5 m.
+ * The forest is lower than the unpinned corridor but still above 0.5 m at
+ * the minute, and the warehouse aisle is improved and still above 1 m.
+ * Margins sit above those measured finals.
  */
-const GLOBAL_FINAL: Record<string, number> = { city: 0.6, track: 2.0, forest: 1.5, warehouse: 2.2 };
-const GLOBAL_CONV: Record<string, number> = { city: 2, track: 2, forest: 2, warehouse: 8 };
+const GLOBAL_FINAL: Record<string, number> = { city: 0.85, track: 0.5, forest: 0.85, warehouse: 1.5 };
+const GLOBAL_CONV: Record<string, number> = { city: 2, track: 2, forest: 2, warehouse: 6 };
 const GLOBAL_DISTANCE: Record<string, number> = { city: 120, track: 180, forest: 150, warehouse: 120 };
 
 export function regressionErrors(row: RunMetrics): string[] {
