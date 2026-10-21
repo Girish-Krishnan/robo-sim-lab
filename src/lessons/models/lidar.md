@@ -9,9 +9,7 @@ prerequisites: getting-started/sensors
 status: ready
 ---
 
-The lidar is a spinning range finder in a plane about a metre off the ground. Each control tick you get one full scan: 270 beams across a 270° field of view, so the beams are about 1° apart.
-
-## In plain words
+The lidar is a spinning range finder in a plane about a metre off the ground. Each control tick you get one full scan: 270 beams across a 270° field of view, so the beams are about 1° apart. This lesson opens in the city with the scan drawn, because the roundabout and the lamp posts give the fan something to hit.
 
 Angle 0 points forward. Positive angles point to the driver's left. The scan does not cover the rear 90°, so something directly behind the car is invisible until you yaw.
 
@@ -33,7 +31,7 @@ The ray starts at the roof puck, not at the bumper. The nose of the body is abou
   <text x="16" y="234" fill="#8e9b94" font-size="13" font-family="sans-serif">The rear wedge is blank.</text>
 </svg>
 
-## The math
+## From a beam to a point on the ground
 
 Beam $i$ has angle $\alpha_i$ in the robot frame. Its direction is
 
@@ -47,16 +45,10 @@ $$y_{\mathrm{hit}} = y + (0.46 + r\cos\alpha_i)\sin\theta + r\sin\alpha_i\cos\th
 
 The 0.46 m is the puck's forward offset from the body origin. The localization lesson uses this endpoint. A beam at `max_range` has no endpoint you should trust.
 
-## Intuition and pitfalls
-
 The right-hand wall in the wall-follow lesson is the beam near $-\pi/2$, not $+\pi/2$. Positive is left. A controller that flips that sign orbits the wrong way and calls it a bug in the plant.
 
-Trees and shelf uprights are thinner than the gap the car needs. One long beam between two trunks does not mean the bumper fits. The avoid example blocks a wedge about as wide as the car around each hit for that reason.
+Trees and shelf uprights are thinner than the gap the car needs. One long beam between two trunks does not mean the bumper fits. The avoid example blocks a wedge about as wide as the car around each hit for that reason. Curbs, floor paint, and the start chevron are invisible. If your map or your controller expects them, it will drive through them and then be surprised by the thing behind them.
 
-Curbs, floor paint, and the start chevron are invisible. If your map or your controller expects them, it will drive through them and then be surprised by the thing behind them.
+## Look at the blank wedge
 
-## Try it
-
-1. Run the avoid starter and watch the inset. Find a beam at the edge of the fan and confirm the rear is empty of rays.
-2. Print the angle and range of the shortest beam once a second. Drive it toward a wall by editing nothing else and see the range fall, then stick at a small number when you are close.
-3. Temporarily treat `max_range` as a real hit at 12 m (remove the usual check) and watch the car brake for empty space.
+Run the avoid starter and watch the inset. Find a beam at the edge of the fan and confirm the rear is empty of rays. Print the angle and range of the shortest beam once a second and watch the range fall as you approach a wall, then stick at a small number when you are close. Temporarily treat `max_range` as a real hit at 12 m, by removing the usual check, and watch the car brake for empty space.

@@ -11,15 +11,13 @@ status: ready
 
 `control(sensors)` receives a fresh sample twenty times a second. The object is the whole contract. If a value is not on it, the program is not allowed to use it.
 
-## In plain words
-
 You get lidar, wheel odometry, an IMU, a clock, and a task. The task can include a path and, later, a known map. You do not get the true pose, the true velocity, the physics body, or a camera image. The HUD speed is for the person watching. It is not in the sample.
 
 That is on purpose. A controller that reads the true position will look brilliant and teach nothing. Localization only means something when the estimate is built from the same sensors a real robot would have.
 
 The Python side is a sandbox. NumPy is there. `print` and tracebacks show up in the console under the editor. Names you create above `control` live for the whole run. A name you create inside `control` does not, unless you hang it on the function or declare it global.
 
-## What a sample contains
+## What is actually on the sample
 
 - `sensors.lidar.ranges` and `.angles` are NumPy arrays. Angle 0 is forward, positive is left. A range equal to `max_range` (12 m) means no return.
 - `sensors.odometry.speed` is noisy rear-wheel speed in m/s. `steering_angle` is the actuator angle, also noisy.
@@ -33,14 +31,12 @@ The noise on the sensors that do exist is not a mystery number. Lidar range is a
 
 Return `(steering, throttle)` or a dict with those keys. Steering is radians, positive left, clamped near $\pm 0.5$. Throttle is $-1$ to $1$.
 
-## Intuition and pitfalls
+## Two signs that will bite you
 
 The odometry pose and the chase-camera heading use opposite signs. A left turn increases odometry yaw and decreases the camera yaw. If you mix them up, a pursuit controller steers the wrong way. Stay in the odometry frame and you never need the camera yaw. The program is not given it anyway.
 
 `draw.path`, `draw.points`, and `draw.text` post pictures back to the view. They are not sensors. Coordinates are the odometry frame. The host places them with the spawn transform, so a path the world gave you stays on the map, and a point computed from a drifting pose walks away from the car.
 
-## Try it
+## Read one sample out loud
 
-1. Open the circle starter and run it. Read the console. It prints how many lidar beams arrived, and that the pose is odometry.
-2. Add a `print` of `sensors.odometry.pose.x` once a second. Reset the world and watch it start again at 0.
-3. Try to read a true position. There is no such attribute. The console should show the error, and the car should stop.
+Run the circle starter and read the console. It prints how many lidar beams arrived, and that the pose is odometry. Add a `print` of `sensors.odometry.pose.x` once a second, reset the world, and watch it start again at 0. Then try to read a true position. There is no such attribute. The console should show the error, and the car should stop.

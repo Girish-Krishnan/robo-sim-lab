@@ -8,4 +8,6 @@ starter: none
 action: sandbox
 ---
 
-Coming soon. An occupancy grid is the map you were handed in the localization module, built from scans instead of from the simulator's solids. Each cell stores the log odds that it is occupied, updated by an inverse sensor model along the lidar beams. The hard part is doing that in the same frame as a pose that is still drifting.
+The warehouse around the car is the kind of building an occupancy grid is for. The map you were handed in localization was built from the simulator's solids. This lesson will build the same kind of grid from scans instead.
+
+Each cell stores the log odds that it is occupied, updated by an inverse sensor model along the lidar beams. A hit raises the odds at the endpoint. The cells the beam passed through get a miss. The hard part is doing that in the same frame as a pose that is still drifting. There is no starter yet.

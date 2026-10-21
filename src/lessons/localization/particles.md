@@ -9,9 +9,7 @@ prerequisites: localization/bayes
 status: ready
 ---
 
-Monte Carlo localization represents the belief with $N$ poses, the particles. Each one is a guess. The weight is how well that guess explains the current scan. Low-variance resampling keeps the guesses that earned their weight and drops the ones that did not.
-
-## In plain words
+Monte Carlo localization represents the belief with $N$ poses, the particles. Each one is a guess. The weight is how well that guess explains the current scan. Low-variance resampling keeps the guesses that earned their weight and drops the ones that did not. On the oval the cloud starts near the car. The camera sits a little high so the magenta dots, the yellow ellipse, and the walls are in the same picture.
 
 The starter uses a few hundred particles, a few dozen lidar beams, and the precomputed distance field. That is the budget that fits in a 20 Hz Pyodide tick. Using all 270 beams and a few thousand particles will miss the deadline and the car will stutter. The geometry does not need it. Walls are large compared with a 0.5 m cell.
 
@@ -35,7 +33,7 @@ Each particle is a saturated magenta dot a few centimetres off the ground, about
   <text x="16" y="214" fill="#9aa7a0" font-size="13" font-family="sans-serif">wall from the known map</text>
 </svg>
 
-## The math
+## Weight, then keep the particles that earned it
 
 Start with particles $x^{[i]}$ and weights $w^{[i]}$, usually uniform after a resample.
 
@@ -63,16 +61,12 @@ and pick the particle whose cumulative weight interval contains $u_i$. One rando
 
 $$\bar\theta = \operatorname{atan2}\left(\sum_i w^{[i]}\sin\theta^{[i]},\; \sum_i w^{[i]}\cos\theta^{[i]}\right).$$
 
-## Intuition and pitfalls
-
 Resampling every tick, with no motion noise, makes every particle a copy of one survivor. That is sample impoverishment. The starter adds a little noise even when the odometry delta is small, and it resamples only when $N_{\mathrm{eff}}$ drops.
 
 The mean is not a particle. It can sit inside a wall if two modes disagree. On these maps one corridor usually wins. If the magenta cloud splits into two blobs, the yellow ellipse grows to cover both, and the red mean sits between them until one blob dies.
 
 Global localization (the kidnapped starter) is the same filter with a different initial cloud. Tracking from the origin is easier and is what flattens the oval. Do not confuse a cloud that started on the answer with a cloud that found the answer.
 
-## Try it
+## Make the cloud too small
 
-1. Run the starter on the oval. You should see a magenta cloud on the car, a yellow ellipse tight around it, and a red trail that stays with it while the amber odometry trail, if Paths is on, walks away.
-2. Cut `N` to `40` and run again. The mean should jump more. Put `360` back.
-3. Force a resample every tick by ignoring $N_{\mathrm{eff}}$. The cloud should look thinner and, after a bad scan, it may not recover. Restore the threshold.
+Run the starter on the oval. You should see a magenta cloud on the car, a yellow ellipse tight around it, and a red trail that stays with it while the amber odometry trail, if Paths is on, walks away. Cut `N` to `40` and run again. The mean should jump more. Put `360` back. Force a resample every tick by ignoring $N_{\mathrm{eff}}$. The cloud should look thinner and, after a bad scan, it may not recover. Restore the threshold.

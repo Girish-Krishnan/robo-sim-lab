@@ -9,9 +9,7 @@ prerequisites: reactive/wall
 status: ready
 ---
 
-Pure pursuit picks a point on the path a fixed distance ahead of the pose it believes, and steers the circular arc that reaches that point. The world publishes the path on `sensors.task.path` in the odometry frame. On the oval that path is the centreline.
-
-## In plain words
+Pure pursuit picks a point on the path a fixed distance ahead of the pose it believes, and steers the circular arc that reaches that point. The world publishes the path on `sensors.task.path` in the odometry frame. On the oval that path is the centreline. Paths is on so the plan, the car, and the odometry trail are all visible.
 
 Each tick the starter finds the nearest point along the route, then walks forward until the point is at least `LOOKAHEAD` metres away. It transforms that point into the body frame of the odometry pose, computes a curvature, and converts curvature to a steering angle with the bicycle model. A small speed PID slows down when the steer is large, so the corner is slower than the straight.
 
@@ -34,7 +32,7 @@ There is also a short reverse if the bumper is in an obstacle and the speed is a
   <text x="16" y="234" fill="#8e9b94" font-size="13" font-family="sans-serif">around the rear axle</text>
 </svg>
 
-## The math
+## The arc that passes through the lookahead point
 
 Let the lookahead point be a distance $L_d$ ahead, and let $\alpha$ be the angle between the car's heading and the line to that point. Positive $\alpha$ means the point is to the left. The arc that passes through the point has curvature
 
@@ -46,9 +44,7 @@ $$\delta = \arctan\left(L \cdot \frac{2\sin\alpha}{L_d}\right).$$
 
 $L$ is the wheelbase, 1.9 m. The starter clamps $\delta$ to the vehicle limit. In code, $\alpha = \operatorname{atan2}(y_{\mathrm{left}}, x_{\mathrm{forward}})$ after rotating the lookahead offset by the odometry yaw.
 
-A longer $L_d$ cuts the corner and oscillates less. A shorter $L_d$ tracks tighter and oscillates more, and it amplifies yaw noise because the same heading error moves the point by $L_d \Delta\theta$ only if you are looking at the geometry of $\alpha$. For a fixed lateral miss, a short lookahead makes a larger $\alpha$.
-
-## Intuition and pitfalls
+A longer $L_d$ cuts the corner and oscillates less. A shorter $L_d$ tracks tighter and oscillates more, and it amplifies yaw noise because a fixed lateral miss makes a larger $\alpha$ when the lookahead is short.
 
 The search for the nearest waypoint has to walk forward from the last index. On a loop, the nearest point in the whole list can be the return leg beside you, and the car will turn around. The starter only searches a window ahead.
 
@@ -56,8 +52,6 @@ Pure pursuit assumes the pose is the pose of the car. This pose is odometry. The
 
 Speed is a second loop. If you hold throttle wide open, the corner radius grows from slip and the lookahead point is behind you before the steer arrives. The bands in the starter (slower when $|\delta|$ is large) are there for that.
 
-## Try it
+## Short lookahead, long lookahead
 
-1. Run the starter on the oval. You should complete a lap. Watch the yellow lookahead point stay ahead of the car at the start.
-2. Set `LOOKAHEAD` to `1.4` and run again. The steering should twitch more, and the path should look tighter and less smooth.
-3. Set `LOOKAHEAD` to `6` and run again. The car should cut the corners and look stable. Put `3.2` back before you leave.
+Run the starter on the oval. You should complete a lap. Watch the yellow lookahead point stay ahead of the car at the start. Set `LOOKAHEAD` to `1.4` and run again. The steering should twitch more, and the path should look tighter and less smooth. Set `LOOKAHEAD` to `6` and run again. The car should cut the corners and look stable. Put `3.2` back before you leave.

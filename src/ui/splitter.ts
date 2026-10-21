@@ -1,7 +1,7 @@
 import { clamp } from "../api";
 
 const STORAGE_KEY = "robo-sim-lab.code-width";
-const MIN_CODE = 300;
+const MIN_CODE = 360;
 const MIN_VIEW = 320;
 
 /** Drag handle between the 3D view and the code pane. Width is remembered. */

@@ -133,7 +133,7 @@ The **Pure pursuit** example tracks `sensors.task.path` with a lookahead and a s
 
 The editor examples are **Circle drive**, **Lidar avoid**, **Wall follow**, **Pure pursuit**, **PF pursuit**, and **PF kidnapped**. Wall follow starts beside a real wall. Pure pursuit and both particle-filter examples start on the path, headed along the first segment. Ctrl or ⌘ Enter runs the buffer from anywhere on the page, including inside the editor.
 
-Lessons are hash routes (`#/lesson/<module>/<slug>`, and `#/lesson/.../lab` for the simulator). `#/sandbox` is free play. GitHub Pages does not rewrite paths, so the course does not use history paths.
+Drive, Code, and Lessons are hash routes: `#/drive` (also the old `#/sandbox`), `#/code`, and `#/lesson/<module>/<slug>`. An old `#/lesson/.../lab` link opens that same lesson, with the simulator already configured beside the reading. GitHub Pages does not rewrite paths, so the course does not use history paths.
 
 ## Adding a lesson
 
@@ -151,25 +151,20 @@ prerequisites: reactive/avoid
 status: ready
 ---
 
-The reading. Use `$inline$` and `$$display$$` math. SVG can sit inline.
-
-## Try it
-
-1. First exercise.
-2. Second exercise.
+The reading. Use `$inline$` and `$$display$$` math. SVG can sit inline. Headings should name the idea, not a repeated template.
 ```
 
 | Field | Meaning |
 | --- | --- |
-| `title`, `order` | Sidebar label and order within the module. Module order is the list in `src/course/catalog.ts`. |
-| `world` | `city`, `track`, `forest`, or `warehouse`. |
+| `title`, `order` | Lesson label and order within the module. Module order is the list in `src/course/catalog.ts`. |
+| `world` | `city`, `track`, `forest`, or `warehouse`. Opening the lesson switches to it. |
 | `spawn` | `default`, `circle`, `avoid`, `wall`, `pursuit`, `mcl`, or `mcl-global`. These are the scenario spawns. |
-| `starter` | An example id from `src/editor/examples.ts`, or `none`. |
-| `action` | `lab` opens the editor, `drive` opens the car, `sandbox` jumps to free play. `status: soon` hides the button. |
+| `starter` | An example id from `src/editor/examples.ts`, or `none`. A starter is loaded into the Try it editor and run. |
+| `action` | `lab` runs starter code, `drive` leaves the keyboard in control, `sandbox` is a reading with the sim configured and no program. |
 | `prerequisites` | Comma-separated lesson ids, `module/slug`. |
 | `status` | `ready` or `soon`. |
 
-`#/lesson/<module>/<slug>/lab` loads that world and spawn into the existing simulator and puts the starter (or the student's saved edit) in the editor. Edits and visited/completed marks live in `localStorage`. **Reset to starter** drops the saved edit.
+Opening a lesson sets that world and spawn, seed 1, and the lidar, path, and camera preset for the lesson. Edits and visited/completed marks live in `localStorage`. **Reset to starter** drops the saved edit.
 
 Math is [KaTeX](https://katex.org/), bundled from `node_modules`. Do not add a CDN link. The page is cross-origin isolated.
 

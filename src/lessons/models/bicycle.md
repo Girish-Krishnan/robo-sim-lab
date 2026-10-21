@@ -9,13 +9,9 @@ prerequisites: getting-started/robot
 status: ready
 ---
 
-The circle example holds a constant steering angle and a constant throttle. That is the bicycle model with the inputs frozen, which makes the geometry easy to see.
+Hold the wheel at a fixed angle and the car draws a circle. That circle is the bicycle model with the inputs frozen, which is why this lesson starts the circle program on an open pad and pulls the camera back far enough to see the steered front wheels and the arc together. Paths is on: the coloured trail is the circle you are about to measure.
 
-## In plain words
-
-Imagine the car as two axles. The rear axle only rolls forward. The front axle is steered by an angle $\delta$. If $\delta$ stays constant and the tires do not slide, the car drives a circle whose centre is off to one side of the rear axle.
-
-Positive $\delta$ is a left turn. On this spawn the car sits on the west side of an open pad, nose pointing along the pad, so a left circle stays in the grass, the infield, the meadow, or the open warehouse bay.
+Positive $\delta$ is a left turn. The car sits on the west side of the pad, nose along the pad, so a left circle stays in the grass, the infield, the meadow, or the open warehouse bay.
 
 <svg viewBox="0 0 440 248" role="img" aria-label="Top view of the bicycle model">
   <rect x="0" y="0" width="440" height="248" rx="12" fill="#10161a"/>
@@ -32,9 +28,9 @@ Positive $\delta$ is a left turn. On this spawn the car sits on the west side of
   <text x="16" y="230" fill="#8e9b94" font-size="13" font-family="sans-serif">front axle is yellow</text>
 </svg>
 
-## The math
+## Why the rear axle is the reference point
 
-With rear-axle speed $v$ and yaw $\theta$ measured from the x axis:
+The rear axle only rolls. It does not steer, so its velocity is along the heading, and the yaw rate is whatever the front wheels demand. With rear-axle speed $v$ and yaw $\theta$ measured from the x axis:
 
 $$\dot{x} = v\cos\theta,\quad \dot{y} = v\sin\theta,\quad \dot{\theta} = \frac{v}{L}\tan\delta$$
 
@@ -42,22 +38,20 @@ The curvature is $\kappa = \tan\delta / L$, and the radius is $R = 1/|\kappa|$. 
 
 $$R = \frac{1.9}{\tan 0.34} \approx 5.4\,\mathrm{m}.$$
 
+A larger $|\delta|$ is a tighter circle, until the steering limit. The formula has $\tan\delta$ in the denominator, which is the opposite of how the steering wheel feels. Speed does not change the radius in the kinematic model. It does change it on this car, because lateral force saturates and the body slides. The circle starter uses a modest throttle for that reason.
+
+## One step, and what the amber trail is not
+
 Over a short time $\Delta t$ a discrete step is
 
 $$x \leftarrow x + v\cos\theta\,\Delta t,\quad y \leftarrow y + v\sin\theta\,\Delta t,\quad \theta \leftarrow \theta + \frac{v}{L}\tan\delta\,\Delta t.$$
 
 That integration is what a motion model does later. The real car is not this exact. The command is held between 20 Hz ticks, the steering slews, and the tires slip, so the body can sit a few tenths of a metre inside or outside the kinematic circle.
 
-## Intuition and pitfalls
-
-A larger $|\delta|$ is a tighter circle, until the steering limit. It is not a larger radius. People mix that up because the steering wheel feels like "more turn" and the radius formula has $\tan\delta$ in the denominator.
-
-Speed does not change the radius in the kinematic model. It does change it on this car, because lateral force saturates and the body slides. The circle starter uses a modest throttle for that reason.
-
 The amber odometry trail is not this bicycle. Heading there comes from the gyro, not from $\tan\delta$. A steering bias is reported on `steering_angle` and is not integrated. If it were, one lap of the oval would walk tens of metres off the car.
 
-## Try it
+## Check the radius yourself
 
-1. Run the starter on the oval infield. Turn Paths on. The coloured trail should be a circle of roughly 5 m radius.
+1. Run the starter. The coloured trail should be a circle of roughly 5 m radius. The HUD steer row should sit near 0.34 rad once the actuator catches up.
 2. Change `0.34` to `0.2` and run again. The circle should get larger, close to $1.9/\tan 0.2$.
 3. Put the throttle up to `0.8` with the original steer. The path should stop being a clean circle. That is slip, which the bicycle model does not have.

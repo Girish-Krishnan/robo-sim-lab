@@ -23,6 +23,17 @@ export const MODULES: CourseModule[] = [
 
 export type LessonAction = "sandbox" | "drive" | "lab";
 export type LessonSpawn = "default" | "circle" | "avoid" | "wall" | "pursuit" | "mcl" | "mcl-global";
+export type LessonCamera = "chase" | "wide" | "overhead";
+
+/** How the simulator should look while this lesson is open. */
+export interface LessonScene {
+  lidar: boolean;
+  paths: boolean;
+  camera: LessonCamera;
+  seed: number;
+  /** Load and run the starter (or the saved edit). */
+  run: boolean;
+}
 
 export interface Lesson {
   id: string;
@@ -65,6 +76,43 @@ export function lessonIndex(id: string): number {
 export function resolveSpawn(lesson: Lesson): SpawnPose {
   if (lesson.spawn === "default") return worldSpawn(lesson.world);
   return spawnFor(lesson.world as EvalWorld, lesson.spawn, "scenario");
+}
+
+/**
+ * World, overlays, and camera for a lesson. Reading a lesson still sets a
+ * scene: the bicycle lesson is a wide chase of the circle starter so the
+ * steered wheels and the arc are both in frame.
+ */
+export function sceneFor(lesson: Lesson): LessonScene {
+  if (lesson.status === "soon") {
+    return { lidar: true, paths: false, camera: "chase", seed: 1, run: false };
+  }
+  const kidnapped = lesson.spawn === "mcl-global" || lesson.starter === "mcl-global";
+  const particles =
+    kidnapped ||
+    lesson.starter === "mcl" ||
+    lesson.slug === "particles" ||
+    lesson.slug === "bayes" ||
+    lesson.slug === "pf-pursuit";
+  const steering = lesson.slug === "bicycle" || lesson.slug === "circle" || lesson.slug === "imu";
+  const paths =
+    particles ||
+    steering ||
+    lesson.moduleId === "tracking" ||
+    lesson.moduleId === "localization" ||
+    lesson.slug === "odometry" ||
+    lesson.slug === "noise" ||
+    lesson.slug === "wall" ||
+    lesson.slug === "driving";
+  const lidarOff = lesson.slug === "bicycle" || lesson.slug === "circle" || lesson.slug === "odometry" || lesson.slug === "imu" || lesson.slug === "noise" || lesson.slug === "pursuit" || lesson.slug === "drift" || lesson.slug === "dead-reckoning";
+  const camera: LessonCamera = kidnapped ? "overhead" : particles || steering ? "wide" : "chase";
+  return {
+    lidar: !lidarOff,
+    paths,
+    camera,
+    seed: 1,
+    run: Boolean(lesson.starter),
+  };
 }
 
 function moduleOrder(id: string): number {

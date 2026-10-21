@@ -30,10 +30,10 @@
         <div class="mode-switch" role="tablist" aria-label="Control mode">
           <button id="mode-drive" type="button" role="tab" aria-selected="true">Drive</button>
           <button id="mode-code" type="button" role="tab" aria-selected="false">Code</button>
+          <button id="mode-lessons" type="button" role="tab" aria-selected="false">Lessons</button>
         </div>
 
         <div class="header-actions">
-          <button id="toc-toggle" type="button">Lessons</button>
           <label class="header-select">
             World
             <select id="world" aria-label="Environment"></select>
@@ -57,9 +57,6 @@
       </header>
 
       <div id="shell">
-        <nav id="toc" aria-label="Lessons"></nav>
-        <div id="stage">
-          <article id="lesson" hidden></article>
       <main>
         <div id="viewport">
           <div id="loading">
@@ -74,26 +71,35 @@
           id="splitter"
           role="separator"
           aria-orientation="vertical"
-          aria-label="Resize code panel"
+          aria-label="Resize side panel"
           tabindex="0"
         ></div>
 
         <aside id="code-panel" hidden>
-          <div class="panel-bar">
-            <label class="example-label">
-              Example
-              <select id="example"></select>
-            </label>
-            <span id="run-state" data-state="idle">Idle</span>
+          <div id="lesson-chrome" hidden>
+            <div id="lesson-nav"></div>
           </div>
-          <p class="api-hint">
-            <code>control(sensors)</code> at 20&nbsp;Hz returns
-            <code>(steering, throttle)</code>. Steering is radians, positive left.
-            Throttle is −1…1. Python sees sensors only, not the true pose.
-          </p>
+          <article id="lesson" hidden></article>
+          <div id="code-chrome">
+            <div class="panel-bar">
+              <label class="example-label">
+                Example
+                <select id="example"></select>
+              </label>
+            </div>
+            <p class="api-hint">
+              <code>control(sensors)</code> at 20&nbsp;Hz returns
+              <code>(steering, throttle)</code>. Steering is radians, positive left.
+              Throttle is −1…1. Python sees sensors only, not the true pose.
+            </p>
+          </div>
           <div id="python-status" hidden>
             <div class="spinner" aria-hidden="true"></div>
             <span>Loading Python and NumPy…</span>
+          </div>
+          <div id="try-bar">
+            <span>Try it</span>
+            <span class="try-note">Edits stay in this browser.</span>
           </div>
           <div id="editor"></div>
           <div class="run-bar">
@@ -101,6 +107,7 @@
             <button id="stop" type="button">Stop</button>
             <button id="reset" type="button">Reset world</button>
             <button id="reset-starter" type="button" hidden>Reset to starter</button>
+            <span id="run-state" data-state="idle">Idle</span>
             <span class="shortcut">Ctrl/⌘ Enter</span>
           </div>
           <div class="console-wrap">
@@ -112,7 +119,6 @@
           </div>
         </aside>
       </main>
-        </div>
       </div>
     </div>
     <script type="module" src="/src/main.ts"></script>

@@ -111,7 +111,7 @@ function inline(text: string, restore: (value: string) => string): string {
   html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
   html = html.replace(/\*([^*]+)\*/g, "<em>$1</em>");
   html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label: string, href: string) => {
-    const safe = /^(https?:\/\/|#[\w./-]*)$/.test(href) ? href : "#/sandbox";
+    const safe = /^(https?:\/\/|#[\w./-]*)$/.test(href) ? href : "#/drive";
     return `<a href="${safe}">${label}</a>`;
   });
   return restore(html);

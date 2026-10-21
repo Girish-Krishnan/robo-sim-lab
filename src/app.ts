@@ -107,7 +107,7 @@ export async function mountApp(): Promise<void> {
 
     sandbox = new CodeSandbox({
       onCommand: (command) => {
-        if (mode === "code" && code.current === "running") robot.setCommand(command, 0);
+        if (codeControls() && code.current === "running") robot.setCommand(command, 0);
       },
       onDraw: (ops) => {
         drawOps = ops;
@@ -125,7 +125,11 @@ export async function mountApp(): Promise<void> {
     });
     const code = sandbox;
 
-    editor = createEditor(mustGet("editor"), DEFAULT_EXAMPLE.source, () => runProgram(), (source) => onCodeChange(source));
+    let scratch = DEFAULT_EXAMPLE.source;
+    editor = createEditor(mustGet("editor"), DEFAULT_EXAMPLE.source, () => runProgram(), (source) => {
+      if (mode === "code") scratch = source;
+      onCodeChange(source);
+    });
     const codeEditor = editor;
     for (const example of EXAMPLES) {
       const option = document.createElement("option");
@@ -151,6 +155,20 @@ export async function mountApp(): Promise<void> {
 
     let lessonSpawn: SpawnPose | null = null;
     let lessonWorld: string | null = null;
+    let lessonCodeActive = false;
+    let lessonCamera: "chase" | "wide" | "overhead" | null = null;
+    const codeControls = () => mode === "code" || (mode === "lessons" && lessonCodeActive);
+    const handsOn = () => mode === "drive" || (mode === "lessons" && !lessonCodeActive);
+    const applyLessonCamera = () => {
+      if (lessonCamera === "overhead") camera.overhead(72);
+      else if (lessonCamera === "wide") camera.frame(16, 0.7);
+      else camera.reset();
+    };
+    const setHint = () => {
+      hint.textContent = handsOn()
+        ? "WASD or arrows to drive · Space brakes · Drag to look · Scroll to zoom · R resets"
+        : "Ctrl/⌘ Enter runs Python · sensors only, at 20 Hz · Drag to look around";
+    };
     let mapCache: { key: string; map: ReturnType<typeof buildKnownMap> } | null = null;
     const taskMap = () => {
       const key = `${yard.id}|${activeSpawn.x.toFixed(2)}|${activeSpawn.z.toFixed(2)}|${activeSpawn.yaw.toFixed(3)}`;
@@ -175,7 +193,7 @@ export async function mountApp(): Promise<void> {
       if (!codeEditor.getValue().includes("UNKNOWN_START = True")) {
         if (kidnappedDistance >= 0) {
           kidnappedDistance = -1;
-          camera.reset();
+          applyLessonCamera();
           view.frameFog(null);
         }
         return;
@@ -198,7 +216,7 @@ export async function mountApp(): Promise<void> {
     };
 
     const resetWorld = () => {
-      if (mode === "code") stopProgram();
+      if (code.current === "running" || code.current === "loading") stopProgram();
       activeSpawn = currentSpawn();
       paths.clear();
       drawOps = [];
@@ -207,9 +225,10 @@ export async function mountApp(): Promise<void> {
       accumulator = 0;
       sensorAccumulator = 0;
       robot.reset(activeSpawn);
+      applyLessonCamera();
       frameKidnappedCloud(true);
       camera.snap(robot.focus());
-      if (mode === "drive") applyDrive();
+      if (handsOn()) applyDrive();
     };
 
     const resetToSeed = (seed = readSeed(seedInput)) => {
@@ -220,7 +239,7 @@ export async function mountApp(): Promise<void> {
     };
 
     const runProgram = () => {
-      if (mode !== "code") return;
+      if (!codeControls()) return;
       consolePanel.log("— running —", "log");
       code.run(codeEditor.getValue());
     };
@@ -233,27 +252,41 @@ export async function mountApp(): Promise<void> {
     };
 
     const setMode = (next: AppMode) => {
+      if (mode === "code" && next !== "code") scratch = codeEditor.getValue();
+      const prev = mode;
       mode = next;
-      document.getElementById("app")?.classList.toggle("code-mode", next === "code");
-      codePanel.hidden = next !== "code";
+      const app = document.getElementById("app");
+      app?.classList.remove("mode-drive", "mode-code", "mode-lessons", "code-mode", "lesson-lab");
+      app?.classList.add(next === "drive" ? "mode-drive" : next === "code" ? "mode-code" : "mode-lessons");
+      if (next !== "lessons") {
+        lessonCodeActive = false;
+        lessonCamera = null;
+        app?.classList.remove("lesson-has-code");
+      }
+      codePanel.hidden = next === "drive";
       mustGet<HTMLButtonElement>("mode-drive").setAttribute("aria-selected", String(next === "drive"));
       mustGet<HTMLButtonElement>("mode-code").setAttribute("aria-selected", String(next === "code"));
-      hint.textContent =
-        next === "drive"
-          ? "WASD or arrows to drive · Space brakes · Drag to look · Scroll to zoom · R resets"
-          : "Ctrl/⌘ Enter runs Python · sensors only, at 20 Hz · Drag to look around";
+      mustGet<HTMLButtonElement>("mode-lessons").setAttribute("aria-selected", String(next === "lessons"));
+      if (next === "code" && prev !== "code") codeEditor.setValue(scratch);
+      if (prev === "lessons" && next !== "lessons") {
+        stopProgram();
+        camera.reset();
+      }
       if (next === "drive") {
         stopProgram();
         applyDrive();
-      } else {
-        robot.setCommand(clampCommand({ steering: 0, throttle: 0 }, ACKERMANN_BUGGY.limits), STOP_BRAKE);
+      } else if (next === "code") {
         code.warmup();
-        requestAnimationFrame(() => codeEditor.relayout());
+        robot.setCommand(clampCommand({ steering: 0, throttle: 0 }, ACKERMANN_BUGGY.limits), STOP_BRAKE);
+      } else if (prev !== "lessons") {
+        robot.setCommand(clampCommand({ steering: 0, throttle: 0 }, ACKERMANN_BUGGY.limits), STOP_BRAKE);
       }
+      setHint();
+      requestAnimationFrame(() => {
+        view.resize(viewport.clientWidth, viewport.clientHeight);
+        codeEditor.relayout();
+      });
     };
-
-    mustGet("mode-drive").addEventListener("click", () => setMode("drive"));
-    mustGet("mode-code").addEventListener("click", () => setMode("code"));
     mustGet("run").addEventListener("click", () => runProgram());
     mustGet("stop").addEventListener("click", () => stopProgram());
     mustGet("reset").addEventListener("click", () => resetWorld());
@@ -273,7 +306,7 @@ export async function mountApp(): Promise<void> {
       switchingWorld = true;
       worldSelect.disabled = true;
       try {
-        if (mode === "code") stopProgram();
+        if (codeControls()) stopProgram();
         disposeWorld(world, yard);
         yard = await mountWorld(id, RAPIER, world, view.scene, graphics);
         view.setAtmosphere(yard.atmosphere);
@@ -283,11 +316,11 @@ export async function mountApp(): Promise<void> {
         drawOps = [];
         drawings.clear();
         robot.reset(activeSpawn);
-        camera.reset();
+        applyLessonCamera();
         frameKidnappedCloud(true);
         camera.snap(robot.focus());
         localStorage.setItem(WORLD_STORAGE_KEY, id);
-        if (mode === "drive") applyDrive();
+        if (handsOn()) applyDrive();
       } finally {
         worldSelect.disabled = false;
         switchingWorld = false;
@@ -329,6 +362,7 @@ export async function mountApp(): Promise<void> {
       if (!example) return;
       if (code.current === "running") stopProgram();
       codeEditor.setValue(example.source);
+      scratch = example.source;
       if (mode === "code") resetWorld();
     });
     const pathsButton = mustGet<HTMLButtonElement>("paths-toggle");
@@ -346,7 +380,7 @@ export async function mountApp(): Promise<void> {
       "keydown",
       (event) => {
         if (
-          mode === "code" &&
+          codeControls() &&
           event.key === "Enter" &&
           (event.ctrlKey || event.metaKey) &&
           !event.shiftKey &&
@@ -358,8 +392,8 @@ export async function mountApp(): Promise<void> {
           return;
         }
         if (isTypingTarget(event.target)) return;
-        if (mode === "drive" && event.code === "KeyR" && !event.repeat) resetWorld();
-        if (mode !== "drive") return;
+        if (handsOn() && event.code === "KeyR" && !event.repeat) resetWorld();
+        if (!handsOn()) return;
         if (event.code.startsWith("Arrow") || event.code === "Space") event.preventDefault();
         keys.add(event.code);
       },
@@ -370,16 +404,30 @@ export async function mountApp(): Promise<void> {
     });
     window.addEventListener("blur", () => keys.clear());
 
-    setMode("drive");
     loading.hidden = true;
 
     mountCourse({
       setWorld: async (id) => {
-        await switchWorld(id, true);
+        await switchWorld(id);
       },
+      getWorld: () => yard.id,
       setMode,
-      setPaused: (next) => {
-        paused = next;
+      applyScene: (scene) => {
+        lessonCodeActive = Boolean(scene?.run);
+        lessonCamera = scene?.camera ?? null;
+        document.getElementById("app")?.classList.toggle("lesson-has-code", lessonCodeActive);
+        if (!scene) {
+          setHint();
+          return;
+        }
+        setLidarButton(scene.lidar);
+        setPaths(scene.paths);
+        noiseSeed = scene.seed >>> 0;
+        seedInput.value = String(noiseSeed);
+        robot.setNoiseSeed(noiseSeed);
+        applyLessonCamera();
+        if (scene.run) code.warmup();
+        setHint();
       },
       setLessonSpawn: (spawn, worldId) => {
         lessonSpawn = spawn;
@@ -398,6 +446,7 @@ export async function mountApp(): Promise<void> {
         view.resize(viewport.clientWidth, viewport.clientHeight);
         codeEditor.relayout();
       },
+      runProgram,
     });
 
     window.roboSim = {
@@ -440,7 +489,7 @@ export async function mountApp(): Promise<void> {
           accumulator = Math.min(accumulator + frameDt, PHYSICS_DT * 5);
           let steps = 0;
           while (accumulator >= PHYSICS_DT && steps < 5) {
-            if (mode === "drive") applyDrive();
+            if (handsOn()) applyDrive();
             robot.preStep(PHYSICS_DT);
             world.step();
             simTime += PHYSICS_DT;
@@ -457,11 +506,11 @@ export async function mountApp(): Promise<void> {
                 map: taskMap(),
               };
               studentPose = sensors.odometry.pose;
-              if (mode === "code") code.offer(sensors);
+              if (codeControls()) code.offer(sensors);
               lidar.update(
                 robot.lidarDebug(),
                 sensors.lidar,
-                mode === "code" ? { ops: drawOps, pose: studentPose } : undefined,
+                codeControls() ? { ops: drawOps, pose: studentPose } : undefined,
               );
               const focusNow = robot.focus();
               paths.push(focusNow, robot.telemetry().trueSpeed, odomToWorld(activeSpawn, sensors.odometry.pose));

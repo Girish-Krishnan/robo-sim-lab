@@ -1,7 +1,7 @@
 import type { SandboxState } from "../sandbox/controller";
 import type { VehicleTelemetry } from "../robots/types";
 
-export type AppMode = "drive" | "code";
+export type AppMode = "drive" | "code" | "lessons";
 
 export class Hud {
   private readonly speed: HTMLElement;
@@ -27,7 +27,8 @@ export class Hud {
     this.steerCmd.textContent = `${telemetry.commandedSteering.toFixed(2)} rad`;
     this.steerAct.textContent = `${telemetry.actuatorSteering.toFixed(2)} rad`;
     this.throttle.textContent = telemetry.commandedThrottle.toFixed(2);
-    this.mode.textContent = mode === "drive" ? "Drive" : `Code · ${label(run)}`;
+    const name = mode === "drive" ? "Drive" : mode === "lessons" ? "Lesson" : "Code";
+    this.mode.textContent = mode === "drive" ? name : `${name} · ${label(run)}`;
   }
 }
 

@@ -1,7 +1,7 @@
 import { EXAMPLES } from "../editor/examples";
 import type { WorldId } from "../sim/worlds";
 import type { SpawnPose } from "../sim/vehicle";
-import { LESSONS, MODULES, lessonById, lessonIndex, moduleLessons, resolveSpawn, type Lesson } from "./catalog";
+import { LESSONS, MODULES, lessonById, lessonIndex, moduleLessons, resolveSpawn, sceneFor, type Lesson } from "./catalog";
 import { renderMarkdown } from "./markdown";
 import {
   clearLessonCode,
@@ -12,34 +12,38 @@ import {
   saveLessonCode,
   toggleCompleted,
 } from "./progress";
+import type { AppMode } from "../ui/hud";
 
 export interface CourseHost {
   setWorld: (id: WorldId) => Promise<void>;
-  setMode: (mode: "drive" | "code") => void;
-  setPaused: (paused: boolean) => void;
+  getWorld: () => WorldId;
+  setMode: (mode: AppMode) => void;
+  applyScene: (scene: ReturnType<typeof sceneFor> | null) => void;
   setLessonSpawn: (spawn: SpawnPose | null, world: string | null) => void;
   resetWorld: () => void;
   setCode: (source: string) => void;
   onCodeChange: (listener: (source: string) => void) => void;
   relayout: () => void;
+  runProgram: () => void;
 }
 
 interface Route {
-  kind: "sandbox" | "lesson";
+  mode: AppMode;
   id?: string;
-  lab?: boolean;
 }
 
+const LAST_LESSON_KEY = "robo-sim-lab.last-lesson";
+
 export function mountCourse(host: CourseHost): void {
-  const toc = document.getElementById("toc");
-  const stage = document.getElementById("stage");
+  const nav = document.getElementById("lesson-nav");
   const article = document.getElementById("lesson");
-  const shell = document.getElementById("shell");
-  if (!toc || !stage || !article || !shell) return;
+  const lessonChrome = document.getElementById("lesson-chrome");
+  if (!nav || !article || !lessonChrome) return;
 
   let applying = false;
   let labId: string | null = null;
   let saveTimer = 0;
+  let opening = 0;
 
   host.onCodeChange((source) => {
     if (applying || !labId) return;
@@ -47,148 +51,196 @@ export function mountCourse(host: CourseHost): void {
     saveTimer = window.setTimeout(() => saveLessonCode(labId as string, source), 250);
   });
 
-  const resetButton = document.getElementById("reset-starter");
-  resetButton?.addEventListener("click", () => {
+  document.getElementById("reset-starter")?.addEventListener("click", () => {
     const lesson = labId ? lessonById(labId) : undefined;
-    if (!lesson) return;
+    if (!lesson?.starter) return;
     clearLessonCode(lesson.id);
     applying = true;
     host.setCode(starterOf(lesson));
     applying = false;
+    host.resetWorld();
+    host.runProgram();
   });
 
-  document.getElementById("toc-toggle")?.addEventListener("click", () => {
-    shell.classList.toggle("toc-open");
-  });
-
-  const renderToc = (active: string | null) => {
-    const progress = loadProgress();
-    const sandboxCurrent = active === null;
-    toc.innerHTML = `
-      <a class="toc-sandbox${sandboxCurrent ? " is-current" : ""}" href="#/sandbox">Sandbox</a>
-      <p class="toc-note">Free play. Any world, any example.</p>
-    `;
-    for (const module of MODULES) {
-      const block = document.createElement("section");
-      block.className = "toc-module";
-      const heading = document.createElement("h2");
-      heading.textContent = module.title;
-      if (module.soon) {
-        const badge = document.createElement("span");
-        badge.className = "soon";
-        badge.textContent = "Soon";
-        heading.append(badge);
-      }
-      block.append(heading);
-      const list = document.createElement("ol");
-      for (const lesson of moduleLessons(module.id)) {
-        const item = document.createElement("li");
-        const link = document.createElement("a");
-        link.href = `#/lesson/${lesson.id}`;
-        link.textContent = lesson.title;
-        if (lesson.id === active) link.classList.add("is-current");
-        if (progress.completed.includes(lesson.id)) link.classList.add("is-done");
-        else if (progress.visited.includes(lesson.id)) link.classList.add("is-visited");
-        if (lesson.status === "soon") link.classList.add("is-soon");
-        item.append(link);
-        list.append(item);
-      }
-      block.append(list);
-      toc.append(block);
-    }
-  };
-
-  const show = (route: Route) => {
-    const lesson = route.kind === "lesson" && route.id ? lessonById(route.id) : undefined;
-    if (route.kind === "lesson" && !lesson) {
-      location.hash = "#/sandbox";
+  const navigate = (route: Route) => {
+    const next = routeHash(route);
+    if (location.hash === next) {
+      show(route);
       return;
     }
-    shell.classList.remove("toc-open");
-    stage.classList.toggle("is-sandbox", route.kind === "sandbox");
-    stage.classList.toggle("is-read", route.kind === "lesson" && !route.lab);
-    stage.classList.toggle("is-lab", route.kind === "lesson" && Boolean(route.lab));
-    document.getElementById("app")?.classList.toggle("lesson-lab", Boolean(route.lab && lesson?.action === "lab"));
-    labId = route.lab && lesson ? lesson.id : null;
-    resetButton?.toggleAttribute("hidden", !(route.lab && lesson?.starter));
+    location.hash = next;
+  };
+
+  document.getElementById("mode-drive")?.addEventListener("click", () => navigate({ mode: "drive" }));
+  document.getElementById("mode-code")?.addEventListener("click", () => navigate({ mode: "code" }));
+  document.getElementById("mode-lessons")?.addEventListener("click", () => {
+    navigate({ mode: "lessons", id: lastLessonId() });
+  });
+
+  const show = (route: Route) => {
+    const lesson = route.mode === "lessons" && route.id ? lessonById(route.id) : undefined;
+    if (route.mode === "lessons" && !lesson) {
+      location.hash = `#/lesson/${lastLessonId()}`;
+      return;
+    }
+    const token = ++opening;
+    labId = lesson?.starter ? lesson.id : null;
+    document.getElementById("reset-starter")?.toggleAttribute("hidden", !lesson?.starter);
+    lessonChrome.hidden = route.mode !== "lessons";
+    article.hidden = route.mode !== "lessons";
 
     if (!lesson) {
-      article.hidden = true;
       article.innerHTML = "";
-      host.setPaused(false);
       host.setLessonSpawn(null, null);
-      renderToc(null);
+      host.applyScene(null);
+      host.setMode(route.mode);
       host.relayout();
       return;
     }
 
     markVisited(lesson.id);
-    article.hidden = false;
-    article.innerHTML = lessonHtml(lesson, Boolean(route.lab));
-    bindLesson(lesson, Boolean(route.lab));
-    renderToc(lesson.id);
-
-    if (!route.lab) {
-      host.setPaused(true);
-      host.relayout();
-      return;
+    try {
+      localStorage.setItem(LAST_LESSON_KEY, lesson.id);
+    } catch {
+      // Progress still works if storage is blocked.
     }
-
-    host.setPaused(false);
-    void openLab(lesson);
+    renderNav(lesson);
+    article.innerHTML = lessonHtml(lesson);
+    const scene = sceneFor(lesson);
+    host.setMode("lessons");
+    host.setLessonSpawn(resolveSpawn(lesson), lesson.world);
+    host.applyScene(scene);
+    void openLesson(lesson, scene.run, token);
   };
 
-  const openLab = async (lesson: Lesson) => {
-    const spawn = resolveSpawn(lesson);
-    host.setLessonSpawn(spawn, lesson.world);
-    await host.setWorld(lesson.world);
-    host.setLessonSpawn(spawn, lesson.world);
-    host.resetWorld();
-    if (lesson.action === "drive" || lesson.action === "sandbox") {
-      host.setMode("drive");
-    } else {
+  const openLesson = async (lesson: Lesson, run: boolean, token: number) => {
+    if (host.getWorld() !== lesson.world) await host.setWorld(lesson.world);
+    if (token !== opening) return;
+    host.setLessonSpawn(resolveSpawn(lesson), lesson.world);
+    if (lesson.starter) {
       applying = true;
       host.setCode(loadLessonCode(lesson.id) ?? starterOf(lesson));
       applying = false;
-      host.setMode("code");
     }
+    host.resetWorld();
+    if (run) host.runProgram();
     host.relayout();
   };
 
-  const bindLesson = (lesson: Lesson, lab: boolean) => {
-    article.querySelector("[data-open]")?.addEventListener("click", () => {
-      if (lesson.action === "sandbox") location.hash = "#/sandbox";
-      else location.hash = `#/lesson/${lesson.id}/lab`;
+  const renderNav = (lesson: Lesson) => {
+    const indexOpen = nav.querySelector("#lesson-index")?.hasAttribute("open") ?? false;
+    const progress = loadProgress();
+    const ready = LESSONS.filter((item) => item.status === "ready");
+    const doneCount = ready.filter((item) => progress.completed.includes(item.id)).length;
+    const index = lessonIndex(lesson.id);
+    const prev = index > 0 ? LESSONS[index - 1] : undefined;
+    const next = index >= 0 && index < LESSONS.length - 1 ? LESSONS[index + 1] : undefined;
+    const done = isCompleted(lesson.id);
+
+    nav.innerHTML = `
+      <div class="lesson-nav-row">
+        <select id="lesson-module" aria-label="Module"></select>
+        <select id="lesson-pick" aria-label="Lesson"></select>
+      </div>
+      <div class="lesson-nav-row">
+        <button type="button" id="lesson-prev" ${prev ? "" : "disabled"}>Prev</button>
+        <button type="button" id="lesson-next" ${next ? "" : "disabled"}>Next</button>
+        <button type="button" id="lesson-complete" class="${done ? "is-on" : ""}">${done ? "Completed" : "Mark complete"}</button>
+        <span class="lesson-progress" title="Completed lessons">${doneCount}/${ready.length}</span>
+      </div>
+      <details id="lesson-index" ${indexOpen ? "open" : ""}>
+        <summary>All lessons</summary>
+        <div class="lesson-index-body"></div>
+      </details>
+    `;
+
+    const moduleSelect = nav.querySelector<HTMLSelectElement>("#lesson-module");
+    const lessonSelect = nav.querySelector<HTMLSelectElement>("#lesson-pick");
+    if (!moduleSelect || !lessonSelect) return;
+    for (const module of MODULES) {
+      const option = document.createElement("option");
+      option.value = module.id;
+      option.textContent = module.soon ? `${module.title} (soon)` : module.title;
+      moduleSelect.append(option);
+    }
+    moduleSelect.value = lesson.moduleId;
+    const fillLessons = (moduleId: string) => {
+      lessonSelect.replaceChildren();
+      for (const item of moduleLessons(moduleId)) {
+        const option = document.createElement("option");
+        option.value = item.id;
+        option.textContent = item.status === "soon" ? `${item.title} (soon)` : item.title;
+        lessonSelect.append(option);
+      }
+    };
+    fillLessons(lesson.moduleId);
+    lessonSelect.value = lesson.id;
+
+    moduleSelect.addEventListener("change", () => {
+      const first = moduleLessons(moduleSelect.value)[0];
+      if (first) navigate({ mode: "lessons", id: first.id });
     });
-    article.querySelector("[data-complete]")?.addEventListener("click", (event) => {
-      const done = toggleCompleted(lesson.id);
-      const button = event.currentTarget as HTMLButtonElement;
-      button.textContent = done ? "Completed" : "Mark complete";
-      button.classList.toggle("is-on", done);
-      renderToc(lesson.id);
+    lessonSelect.addEventListener("change", () => {
+      if (lessonSelect.value) navigate({ mode: "lessons", id: lessonSelect.value });
     });
-    article.querySelector("[data-focus]")?.addEventListener("click", () => {
-      stage.classList.toggle("sim-focus");
-      host.relayout();
+    nav.querySelector("#lesson-prev")?.addEventListener("click", () => {
+      if (prev) navigate({ mode: "lessons", id: prev.id });
     });
-    if (lab) article.querySelector("[data-focus]")?.removeAttribute("hidden");
+    nav.querySelector("#lesson-next")?.addEventListener("click", () => {
+      if (next) navigate({ mode: "lessons", id: next.id });
+    });
+    nav.querySelector("#lesson-complete")?.addEventListener("click", () => {
+      toggleCompleted(lesson.id);
+      renderNav(lesson);
+    });
+
+    const body = nav.querySelector(".lesson-index-body");
+    if (!body) return;
+    for (const module of MODULES) {
+      const block = document.createElement("section");
+      const heading = document.createElement("h2");
+      heading.textContent = module.title;
+      block.append(heading);
+      const list = document.createElement("ol");
+      for (const item of moduleLessons(module.id)) {
+        const li = document.createElement("li");
+        const link = document.createElement("a");
+        link.href = `#/lesson/${item.id}`;
+        link.textContent = item.title;
+        if (item.id === lesson.id) link.classList.add("is-current");
+        if (progress.completed.includes(item.id)) link.classList.add("is-done");
+        else if (progress.visited.includes(item.id)) link.classList.add("is-visited");
+        if (item.status === "soon") link.classList.add("is-soon");
+        li.append(link);
+        list.append(li);
+      }
+      block.append(list);
+      body.append(block);
+    }
   };
 
   window.addEventListener("hashchange", () => show(parseRoute(location.hash)));
   if (!location.hash || location.hash === "#") {
-    history.replaceState(null, "", "#/lesson/getting-started/sandbox");
+    history.replaceState(null, "", "#/drive");
   }
   show(parseRoute(location.hash));
+}
+
+function lastLessonId(): string {
+  try {
+    const saved = localStorage.getItem(LAST_LESSON_KEY);
+    if (saved && lessonById(saved)) return saved;
+  } catch {
+    // Fall through to the first lesson.
+  }
+  return LESSONS[0]?.id ?? "getting-started/sandbox";
 }
 
 function starterOf(lesson: Lesson): string {
   return EXAMPLES.find((example) => example.id === lesson.starter)?.source ?? "# This lesson has no starter code yet.\n\ndef control(sensors):\n    return 0.0, 0.0\n";
 }
 
-function lessonHtml(lesson: Lesson, lab: boolean): string {
-  const index = lessonIndex(lesson.id);
-  const prev = index > 0 ? LESSONS[index - 1] : undefined;
-  const next = index >= 0 && index < LESSONS.length - 1 ? LESSONS[index + 1] : undefined;
+function lessonHtml(lesson: Lesson): string {
   const prereq = lesson.prerequisites
     .map((id) => {
       const item = lessonById(id);
@@ -196,40 +248,30 @@ function lessonHtml(lesson: Lesson, lab: boolean): string {
     })
     .filter((item) => item.length > 0)
     .join(", ");
-  const done = isCompleted(lesson.id);
-  const openLabel =
-    lesson.status === "soon"
-      ? ""
-      : lesson.action === "sandbox"
-        ? "Open the sandbox"
-        : lesson.action === "drive"
-          ? "Drive this world"
-          : "Open in sandbox";
+  const kicker = MODULES.find((item) => item.id === lesson.moduleId)?.title ?? "";
   return `
     <div class="lesson-scroll">
-      <p class="lesson-kicker">${escapeText(MODULES.find((item) => item.id === lesson.moduleId)?.title ?? "")}${lesson.status === "soon" ? " · Coming soon" : ""}</p>
+      <p class="lesson-kicker">${escapeText(kicker)}${lesson.status === "soon" ? " · Coming soon" : ""}</p>
       <h1>${escapeText(lesson.title)}</h1>
       ${prereq ? `<p class="lesson-prereq">Read first: ${prereq}</p>` : ""}
-      <div class="lesson-body">${lesson.status === "soon" ? renderMarkdown(lesson.markdown) : renderMarkdown(lesson.markdown)}</div>
-      <div class="lesson-actions">
-        ${openLabel ? `<button type="button" class="primary" data-open>${openLabel}</button>` : ""}
-        <button type="button" data-complete class="${done ? "is-on" : ""}">${done ? "Completed" : "Mark complete"}</button>
-        ${lab ? `<button type="button" data-focus>Hide reading</button>` : ""}
-      </div>
-      <nav class="lesson-pager" aria-label="Lesson">
-        ${prev ? `<a href="#/lesson/${prev.id}">← ${escapeText(prev.title)}</a>` : "<span></span>"}
-        ${next ? `<a href="#/lesson/${next.id}">${escapeText(next.title)} →</a>` : "<span></span>"}
-      </nav>
+      <div class="lesson-body">${renderMarkdown(lesson.markdown)}</div>
     </div>
   `;
 }
 
 function parseRoute(hash: string): Route {
   const path = hash.replace(/^#/, "").replace(/^\//, "");
-  if (path === "" || path === "sandbox") return { kind: "sandbox" };
-  const match = path.match(/^lesson\/([a-z0-9-]+)\/([a-z0-9-]+)(\/lab)?$/);
-  if (!match) return { kind: "sandbox" };
-  return { kind: "lesson", id: `${match[1]}/${match[2]}`, lab: Boolean(match[3]) };
+  if (path === "" || path === "sandbox" || path === "drive") return { mode: "drive" };
+  if (path === "code") return { mode: "code" };
+  const match = path.match(/^lesson\/([a-z0-9-]+)\/([a-z0-9-]+)(?:\/lab)?$/);
+  if (!match) return { mode: "drive" };
+  return { mode: "lessons", id: `${match[1]}/${match[2]}` };
+}
+
+function routeHash(route: Route): string {
+  if (route.mode === "code") return "#/code";
+  if (route.mode === "lessons" && route.id) return `#/lesson/${route.id}`;
+  return "#/drive";
 }
 
 function escapeText(value: string): string {
