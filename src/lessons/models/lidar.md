@@ -9,7 +9,9 @@ prerequisites: getting-started/sensors
 status: ready
 ---
 
-The lidar is a spinning range finder in a plane about a metre off the ground. Each control tick you get one full scan: 270 beams across a 270° field of view, so the beams are about 1° apart. This lesson opens in the city with the scan drawn, because the roundabout and the lamp posts give the fan something to hit.
+The lidar is a spinning range finder in a plane about a metre off the ground. Each control tick you get one full scan: 270 beams across a 270° field of view, so the beams are about 1° apart. A roundabout and a row of lamp posts give the fan something to hit.
+
+In the sim: city streets, with the scan drawn.
 
 Angle 0 points forward. Positive angles point to the driver's left. The scan does not cover the rear 90°, so something directly behind the car is invisible until you yaw.
 

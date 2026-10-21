@@ -9,7 +9,9 @@ prerequisites: reactive/avoid
 status: ready
 ---
 
-Wall following steers to hold a distance from the wall on the driver's right. On the oval that wall is the inner wall of the east straight, which is where this lesson places the car. The same program then has to survive the corner, where the wall ends for a moment and comes back on the next straight. Paths is on so a lap is easy to see.
+Wall following steers to hold a distance from the wall on the driver's right. On the oval that wall is the inner wall of the east straight. The same program then has to survive the corner, where the wall ends for a moment and comes back on the next straight.
+
+In the sim: the east straight, inner wall on the right, with the trails on so a lap is easy to see.
 
 Two beams do most of the work. The beam near $-90^\circ$ measures the side distance. The beam near $-45^\circ$ sees the wall ahead of the rear axle, so the car can start turning before the side beam falls off the end. The target distance is 3.2 m, which puts the car in the lane rather than scraping the wall or driving down the middle toward the cones.
 

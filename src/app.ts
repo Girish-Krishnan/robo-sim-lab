@@ -27,7 +27,7 @@ import { mountCourse } from "./course/shell";
 import { CodeSandbox, type SandboxState } from "./sandbox/controller";
 import { ConsolePanel } from "./ui/console-panel";
 import { Hud, type AppMode } from "./ui/hud";
-import { mountSplitter } from "./ui/splitter";
+import { mountLabSplitter, mountSplitter } from "./ui/splitter";
 
 export async function mountApp(): Promise<void> {
   const viewport = mustGet<HTMLElement>("viewport");
@@ -164,10 +164,19 @@ export async function mountApp(): Promise<void> {
       else if (lessonCamera === "wide") camera.frame(16, 0.7);
       else camera.reset();
     };
+    let hintTimer = 0;
     const setHint = () => {
+      window.clearTimeout(hintTimer);
+      hint.classList.remove("is-faded");
+      if (mode === "lessons") {
+        hint.hidden = true;
+        return;
+      }
+      hint.hidden = false;
       hint.textContent = handsOn()
         ? "WASD or arrows to drive · Space brakes · Drag to look · Scroll to zoom · R resets"
         : "Ctrl/⌘ Enter runs Python · sensors only, at 20 Hz · Drag to look around";
+      hintTimer = window.setTimeout(() => hint.classList.add("is-faded"), 4000);
     };
     let mapCache: { key: string; map: ReturnType<typeof buildKnownMap> } | null = null;
     const taskMap = () => {
@@ -356,6 +365,23 @@ export async function mountApp(): Promise<void> {
     mountSplitter(mustGet("splitter"), () => {
       view.resize(viewport.clientWidth, viewport.clientHeight);
       codeEditor.relayout();
+    });
+    mountLabSplitter(mustGet("lab-split"), () => codeEditor.relayout());
+    const editCode = mustGet<HTMLButtonElement>("edit-code");
+    const toggleConsole = mustGet<HTMLButtonElement>("toggle-console");
+    const appEl = () => document.getElementById("app");
+    editCode.addEventListener("click", () => {
+      const open = !appEl()?.classList.contains("lab-open");
+      appEl()?.classList.toggle("lab-open", open);
+      editCode.setAttribute("aria-expanded", String(open));
+      editCode.textContent = open ? "Hide code" : "Edit code";
+      requestAnimationFrame(() => codeEditor.relayout());
+    });
+    toggleConsole.addEventListener("click", () => {
+      const open = !appEl()?.classList.contains("console-open");
+      appEl()?.classList.toggle("console-open", open);
+      toggleConsole.setAttribute("aria-expanded", String(open));
+      toggleConsole.classList.toggle("is-on", open);
     });
     exampleSelect.addEventListener("change", () => {
       const example = EXAMPLES.find((item) => item.id === exampleSelect.value);

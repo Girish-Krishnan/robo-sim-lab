@@ -9,7 +9,9 @@ prerequisites: getting-started/sandbox
 status: ready
 ---
 
-This is a small Ackermann buggy: four wheels, the front pair steered, the rear pair driven. It is not a skid-steer robot and it is not a 30 cm F1TENTH car. The wheelbase is 1.9 m, so the turning circle is several metres. The HUD under the view shows the steering command and the angle the wheels have actually reached. They are not the same number while the steering is still slewing.
+This is a small Ackermann buggy: four wheels, the front pair steered, the rear pair driven. It is not a skid-steer robot and it is not a 30 cm F1TENTH car. The wheelbase is 1.9 m, so the turning circle is several metres. The steering command and the angle the wheels have actually reached are different numbers while the steering is still slewing.
+
+In the sim: both the command and the slewed wheel angle are on the readout under the view.
 
 ## Three frames you will keep meeting
 

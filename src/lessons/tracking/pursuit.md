@@ -9,7 +9,9 @@ prerequisites: reactive/wall
 status: ready
 ---
 
-Pure pursuit picks a point on the path a fixed distance ahead of the pose it believes, and steers the circular arc that reaches that point. The world publishes the path on `sensors.task.path` in the odometry frame. On the oval that path is the centreline. Paths is on so the plan, the car, and the odometry trail are all visible.
+Pure pursuit picks a point on the path a fixed distance ahead of the pose it believes, and steers the circular arc that reaches that point. The world publishes the path on `sensors.task.path` in the odometry frame. On the oval that path is the centreline.
+
+In the sim: the plan, the car, and the odometry trail are all drawn.
 
 Each tick the starter finds the nearest point along the route, then walks forward until the point is at least `LOOKAHEAD` metres away. It transforms that point into the body frame of the odometry pose, computes a curvature, and converts curvature to a steering angle with the bicycle model. A small speed PID slows down when the steer is large, so the corner is slower than the straight.
 

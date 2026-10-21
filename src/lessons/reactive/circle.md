@@ -9,7 +9,9 @@ prerequisites: models/bicycle
 status: ready
 ---
 
-Open loop means the command does not look at a sensor. The circle starter returns the same steering and the same throttle on every tick. It is the right first program because when it fails, the failure is the plant, not a bug in your feedback. The camera is pulled back so the whole circle fits.
+Open loop means the command does not look at a sensor. The circle starter returns the same steering and the same throttle on every tick. It is the right first program because when it fails, the failure is the plant, not a bug in your feedback.
+
+In the sim: the same fixed command, with the camera far enough back to see the whole lap.
 
 The starter turns left at 0.34 rad and asks for a medium throttle. The car is placed on a pad that was checked to be clear of that circle: the south lawn in the city, the oval infield, the meadow south of the trees, and the open bay in the warehouse. If you move the steer or the throttle a lot, that clearance promise ends.
 

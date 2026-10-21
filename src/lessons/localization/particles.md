@@ -9,7 +9,9 @@ prerequisites: localization/bayes
 status: ready
 ---
 
-Monte Carlo localization represents the belief with $N$ poses, the particles. Each one is a guess. The weight is how well that guess explains the current scan. Low-variance resampling keeps the guesses that earned their weight and drops the ones that did not. On the oval the cloud starts near the car. The camera sits a little high so the magenta dots, the yellow ellipse, and the walls are in the same picture.
+Monte Carlo localization represents the belief with $N$ poses, the particles. Each one is a guess. The weight is how well that guess explains the current scan. Low-variance resampling keeps the guesses that earned their weight and drops the ones that did not. On the oval the cloud starts near the car.
+
+In the sim: the tracking cloud on the oval, a little above the car, so the dots, the ellipse, and the walls share one picture.
 
 The starter uses a few hundred particles, a few dozen lidar beams, and the precomputed distance field. That is the budget that fits in a 20 Hz Pyodide tick. Using all 270 beams and a few thousand particles will miss the deadline and the car will stutter. The geometry does not need it. Walls are large compared with a 0.5 m cell.
 
@@ -69,4 +71,4 @@ Global localization (the kidnapped starter) is the same filter with a different 
 
 ## Make the cloud too small
 
-Run the starter on the oval. You should see a magenta cloud on the car, a yellow ellipse tight around it, and a red trail that stays with it while the amber odometry trail, if Paths is on, walks away. Cut `N` to `40` and run again. The mean should jump more. Put `360` back. Force a resample every tick by ignoring $N_{\mathrm{eff}}$. The cloud should look thinner and, after a bad scan, it may not recover. Restore the threshold.
+Run the starter on the oval. You should see a magenta cloud on the car, a yellow ellipse tight around it, and a red trail that stays with it while the amber odometry trail walks away. Cut `N` to `40` and run again. The mean should jump more. Put `360` back. Force a resample every tick by ignoring $N_{\mathrm{eff}}$. The cloud should look thinner and, after a bad scan, it may not recover. Restore the threshold.

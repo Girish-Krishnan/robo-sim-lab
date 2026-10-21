@@ -159,7 +159,7 @@ The reading. Use `$inline$` and `$$display$$` math. SVG can sit inline. Headings
 | `title`, `order` | Lesson label and order within the module. Module order is the list in `src/course/catalog.ts`. |
 | `world` | `city`, `track`, `forest`, or `warehouse`. Opening the lesson switches to it. |
 | `spawn` | `default`, `circle`, `avoid`, `wall`, `pursuit`, `mcl`, or `mcl-global`. These are the scenario spawns. |
-| `starter` | An example id from `src/editor/examples.ts`, or `none`. A starter is loaded into the Try it editor and run. |
+| `starter` | An example id from `src/editor/examples.ts`, or `none`. A starter is loaded into the Try it editor and run. The editor starts collapsed; Edit code opens it. |
 | `action` | `lab` runs starter code, `drive` leaves the keyboard in control, `sandbox` is a reading with the sim configured and no program. |
 | `prerequisites` | Comma-separated lesson ids, `module/slug`. |
 | `status` | `ready` or `soon`. |

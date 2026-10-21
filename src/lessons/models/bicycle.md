@@ -9,7 +9,9 @@ prerequisites: getting-started/robot
 status: ready
 ---
 
-Hold the wheel at a fixed angle and the car draws a circle. That circle is the bicycle model with the inputs frozen, which is why this lesson starts the circle program on an open pad and pulls the camera back far enough to see the steered front wheels and the arc together. Paths is on: the coloured trail is the circle you are about to measure.
+Hold the wheel at a fixed angle and the car draws a circle. The rear axle rolls, the front axle is steered by $\delta$, and a constant $\delta$ is that circle.
+
+In the sim: a fixed steer on an open pad, with the coloured trail showing the circle.
 
 Positive $\delta$ is a left turn. The car sits on the west side of the pad, nose along the pad, so a left circle stays in the grass, the infield, the meadow, or the open warehouse bay.
 

@@ -43,4 +43,4 @@ A contact on the second lap is often the drift, not a bad curvature formula. If 
 
 ## Fifteen seconds, then fifty
 
-Run a full minute on the oval with Paths on. Pause near 15 seconds and again near 50 seconds. The gap between the car and the amber trail should be much larger the second time. Run the same starter in the city. Cross-track should stay roughly flat. That does not contradict this lesson: the roundabout's error is slip, and it does not bend upward with time. The particle-filter pursuit on this same oval is what stops the late cross-track climbing the way 0.18 m to 2.23 m climbs.
+Run a full minute on the oval. Pause near 15 seconds and again near 50 seconds. The gap between the car and the amber trail should be much larger the second time. Run the same starter in the city. Cross-track should stay roughly flat. That does not contradict this lesson: the roundabout's error is slip, and it does not bend upward with time. The particle-filter pursuit on this same oval is what stops the late cross-track climbing the way 0.18 m to 2.23 m climbs.

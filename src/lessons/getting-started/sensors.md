@@ -15,7 +15,7 @@ You get lidar, wheel odometry, an IMU, a clock, and a task. The task can include
 
 That is on purpose. A controller that reads the true position will look brilliant and teach nothing. Localization only means something when the estimate is built from the same sensors a real robot would have.
 
-The Python side is a sandbox. NumPy is there. `print` and tracebacks show up in the console under the editor. Names you create above `control` live for the whole run. A name you create inside `control` does not, unless you hang it on the function or declare it global.
+The Python side is a sandbox. NumPy is there. `print` and tracebacks show up in the console. Names you create above `control` live for the whole run. A name you create inside `control` does not, unless you hang it on the function or declare it global.
 
 ## What is actually on the sample
 

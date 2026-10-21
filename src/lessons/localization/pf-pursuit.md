@@ -9,11 +9,13 @@ prerequisites: localization/particles, tracking/pursuit
 status: ready
 ---
 
-This is the same pure pursuit law as the path-tracking lesson, with one input changed. The lookahead is computed from the particle-filter mean instead of from `sensors.odometry.pose`. Wheel speed is still the wheel speed. The gyro is still inside the motion model. It is no longer the heading you steer by. The oval, the path trails, and the particle cloud are all on so you can see three different poses at once: truth, the estimate, and raw odometry.
+This is the same pure pursuit law as the path-tracking lesson, with one input changed. The lookahead is computed from the particle-filter mean instead of from `sensors.odometry.pose`. Wheel speed is still the wheel speed. The gyro is still inside the motion model. It is no longer the heading you steer by. Three poses are in the picture at once: truth, the estimate, and raw odometry.
+
+In the sim: the oval, with the path trails and the particle cloud drawn.
 
 On the oval, pursuit that trusts odometry lets cross-track grow from about 0.18 m in the first 15 seconds to about 2.23 m after 45 seconds. On seed 1, the same minute with this filter stayed near **0.19 m** mean cross-track, and about **0.34 m** after 45 seconds, with no real contact. The estimate is what the lidar and the map agree on, so a slow gyro bias stops being a slow steer away from the centreline.
 
-The starter still draws the path and the lookahead in the odometry frame. It also draws the particles and the estimate. Paths in the header still draws truth and raw odometry, which the program cannot see. The picture you want is: coloured truth on the centreline, red estimate on the car, amber odometry leaving.
+The starter draws the path and the lookahead in the odometry frame, and it draws the particles and the estimate. The coloured trail is where the car actually went, the red trail is the filter's estimate, and the amber trail is raw odometry. The program cannot read the coloured or amber trails. The picture you want is coloured truth on the centreline, the red estimate on the car, and amber odometry leaving.
 
 The city will not drop to zero cross-track. The body slides in a tight roundabout even with a perfect pose, so the mean stays near 0.6 m. On seed 1 the filter's late cross-track, after 45 s, was about 0.43 m against about 0.63 m for raw odometry. That is a real correction of heading, on top of a slip the bicycle model does not remove.
 
@@ -43,4 +45,4 @@ Do not feed `odometry.pose` back in "as a prior" by mixing it 50/50 with the mea
 
 ## Truth, red, and amber
 
-Run the starter on the oval for a full minute with Paths on. The amber trail should still leave. The car and the red estimate should stay near the centreline. Increase `LOOKAHEAD` to `6`. The cloud should look the same. The path should cut corners more, which is pursuit, not the filter. Change `UNKNOWN_START` to `True`, or open the kidnapped lesson, and watch the cloud start spread out instead of on the car.
+Run the starter on the oval for a full minute. The amber trail should still leave. The car and the red estimate should stay near the centreline. Increase `LOOKAHEAD` to `6`. The cloud should look the same. The path should cut corners more, which is pursuit, not the filter. Change `UNKNOWN_START` to `True`, or open the kidnapped lesson, and watch the cloud start spread out instead of on the car.

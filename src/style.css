@@ -195,25 +195,52 @@ button.primary:hover { background: #49d0ba; }
 }
 .lesson-body .katex { font-size: 1.05em; }
 .lesson-body .katex-display { margin: 0; font-size: 1.02em; }
-.lesson-body .diagram { max-width: 100%; margin: 8px 0 12px; }
+.lesson-body .diagram { max-width: 100%; margin: 8px 0 12px; overflow: visible; }
 /* Diagrams only. KaTeX draws \sqrt as an inline SVG; stretching every svg
    in the lesson flattens that radical to a blank gap. */
-.lesson-body .diagram svg { display: block; width: 100%; max-width: 100%; height: auto; }
+.lesson-body .diagram svg {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  max-height: none;
+}
+.lesson-body .sim-hint {
+  margin: 10px 0 14px;
+  padding: 6px 10px;
+  border-left: 3px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+  background: rgba(18, 143, 134, 0.1);
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
 
 #app.mode-lessons #code-chrome { display: none !important; }
 #code-chrome { flex: none; }
 
 #try-bar {
   display: none;
-  align-items: baseline;
-  gap: 8px;
-  padding: 6px 10px 0;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 3px;
+  padding: 4px 4px;
+  border-top: 1px solid var(--line);
+  flex: none;
+  background: #0e1316;
   color: var(--text);
-  font-size: 13px;
-  font-weight: 620;
+  font-size: 11px;
+  min-width: 0;
 }
-.try-note { color: var(--muted); font-weight: 430; font-size: 12px; }
+#try-bar button { padding: 3px 4px; font-size: 11px; white-space: nowrap; }
+#try-label { font-weight: 620; white-space: nowrap; }
+#toggle-console.is-on { background: #1b2a28; color: #d7fff6; border-color: rgba(47, 191, 168, 0.45); }
+#app.mode-code #try-bar,
 #app.mode-lessons.lesson-has-code #try-bar { display: flex; }
+#app.mode-code #try-label,
+#app.mode-code #edit-code,
+#app.mode-code #toggle-console,
+#app.mode-lessons #try-bar .shortcut { display: none; }
 
 header {
   display: flex;
@@ -380,7 +407,10 @@ main {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  transition: opacity 0.6s ease;
 }
+#hint.is-faded { opacity: 0; }
+#hint[hidden] { display: none; }
 
 #hud {
   position: absolute;
@@ -436,7 +466,32 @@ main {
 #app.mode-lessons #splitter { display: block; }
 
 body.splitter-drag { cursor: col-resize; user-select: none; }
+body.splitter-drag-row,
+body.splitter-drag.splitter-drag-row { cursor: row-resize; }
 body.splitter-drag iframe { pointer-events: none; }
+
+#lab-split {
+  display: none;
+  flex: none;
+  height: 8px;
+  cursor: row-resize;
+  touch-action: none;
+  position: relative;
+  background: transparent;
+}
+#lab-split::before {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: 3px;
+  height: 2px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.14);
+}
+#lab-split:hover::before,
+#lab-split.dragging::before,
+#lab-split:focus-visible::before { background: var(--accent); }
 
 #code-panel {
   display: flex;
@@ -475,13 +530,14 @@ body.splitter-drag iframe { pointer-events: none; }
 
 #run-state {
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 10px;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   color: var(--muted);
   border: 1px solid var(--line);
   border-radius: 999px;
-  padding: 4px 8px;
+  padding: 2px 6px;
+  white-space: nowrap;
 }
 
 #run-state[data-state="running"] { color: var(--accent); border-color: rgba(47, 191, 168, 0.45); }
@@ -515,15 +571,33 @@ body.splitter-drag iframe { pointer-events: none; }
 }
 
 #editor { flex: 1 1 auto; min-height: 0; overflow: hidden; }
-#app.mode-lessons.lesson-has-code #editor {
-  flex: 0 0 148px;
-  min-height: 112px;
-  border-top: 1px solid var(--line);
-}
-#app.mode-lessons:not(.lesson-has-code) #editor,
-#app.mode-lessons:not(.lesson-has-code) .run-bar,
-#app.mode-lessons:not(.lesson-has-code) .console-wrap,
+#app.mode-lessons #lesson { min-height: 240px; }
+#app.mode-lessons.lesson-has-code #lesson-chrome { order: 0; }
+#app.mode-lessons.lesson-has-code #lesson { order: 1; }
+#app.mode-lessons.lesson-has-code #python-status { order: 2; }
+#app.mode-lessons.lesson-has-code #lab-split { order: 3; }
+#app.mode-lessons.lesson-has-code #editor { order: 4; }
+#app.mode-lessons.lesson-has-code .console-wrap { order: 5; }
+#app.mode-lessons.lesson-has-code #try-bar { order: 6; }
+#app.mode-lessons #editor,
+#app.mode-lessons #lab-split,
+#app.mode-lessons .console-wrap,
+#app.mode-code #lab-split { display: none !important; }
+#app.mode-lessons:not(.lesson-has-code) #try-bar,
 #app.mode-lessons:not(.lesson-has-code) #python-status { display: none !important; }
+#app.mode-lessons.lesson-has-code.lab-open #lab-split { display: block !important; }
+#app.mode-lessons.lesson-has-code.lab-open #editor {
+  display: block !important;
+  flex: 0 0 var(--lab-editor, 156px);
+  height: var(--lab-editor, 156px);
+  min-height: 100px;
+  max-height: var(--lab-editor, 156px);
+}
+#app.mode-lessons.lesson-has-code.console-open .console-wrap {
+  display: flex !important;
+  height: 112px;
+  flex: none;
+}
 #app.mode-code #lesson-chrome,
 #app.mode-code #lesson,
 #app.mode-drive #lesson-chrome,
@@ -532,19 +606,18 @@ body.splitter-drag iframe { pointer-events: none; }
 .cm-editor { height: 100%; }
 .cm-scroller { overflow: auto; }
 
-.run-bar { border-top: 1px solid var(--line); }
 #run-state { margin-left: auto; }
-.shortcut { color: var(--muted); }
+.shortcut { color: var(--muted); margin-left: 4px; }
 
 .console-wrap {
   height: 168px;
+  flex: none;
   display: flex;
   flex-direction: column;
   min-height: 0;
   border-top: 1px solid var(--line);
   background: #0c1012;
 }
-#app.mode-lessons.lesson-has-code .console-wrap { height: 96px; flex: none; }
 
 .console-bar {
   padding: 4px 10px;

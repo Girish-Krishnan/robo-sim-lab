@@ -9,7 +9,9 @@ prerequisites: tracking/drift
 status: ready
 ---
 
-Dead reckoning is the name for the pose you have been using. You start from a known pose, and you add up motion. You never look outside. When the motion measurement is biased, the pose is wrong, and every later addition is wrong in the new wrong frame. The oval pursuit program is running again so that pose is on screen, amber trail and all.
+Dead reckoning is the name for the pose you have been using. You start from a known pose, and you add up motion. You never look outside. When the motion measurement is biased, the pose is wrong, and every later addition is wrong in the new wrong frame.
+
+In the sim: pursuit on the oval. The amber trail is that integral.
 
 On reset, the known pose is the origin of the odometry frame, which really is where the car is. That gift expires. After that, `sensors.odometry.pose` is only the integral of wheel speed and yaw rate. The path tracker believed it, and on the oval the true cross-track grew from about 0.18 m to about 2.23 m.
 

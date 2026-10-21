@@ -9,7 +9,9 @@ prerequisites: models/lidar
 status: ready
 ---
 
-Avoidance looks at the scan and steers toward a gap the car fits through. There is no map and no path. The forest spawn points you into the trees so a gap follower has something to do besides drive a straight empty road. The lidar inset is on for that reason.
+Avoidance looks at the scan and steers toward a gap the car fits through. There is no map and no path. Pointed into the trees, a gap follower has something to do besides drive a straight empty road.
+
+In the sim: the forest, aimed into the trees, with the lidar drawn.
 
 Each hit blocks a wedge about as wide as the car, not a single ray. A one-beam hole between two trunks is not a door. Among the openings that remain in front of the car, the starter aims at the widest one, and it slows down when the nearest forward return is close. Speed follows that nearest return, not only the dead-ahead beam, because a cone off to the side is still on the bumper's path.
 

@@ -9,7 +9,9 @@ prerequisites: localization/pf-pursuit
 status: ready
 ---
 
-A kidnapped robot was moved while it was not looking. The odometry origin is no longer a hint. The prior is spread over free space, and the view pulls back so that cloud is on screen. The car creeps until one pose owns the scan, then it drives the route.
+A kidnapped robot was moved while it was not looking. The odometry origin is no longer a hint. The prior is spread over free space. The car creeps until one pose owns the scan, then it drives the route.
+
+In the sim: overhead on the oval until the cloud collapses onto the car.
 
 `UNKNOWN_START` in the kidnapped starter is true. Most of the 720 particles are free cells with a random heading. A minority sit on the known route at twelve headings. A few hundred uniform poses do not cover $x$, $y$, and yaw, so a route lattice is there so that some particle can land on the car. Nothing reads the true pose. The camera frames the known map from above, because a chase camera behind the bumper cannot show a cloud that fills the yard.
 

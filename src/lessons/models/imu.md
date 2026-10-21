@@ -9,7 +9,9 @@ prerequisites: models/odometry
 status: ready
 ---
 
-The IMU in this sandbox is a yaw gyro and a three-axis accelerometer. There is no magnetometer, so nothing here measures absolute heading. Yaw is only as good as the integral of the gyro. The circle program is running so the yaw rate has a steady value you can compare with $(v/L)\tan\delta$.
+The IMU in this sandbox is a yaw gyro and a three-axis accelerometer. There is no magnetometer, so nothing here measures absolute heading. Yaw is only as good as the integral of the gyro. On a steady circle that rate sits near $(v/L)\tan\delta$, plus a bias that does not average out.
+
+In the sim: the circle program, so the yaw rate has a constant value to compare.
 
 `sensors.imu.yaw_rate` is radians per second about body +z. Positive is a left turn, the same sign as positive steering and as the odometry yaw. White noise is about 0.002 rad/s. A bias drawn once per reset has standard deviation 0.0012 rad/s. The odometry lesson integrates this rate. If you integrate it yourself, use the same sample the odometry used or the two headings will drift apart for no good reason.
 
@@ -27,7 +29,7 @@ Specific force $f$ and acceleration $a$ are different by gravity. In the world, 
 
 Do not estimate speed by integrating `accel.x`. The bias is 0.02 m/s², one sigma. Integrated for a minute that is tens of metres per second of fake speed. Wheel speed is the speed sensor. The accelerometer is for bumps, braking, and, later, an attitude filter this course does not build yet.
 
-The gyro bias and the speed bias are drawn in a fixed order from the seed. Seed 1 is the seed the eval uses. If your console numbers disagree with the lesson, check the seed field in the header before changing a gain.
+The gyro bias and the speed bias are drawn in a fixed order from the seed. Seed 1 is the seed the eval uses. If your console numbers disagree with the lesson, check the seed before changing a gain.
 
 ## A rate you can predict
 

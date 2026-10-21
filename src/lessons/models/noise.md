@@ -9,13 +9,15 @@ prerequisites: models/imu
 status: ready
 ---
 
-The plots look noisy, and they also look biased. Those are different, and only one of them is why the oval path walks off. This lesson runs pure pursuit with the path trails on, seed 1, so the late amber trail is the bias and not a fresh draw.
+The plots look noisy, and they also look biased. Those are different, and only one of them is why the oval path walks off. White noise redraws every sample. Bias is drawn once and then held, so the late error is the bias.
+
+In the sim: pure pursuit on the oval, seed 1. The late amber trail is that bias, not a fresh draw.
 
 **White noise** is a fresh random number every sample. On the lidar it is about 2 cm. On wheel speed it is about 2 cm/s. On the gyro it is about 0.002 rad/s. Averaged over a second of 20 Hz control, a lot of it shrinks.
 
 **Bias** is drawn once when you reset and then held. Speed bias scales every metre you travel. Gyro bias turns every second into a little extra yaw. Steering bias shows up on `steering_angle` and is not integrated into the pose. If you build your own heading from $\tan(\delta)$, you put that bias back into the curvature and the amber trail will leave the oval.
 
-The eval fixes the seed at 1 so a push to the course can be compared with the last one. **Reset seed** in the header replays the draw. A different seed is a different car, in the sensor sense, on the same track.
+The eval fixes the seed at 1 so a push to the course can be compared with the last one. **Reset seed** replays the same draw. A different seed is a different car, in the sensor sense, on the same track.
 
 ## Each sensor, written as an equation
 

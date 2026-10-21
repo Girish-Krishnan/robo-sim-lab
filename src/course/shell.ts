@@ -77,7 +77,22 @@ export function mountCourse(host: CourseHost): void {
     navigate({ mode: "lessons", id: lastLessonId() });
   });
 
+  const collapseLab = () => {
+    document.getElementById("app")?.classList.remove("lab-open", "console-open");
+    const edit = document.getElementById("edit-code");
+    if (edit) {
+      edit.setAttribute("aria-expanded", "false");
+      edit.textContent = "Edit code";
+    }
+    const consoleBtn = document.getElementById("toggle-console");
+    if (consoleBtn) {
+      consoleBtn.setAttribute("aria-expanded", "false");
+      consoleBtn.classList.remove("is-on");
+    }
+  };
+
   const show = (route: Route) => {
+    collapseLab();
     const lesson = route.mode === "lessons" && route.id ? lessonById(route.id) : undefined;
     if (route.mode === "lessons" && !lesson) {
       location.hash = `#/lesson/${lastLessonId()}`;

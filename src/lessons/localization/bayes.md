@@ -9,7 +9,9 @@ prerequisites: localization/dead-reckoning
 status: ready
 ---
 
-A Bayes filter is the honest version of dead reckoning. Instead of one pose, you keep a belief over poses. Motion spreads the belief. A measurement tightens it back onto the poses that would have produced that measurement. The filter starter is loaded here, on the oval, with the camera pulled back enough to see the cloud once it is running.
+A Bayes filter is the honest version of dead reckoning. Instead of one pose, you keep a belief over poses. Motion spreads the belief. A measurement tightens it back onto the poses that would have produced that measurement.
+
+In the sim: the filter on the oval, pulled back so the cloud fits once it is running.
 
 The belief $\mathrm{bel}(x_t)$ is a probability distribution over the car's pose at time $t$. You never write the whole function down. You either keep a grid (too big here) or a cloud of weighted samples (the next lesson). The shape of the update is the same.
 

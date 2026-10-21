@@ -97,17 +97,23 @@
             <div class="spinner" aria-hidden="true"></div>
             <span>Loading Python and NumPy…</span>
           </div>
-          <div id="try-bar">
-            <span>Try it</span>
-            <span class="try-note">Edits stay in this browser.</span>
-          </div>
+          <div
+            id="lab-split"
+            role="separator"
+            aria-orientation="horizontal"
+            aria-label="Resize editor"
+            tabindex="0"
+          ></div>
           <div id="editor"></div>
-          <div class="run-bar">
+          <div id="try-bar">
+            <span id="try-label">Try it</span>
             <button id="run" type="button" class="primary">Run</button>
             <button id="stop" type="button">Stop</button>
-            <button id="reset" type="button">Reset world</button>
-            <button id="reset-starter" type="button" hidden>Reset to starter</button>
+            <button id="reset" type="button">Reset</button>
+            <button id="reset-starter" type="button" hidden>Starter</button>
             <span id="run-state" data-state="idle">Idle</span>
+            <button id="edit-code" type="button" aria-expanded="false">Edit code</button>
+            <button id="toggle-console" type="button" aria-expanded="false">Console</button>
             <span class="shortcut">Ctrl/⌘ Enter</span>
           </div>
           <div class="console-wrap">

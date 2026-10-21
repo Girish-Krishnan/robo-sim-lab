@@ -90,7 +90,9 @@ function renderProse(source: string): string {
       para.push(lines[i] ?? "");
       i += 1;
     }
-    out.push(`<p>${inline(para.join(" "), restore)}</p>`);
+    const raw = para.join(" ").trim();
+    const simHint = /^(\*\*)?In the sim:/.test(raw);
+    out.push(`<p${simHint ? ' class="sim-hint"' : ""}>${inline(para.join(" "), restore)}</p>`);
   }
   return out.join("\n");
 }

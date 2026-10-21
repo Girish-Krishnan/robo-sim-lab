@@ -9,7 +9,9 @@ prerequisites: models/bicycle
 status: ready
 ---
 
-Wheel odometry is a guess of the pose, updated from how fast the rear wheels turned and how fast the gyro says the car is yawing. It is not a measurement of position. Nothing in the sample looks at the map. This lesson runs pure pursuit on the oval with Paths on, so you can watch the guess leave the car.
+Wheel odometry is a guess of the pose, updated from how fast the rear wheels turned and how fast the gyro says the car is yawing. It is not a measurement of position. Nothing in the sample looks at the map.
+
+In the sim: pure pursuit on the oval. The amber trail is the guess leaving the car.
 
 Each reset, the pose starts at $(0, 0, 0)$ in its own frame. Forward is the direction the car faced at that instant. After that, the only inputs are noisy wheel speed and the gyro yaw rate. If those are biased, the guess walks off the car and never notices.
 
