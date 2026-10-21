@@ -197,7 +197,9 @@ button.primary:hover { background: #49d0ba; }
 }
 .lesson-body .katex-display { margin: 0; }
 .lesson-body .diagram { max-width: 100%; margin: 8px 0 16px; }
-.lesson-body svg { display: block; width: 100%; max-width: 100%; height: auto; }
+/* Diagrams only. KaTeX draws \sqrt as an inline SVG; stretching every svg
+   in the lesson flattens that radical to a blank gap. */
+.lesson-body .diagram svg { display: block; width: 100%; max-width: 100%; height: auto; }
 .lesson-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
 .lesson-actions button.is-on { background: var(--amber); color: #2a1c08; border-color: transparent; }
 .lesson-pager {
