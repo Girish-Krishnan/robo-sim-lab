@@ -601,6 +601,7 @@ export async function mountApp(): Promise<void> {
       saveScratch(scratch);
       browser.hidden = true;
       confirmBox.hidden = true;
+      browseButton.setAttribute("aria-expanded", "false");
       trackCloud = id === "mcl-global";
       publishCodeLegend();
       if (mode === "code") resetWorld();
@@ -624,17 +625,57 @@ export async function mountApp(): Promise<void> {
       item.append(button);
       exampleList.append(item);
     }
-    mustGet("browse-examples").addEventListener("click", () => {
+    const browseButton = mustGet<HTMLButtonElement>("browse-examples");
+    const placeExampleBrowser = () => {
+      const anchor = browseButton.getBoundingClientRect();
+      const margin = 10;
+      const panel = codePanel.getBoundingClientRect();
+      const width = Math.min(440, Math.max(260, panel.width - 20), window.innerWidth - margin * 2);
+      const left = Math.min(Math.max(margin, anchor.left), Math.max(margin, window.innerWidth - width - margin));
+      const spaceBelow = window.innerHeight - anchor.bottom - margin;
+      const spaceAbove = anchor.top - margin;
+      const cap = Math.min(520, Math.max(160, window.innerHeight - margin * 2));
+      browser.style.left = `${Math.round(left)}px`;
+      browser.style.width = `${Math.round(width)}px`;
+      browser.style.right = "auto";
+      // Under the button when the panel is tall. On a short window the list
+      // floats in the viewport so more than a couple of cards are visible.
+      if (spaceBelow >= 280) {
+        const maxH = Math.min(cap, spaceBelow - 6);
+        browser.style.top = `${Math.round(anchor.bottom + 6)}px`;
+        browser.style.maxHeight = `${Math.round(maxH)}px`;
+      } else if (spaceAbove >= 240) {
+        const maxH = Math.min(cap, spaceAbove - 8);
+        browser.style.top = `${Math.round(anchor.top - 6 - maxH)}px`;
+        browser.style.maxHeight = `${Math.round(maxH)}px`;
+      } else {
+        browser.style.top = `${margin}px`;
+        browser.style.maxHeight = `${Math.round(cap)}px`;
+      }
+    };
+    browseButton.addEventListener("click", () => {
       browser.hidden = !browser.hidden;
       confirmBox.hidden = true;
+      browseButton.setAttribute("aria-expanded", String(!browser.hidden));
+      if (!browser.hidden) {
+        browser.scrollTop = 0;
+        placeExampleBrowser();
+      }
+    });
+    window.addEventListener("resize", () => {
+      if (!browser.hidden) placeExampleBrowser();
+    });
+    codePanel.addEventListener("scroll", () => {
+      if (!browser.hidden) placeExampleBrowser();
     });
     document.addEventListener("pointerdown", (event) => {
       if (browser.hidden) return;
       const target = event.target;
       if (!(target instanceof Node)) return;
-      if (browser.contains(target) || mustGet("browse-examples").contains(target)) return;
+      if (browser.contains(target) || browseButton.contains(target)) return;
       browser.hidden = true;
       confirmBox.hidden = true;
+      browseButton.setAttribute("aria-expanded", "false");
     });
     mustGet("example-confirm-yes").addEventListener("click", () => {
       if (pendingExample) loadExample(pendingExample);
@@ -892,7 +933,8 @@ export async function mountApp(): Promise<void> {
         const focus = robot.focus();
         camera.update(frameDt, focus);
         view.followSun(focus.x, focus.z);
-        hud.update(pausedView ?? robot.telemetry(), mode, code.current, simTime, paused);
+        const sampling = !codeControls() || code.current === "running";
+        hud.update(pausedView ?? robot.telemetry(), mode, code.current, simTime, paused, sampling);
         view.render();
       } catch (error) {
         console.error(error);

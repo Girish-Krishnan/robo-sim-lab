@@ -825,11 +825,11 @@ body.splitter-drag iframe { pointer-events: none; }
 #legend-list strong { font-weight: 650; }
 
 #example-browser {
-  position: absolute;
-  z-index: 6;
+  position: fixed;
+  z-index: 24;
   left: 10px;
-  right: 10px;
   top: 46px;
+  width: min(440px, calc(100vw - 20px));
   margin: 0;
   border: 1px solid var(--line);
   border-radius: 10px;

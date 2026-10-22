@@ -25,10 +25,10 @@ export class Hud {
     this.mode = row(root, "Mode", true);
   }
 
-  update(telemetry: VehicleTelemetry, mode: AppMode, run: SandboxState, simTime = 0, paused = false): void {
+  update(telemetry: VehicleTelemetry, mode: AppMode, run: SandboxState, simTime = 0, paused = false, sampling = true): void {
     this.root.classList.toggle("is-paused", paused);
     this.speed.textContent = `${telemetry.trueSpeed.toFixed(2)} m/s`;
-    this.odom.textContent = `${telemetry.odomSpeed.toFixed(2)} m/s`;
+    this.odom.textContent = `${displayedOdom(telemetry.odomSpeed, telemetry.trueSpeed, sampling).toFixed(2)} m/s`;
     this.steerCmd.textContent = `${telemetry.commandedSteering.toFixed(2)} rad`;
     this.steerAct.textContent = `${telemetry.actuatorSteering.toFixed(2)} rad`;
     this.throttle.textContent = telemetry.commandedThrottle.toFixed(2);
@@ -47,6 +47,15 @@ function row(root: HTMLElement, labelText: string, fold = false): HTMLElement {
   line.append(name, value);
   root.append(line);
   return value;
+}
+
+/**
+ * Wheel speed is only refreshed while a program is being fed scans.
+ * Once the car has halted, the last reading would sit beside Speed 0.
+ */
+export function displayedOdom(odomSpeed: number, trueSpeed: number, sampling: boolean): number {
+  if (!sampling && Math.abs(trueSpeed) < 0.05) return 0;
+  return odomSpeed;
 }
 
 function label(state: SandboxState): string {

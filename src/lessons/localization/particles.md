@@ -19,6 +19,8 @@ The starter keeps a few hundred particles and scores a few dozen lidar beams aga
 
 {{scatter}}
 
+On a straight every stretch of wall looks the same, so the red mean can sit a few metres ahead or behind with a small ring: confident and wrong. The first corner settles it, usually within 15 s.
+
 The blocks below are one tick of that filter. They are slices of the same program that is driving the oval.
 
 How many particles, and how far ahead pursuit looks:

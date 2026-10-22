@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { LESSONS, MODULES, lessonById, resolveSpawnIn } from "../src/course/catalog";
 import { progressCard } from "../src/course/shell";
 import { renderMarkdown } from "../src/course/markdown";
+import { displayedOdom } from "../src/ui/hud";
 import { chunkAtLine, readChunks } from "../src/editor/chunks";
 import { formatStudentError } from "../src/editor/errors";
 import { EXAMPLES } from "../src/editor/examples";
@@ -51,6 +52,24 @@ describe("course catalog", () => {
     expect(progressCard(earlier!, [])).toBe("");
     const soon = lessonById("mapping/slam");
     expect(progressCard(soon!, [])).toBe("");
+  });
+
+  it("says a scattered straight can look sure and still be off", () => {
+    const particles = lessonById("localization/particles");
+    expect(particles?.markdown).toContain("confident and wrong");
+    expect(particles?.markdown).toContain("usually within 15 s");
+    const kidnapped = lessonById("localization/kidnapped");
+    expect(kidnapped?.markdown).toContain("lock onto the wrong straight for a while");
+    expect(kidnapped?.markdown).toContain("a corner usually settles it");
+    expect(kidnapped?.markdown).not.toContain("does not creep");
+    expect(kidnapped?.markdown).not.toContain("not creeping");
+    expect(kidnapped?.markdown).toContain("cruising at about 4 m/s by 4 s");
+  });
+
+  it("drops a stale odom readout once the car has halted", () => {
+    expect(displayedOdom(3.88, 0, false)).toBe(0);
+    expect(displayedOdom(3.88, 0.2, false)).toBe(3.88);
+    expect(displayedOdom(3.88, 0, true)).toBe(3.88);
   });
 
   it("puts the kidnapped expert note behind a collapsed Going further", () => {
