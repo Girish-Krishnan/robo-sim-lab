@@ -47,9 +47,9 @@
           </label>
           <button id="lidar-toggle" type="button" class="is-on" aria-pressed="true" title="Show or hide the lidar beams and the corner inset">Lidar on</button>
           <button id="paths-toggle" type="button" aria-pressed="false" title="Show or hide the true path and the odometry trail">Paths off</button>
-          <label class="header-select" title="Sensor-noise seed. Press Enter to restart with this bias.">
+          <label class="header-select" title="Sensor-noise seed. Bias is a constant error drawn once from this number and then held for the whole run. Press Enter to restart.">
             Seed
-            <input id="seed" type="number" min="0" step="1" value="1" aria-label="Noise seed" title="Type a seed and press Enter. The car restarts with that bias." />
+            <input id="seed" type="number" min="0" step="1" value="1" aria-label="Noise seed" title="Bias is the constant part of the sensor error. This seed draws it once, and the run holds that draw. Type a number and press Enter. Reset run replays the same bias." />
           </label>
           <button id="reset-seed" type="button" title="Restart the car with the seed in the box">Reset seed</button>
           <button id="pause" type="button" aria-pressed="false" title="Pause physics and the control program">Pause</button>

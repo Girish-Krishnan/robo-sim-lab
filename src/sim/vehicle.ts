@@ -206,6 +206,20 @@ export class AckermannBuggy implements SimRobot {
     this.brake = brake;
   }
 
+  /** Drop speed to zero. A brake alone leaves a coasting car under a stopped badge. */
+  halt(): void {
+    this.command = { steering: 0, throttle: 0 };
+    this.brake = STOP_BRAKE;
+    this.steer = 0;
+    this.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    this.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+    for (let i = 0; i < 4; i++) {
+      this.vehicle.setWheelEngineForce(i, 0);
+      this.vehicle.setWheelBrake(i, STOP_BRAKE);
+      this.vehicle.setWheelSteering(i, 0);
+    }
+  }
+
   preStep(dt: number): void {
     const maxStep = STEER_RATE * dt;
     this.steer += clamp(this.command.steering - this.steer, -maxStep, maxStep);

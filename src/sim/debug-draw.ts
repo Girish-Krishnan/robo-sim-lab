@@ -28,17 +28,25 @@ export class DebugDraw {
 
   set(ops: readonly DrawOp[], spawn: SpawnPose): void {
     this.clear();
+    // Dots first, then the ring, then the mean. A tight cloud used to paint
+    // a magenta disc over the red estimate.
     for (const op of ops) {
       if (op.kind === "text") {
         const at = place(spawn, op.x, op.y, 0.46);
         this.group.add(textSprite(op.text, op.color, at));
-        continue;
       }
-      if (op.kind === "path" && op.points.length >= 2) {
-        this.group.add(ribbon(op.points.map((point) => place(spawn, point.x, point.y, 0.46)), op.color));
-      }
-      if (op.kind === "ellipse") this.group.add(ellipseRing(spawn, op));
+    }
+    for (const op of ops) {
       if (op.kind === "points" && op.points.length > 0) this.group.add(markers(spawn, op.points, op.color));
+    }
+    for (const op of ops) {
+      if (op.kind === "ellipse") this.group.add(ellipseRing(spawn, op));
+    }
+    for (const op of ops) {
+      if (op.kind === "path" && op.points.length >= 2) {
+        const mean = op.color.toLowerCase() === "#ff5d73" || op.color.toLowerCase() === "#ffe08a";
+        this.group.add(ribbon(op.points.map((point) => place(spawn, point.x, point.y, mean ? 0.52 : 0.46)), op.color, mean ? 0.12 : 0.08, mean));
+      }
     }
   }
 }
@@ -48,7 +56,7 @@ function place(spawn: SpawnPose, x: number, y: number, height: number): THREE.Ve
   return new THREE.Vector3(world.x, height, world.z);
 }
 
-function ribbon(points: THREE.Vector3[], color: string, half = 0.08): THREE.Mesh {
+function ribbon(points: THREE.Vector3[], color: string, half = 0.08, onTop = false): THREE.Mesh {
   const positions: number[] = [];
   const indices: number[] = [];
   for (let i = 0; i < points.length; i++) {
@@ -70,7 +78,16 @@ function ribbon(points: THREE.Vector3[], color: string, half = 0.08): THREE.Mesh
   geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(positions), 3));
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
-  return new THREE.Mesh(geometry, basic(color, 0.92));
+  const mesh = new THREE.Mesh(geometry, basic(color, onTop ? 1 : 0.92));
+  if (onTop) {
+    mesh.renderOrder = 14;
+    mesh.frustumCulled = false;
+    const material = mesh.material;
+    material.depthTest = false;
+    material.toneMapped = false;
+    material.fog = false;
+  }
+  return mesh;
 }
 
 /** A few centimetres off the floor. Pixel size, so a cloud stays a cloud. */
@@ -172,11 +189,11 @@ function markers(spawn: SpawnPose, points: { x: number; y: number; yaw?: number;
   const dots = new THREE.Points(
     geometry,
     new THREE.PointsMaterial({
-      size: converged ? 2 : count >= 24 ? 3.5 : 5,
+      size: converged ? 1.5 : count >= 24 ? 3.5 : 5,
       sizeAttenuation: false,
       vertexColors: true,
       transparent: true,
-      opacity: converged ? 0.9 : 0.45,
+      opacity: converged ? 0.4 : 0.45,
       depthTest: false,
       depthWrite: false,
       toneMapped: false,

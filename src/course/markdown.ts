@@ -41,6 +41,11 @@ function renderProse(source: string): string {
       i += 1;
       continue;
     }
+    if (trimmed === "{{scatter}}") {
+      out.push(`<p><button type="button" id="scatter-guesses">Scatter guesses</button></p>`);
+      i += 1;
+      continue;
+    }
     if (trimmed.startsWith("<svg") || trimmed.startsWith("<div")) {
       const tag = trimmed.startsWith("<svg") ? "svg" : "div";
       const chunk = [line];
@@ -114,6 +119,7 @@ function isBoundary(line: string): boolean {
   if (/^\d+\.\s/.test(trimmed) || /^[-*]\s/.test(trimmed)) return true;
   if (/^@@MATH\d+@@$/.test(trimmed)) return true;
   if (/^\{\{code:[A-Za-z0-9_-]+\}\}$/.test(trimmed)) return true;
+  if (trimmed === "{{scatter}}") return true;
   return false;
 }
 

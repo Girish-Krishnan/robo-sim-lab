@@ -16,8 +16,8 @@ In the sim: pure pursuit on the oval, seed 1. The late blue trail is that held b
 <svg viewBox="0 0 520 240" role="img" aria-label="White noise jitters around the truth. A bias walks away and stays walked away.">
   <rect width="520" height="240" rx="12" fill="#0e1418"/>
   <line x1="40" y1="150" x2="490" y2="150" stroke="#3d4a44" stroke-width="2"/>
-  <text x="400" y="142" fill="#d5ddd8" font-size="15" font-family="sans-serif">truth</text>
-  <path d="M40 146 L70 158 L100 140 L130 162 L160 144 L190 156 L220 138 L250 160 L280 148 L310 142 L340 158 L370 146 L400 154 L430 148 L460 152" fill="none" stroke="#ffd24a" stroke-width="2"/>
+  <text x="412" y="128" fill="#d5ddd8" font-size="15" font-family="sans-serif">truth</text>
+  <path d="M40 146 L70 158 L100 140 L130 162 L160 144 L190 156 L220 138 L250 160 L280 148 L310 142 L340 158 L370 146" fill="none" stroke="#ffd24a" stroke-width="2"/>
   <path d="M40 150 V118 H490" fill="none" stroke="#6ea8ff" stroke-width="3"/>
   <text x="48" y="36" fill="#f4f7f4" font-size="18" font-family="sans-serif">Two kinds of wrong</text>
   <text x="48" y="200" fill="#ffd24a" font-size="16" font-family="sans-serif">Yellow: white noise, a fresh error every sample.</text>

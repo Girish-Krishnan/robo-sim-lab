@@ -32,6 +32,7 @@ export interface CourseHost {
   onCodeChange: (listener: (source: string) => void) => void;
   relayout: () => void;
   runProgram: () => void;
+  scatterGuesses: () => void;
 }
 
 interface Route {
@@ -41,7 +42,7 @@ interface Route {
 
 const LAST_LESSON_KEY = "robo-sim-lab.last-lesson";
 
-export function mountCourse(host: CourseHost): void {
+export async function mountCourse(host: CourseHost): Promise<void> {
   const nav = document.getElementById("lesson-nav");
   const article = document.getElementById("lesson");
   const lessonChrome = document.getElementById("lesson-chrome");
@@ -168,7 +169,7 @@ export function mountCourse(host: CourseHost): void {
     }
   };
 
-  const show = (route: Route) => {
+  const show = (route: Route): Promise<void> | void => {
     collapseLab();
     const lesson = route.mode === "lessons" && route.id ? lessonById(route.id) : undefined;
     if (route.mode === "lessons" && !lesson) {
@@ -203,13 +204,18 @@ export function mountCourse(host: CourseHost): void {
     renderNav(lesson);
     parkDrive();
     article.innerHTML = lessonHtml(lesson);
+    article.scrollTop = 0;
+    requestAnimationFrame(() => {
+      article.scrollTop = 0;
+    });
+    article.querySelector("#scatter-guesses")?.addEventListener("click", () => host.scatterGuesses());
     placeDrive(sceneFor(lesson).manual);
     const scene = sceneFor(lesson);
     host.setMode("lessons");
     host.clearConsole();
     host.setLessonSpawn(resolveSpawn(lesson), lesson.world, lesson.spawn);
     host.applyScene(scene);
-    void openLesson(lesson, scene.run, token);
+    return openLesson(lesson, scene.run, token);
   };
 
   const openLesson = async (lesson: Lesson, run: boolean, token: number) => {
@@ -247,9 +253,9 @@ export function mountCourse(host: CourseHost): void {
       </div>
       <div class="lesson-nav-row">
         <button type="button" id="lesson-prev" ${prev ? "" : "disabled"}>Prev</button>
-        <button type="button" id="lesson-next" ${soon ? "disabled" : ""}>${soon || nextReady ? "Next" : "Done"}</button>
-        <button type="button" id="lesson-complete" class="${done ? "is-on" : ""}">${done ? "Completed" : "Mark complete"}</button>
-        <span class="lesson-progress" title="Completed lessons you can run">${doneCount}/${ready.length} available</span>
+        <button type="button" id="lesson-next" ${soon || !nextReady ? "disabled" : ""}>Next</button>
+        <button type="button" id="lesson-complete" class="${done ? "is-on" : ""}" ${soon ? "disabled" : ""}>${done ? "Completed" : "Mark complete"}</button>
+        <span class="lesson-progress" title="Ready lessons you have marked complete">${doneCount} of ${ready.length} lessons done</span>
       </div>
       <details id="lesson-index" ${indexOpen ? "open" : ""}>
         <summary>All lessons</summary>
@@ -292,19 +298,15 @@ export function mountCourse(host: CourseHost): void {
       if (prev) navigate({ mode: "lessons", id: prev.id });
     });
     nav.querySelector("#lesson-next")?.addEventListener("click", () => {
-      if (lesson.status === "soon") return;
+      if (lesson.status === "soon" || !nextReady) return;
       if (lesson.status === "ready") markCompleted(lesson.id);
-      if (nextReady) {
-        navigate({ mode: "lessons", id: nextReady.id });
-        return;
-      }
-      nav.querySelector("#lesson-index")?.setAttribute("open", "");
-      renderNav(lesson);
-      article.querySelector(".course-complete")?.scrollIntoView({ block: "nearest" });
+      navigate({ mode: "lessons", id: nextReady.id });
     });
     nav.querySelector("#lesson-complete")?.addEventListener("click", () => {
+      if (lesson.status === "soon") return;
       toggleCompleted(lesson.id);
       renderNav(lesson);
+      fillProgressCard(lesson);
     });
 
     const body = nav.querySelector(".lesson-index-body");
@@ -336,11 +338,20 @@ export function mountCourse(host: CourseHost): void {
     });
   };
 
+  const fillProgressCard = (lesson: Lesson) => {
+    const scroll = article.querySelector(".lesson-scroll");
+    if (!scroll) return;
+    scroll.querySelector(".course-complete")?.remove();
+    const html = progressCard(lesson, loadProgress().completed);
+    if (html) scroll.insertAdjacentHTML("beforeend", html);
+  };
+
   window.addEventListener("hashchange", () => show(parseRoute(location.hash)));
   if (!location.hash || location.hash === "#" || location.hash === "#/") {
     history.replaceState(null, "", "#/lesson/getting-started/sandbox");
   }
-  show(parseRoute(location.hash));
+  const pending = show(parseRoute(location.hash));
+  if (pending) await pending;
 }
 
 function lastLessonId(): string {
@@ -372,19 +383,34 @@ function lessonHtml(lesson: Lesson): string {
       <h1>${escapeText(lesson.title)}</h1>
       ${prereq ? `<p class="lesson-prereq">Read first: ${prereq}</p>` : ""}
       <div class="lesson-body">${renderMarkdown(lesson.markdown)}</div>
-      ${courseComplete(lesson)}
+      ${progressCard(lesson, loadProgress().completed)}
     </div>
   `;
 }
 
-function courseComplete(lesson: Lesson): string {
+/** End-of-course card. It lives on the last ready lesson, and only congratulates a finished set. */
+export function progressCard(lesson: Lesson, completed: readonly string[]): string {
   const index = lessonIndex(lesson.id);
   const later = index >= 0 && LESSONS.slice(index + 1).some((item) => item.status === "ready");
   if (lesson.status !== "ready" || later) return "";
-  return `
+  const ready = LESSONS.filter((item) => item.status === "ready");
+  const open = ready.filter((item) => !completed.includes(item.id));
+  if (open.length === 0) {
+    return `
     <aside class="course-complete">
       <h2>Course complete</h2>
       <p>You drove the car, read the sensors, and ran a particle filter from a kidnapped start. Mapping, planning, and the later controllers are still being written. Those modules stay grey in the menu until they have a lesson.</p>
+    </aside>
+  `;
+  }
+  const noun = open.length === 1 ? "lesson" : "lessons";
+  const links = open
+    .map((item) => `<li><a href="#/lesson/${item.id}">${escapeText(item.title)}</a></li>`)
+    .join("");
+  return `
+    <aside class="course-complete lessons-open">
+      <h2>${open.length} ${noun} still open</h2>
+      <ul>${links}</ul>
     </aside>
   `;
 }

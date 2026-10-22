@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { LESSONS, MODULES, lessonById, resolveSpawnIn } from "../src/course/catalog";
+import { progressCard } from "../src/course/shell";
 import { renderMarkdown } from "../src/course/markdown";
 import { chunkAtLine, readChunks } from "../src/editor/chunks";
 import { formatStudentError } from "../src/editor/errors";
@@ -31,6 +32,25 @@ describe("course catalog", () => {
       expect(lessons.length).toBeGreaterThan(0);
       expect(lessons.every((lesson) => lesson.status === "soon")).toBe(true);
     }
+  });
+
+  it("saves the course-complete card for a finished set of ready lessons", () => {
+    const last = LESSONS.filter((lesson) => lesson.status === "ready").at(-1);
+    expect(last?.id).toBe("localization/kidnapped");
+    const none = progressCard(last!, []);
+    expect(none).toContain("19 lessons still open");
+    expect(none).not.toContain("Course complete");
+    expect(none).toContain('href="#/lesson/localization/particles"');
+    const finished = progressCard(
+      last!,
+      LESSONS.filter((lesson) => lesson.status === "ready").map((lesson) => lesson.id),
+    );
+    expect(finished).toContain("Course complete");
+    expect(finished).not.toContain("still open");
+    const earlier = lessonById("localization/particles");
+    expect(progressCard(earlier!, [])).toBe("");
+    const soon = lessonById("mapping/slam");
+    expect(progressCard(soon!, [])).toBe("");
   });
 
   it("renders KaTeX and leaves an inline diagram in the page", () => {

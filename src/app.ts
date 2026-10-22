@@ -28,6 +28,7 @@ import {
   type SimWorld,
   type WorldId,
 } from "./sim/worlds";
+import { lessonById } from "./course/catalog";
 import { mountCourse } from "./course/shell";
 import { CodeSandbox, type SandboxState } from "./sandbox/controller";
 import { ConsolePanel } from "./ui/console-panel";
@@ -36,6 +37,7 @@ import { mountLegend } from "./ui/legend";
 import { mountLabSplitter, mountSplitter } from "./ui/splitter";
 
 export async function mountApp(): Promise<void> {
+  document.getElementById("app")?.classList.add("is-booting");
   const viewport = mustGet<HTMLElement>("viewport");
   const loading = mustGet<HTMLElement>("loading");
   const loadingText = mustGet<HTMLElement>("loading-text");
@@ -55,7 +57,13 @@ export async function mountApp(): Promise<void> {
   let editor: CodeEditor | null = null;
   let onCodeChange: (source: string) => void = () => undefined;
 
+  let paused = false;
   const setRunState = (state: SandboxState) => {
+    if (paused) {
+      runState.dataset.state = "paused";
+      runState.textContent = "Paused";
+      return;
+    }
     runState.dataset.state = state;
     runState.textContent =
       state === "running"
@@ -100,8 +108,7 @@ export async function mountApp(): Promise<void> {
     let graphics: GraphicsQuality = savedQuality === "low" ? "low" : "high";
     view.setQuality(graphics);
     addPhysicsGround(RAPIER, world);
-    const savedWorld = localStorage.getItem(WORLD_STORAGE_KEY);
-    const initialWorld: WorldId = isWorldId(savedWorld) ? savedWorld : "city";
+    const initialWorld = bootWorld();
     let yard: SimWorld = await mountWorld(initialWorld, RAPIER, world, view.scene, graphics);
     view.setAtmosphere(yard.atmosphere);
     const robot = new AckermannBuggy(RAPIER, world, view.scene);
@@ -116,7 +123,6 @@ export async function mountApp(): Promise<void> {
     robot.setNoiseSeed(noiseSeed);
     let activeSpawn: SpawnPose = yard.spawn;
     robot.reset(activeSpawn);
-    let paused = false;
     let pausedView: VehicleTelemetry | null = null;
     let simTime = 0;
     let accumulator = 0;
@@ -208,19 +214,27 @@ export async function mountApp(): Promise<void> {
     }
     exampleSelect.value = "";
 
+    const LESSON_DRIVE_CAP = 3;
     const applyDrive = () => {
       const forward = keys.has("KeyW") || keys.has("ArrowUp");
       const back = keys.has("KeyS") || keys.has("ArrowDown");
       const left = keys.has("KeyA") || keys.has("ArrowLeft");
       const right = keys.has("KeyD") || keys.has("ArrowRight");
       const braking = keys.has("Space");
-      const throttle = braking ? 0 : forward ? 1 : back ? -0.65 : 0;
+      let throttle = braking ? 0 : forward ? 1 : back ? -0.65 : 0;
+      let brake = braking ? SERVICE_BRAKE : 0;
+      // Lesson self-drive stays near 3 m/s. Full throttle reaches 8 m/s and tips the car.
+      if (mode === "lessons" && driveSelf && !braking && forward) {
+        const speed = robot.telemetry().trueSpeed;
+        if (speed >= LESSON_DRIVE_CAP) {
+          throttle = 0;
+          brake = 1.4;
+        } else if (speed > LESSON_DRIVE_CAP - 0.7) throttle = 0.16;
+        else throttle = 0.5;
+      }
       // Positive steering is a left turn from the driver's seat (nose toward +X at yaw 0).
       const steering = ((left ? 1 : 0) - (right ? 1 : 0)) * ACKERMANN_BUGGY.limits.maxSteering;
-      robot.setCommand(
-        clampCommand({ steering, throttle }, ACKERMANN_BUGGY.limits),
-        braking ? SERVICE_BRAKE : 0,
-      );
+      robot.setCommand(clampCommand({ steering, throttle }, ACKERMANN_BUGGY.limits), brake);
     };
 
     let lessonSpawn: SpawnPose | null = null;
@@ -242,12 +256,21 @@ export async function mountApp(): Promise<void> {
     const setHint = () => {
       window.clearTimeout(hintTimer);
       hint.classList.remove("is-faded");
+      if (paused) {
+        hint.hidden = true;
+        driveHint.hidden = false;
+        driveHint.textContent = "Paused, press Resume";
+        return;
+      }
       if ((mode === "lessons" && !driveSelf) || driveSelf) {
         hint.hidden = true;
+        if (!driveSelf) driveHint.hidden = true;
         if (driveSelf) {
           driveHint.hidden = false;
           driveHint.textContent = simArmed
-            ? "You are driving. WASD or arrows, Space brakes. The filter still scores the scan."
+            ? mode === "lessons"
+              ? "You are driving. WASD or arrows, Space brakes. Speed stays near 3 m/s."
+              : "You are driving. WASD or arrows, Space brakes. The filter still scores the scan."
             : "Press a drive key to take the wheel. WASD or arrows, Space brakes.";
         }
         return;
@@ -333,7 +356,7 @@ export async function mountApp(): Promise<void> {
     const hideStopped = () => {
       runBanner.hidden = true;
     };
-    const resetWorld = (rerun = false) => {
+    const resetWorld = (rerun = false, source?: string) => {
       const wasRunning = code.current === "running" || code.current === "loading";
       if (wasRunning) stopProgram();
       activeSpawn = currentSpawn();
@@ -350,7 +373,8 @@ export async function mountApp(): Promise<void> {
       frameKidnappedCloud(true);
       camera.snap(robot.focus());
       if (handsOn()) applyDrive();
-      if (rerun && wasRunning && (codeControls() || driveSelf)) runProgram();
+      const shouldRun = source !== undefined || (rerun && wasRunning);
+      if (shouldRun && (codeControls() || driveSelf)) runProgram(source);
       else if (wasRunning && (codeControls() || driveSelf)) showStopped();
     };
 
@@ -362,7 +386,7 @@ export async function mountApp(): Promise<void> {
     };
 
     const manualDrive = () => driveSelf && simArmed;
-    const runProgram = () => {
+    const runProgram = (source?: string) => {
       if (!codeControls() && !driveSelf) return;
       hideStopped();
       if (trackCloud) {
@@ -374,7 +398,13 @@ export async function mountApp(): Promise<void> {
       consolePanel.log("— running —", "log");
       editor?.highlightLine(null);
       window.dispatchEvent(new CustomEvent("robo-student-error", { detail: { text: "", line: null, chunk: null, local: null } }));
-      code.run(codeEditor.getValue());
+      code.run(source ?? codeEditor.getValue());
+    };
+    const scatterGuesses = () => {
+      const source = codeEditor.getValue().replace(/TRACK_SPREAD\s*=\s*[0-9.]+/, "TRACK_SPREAD = 2.2");
+      if (source === codeEditor.getValue()) return;
+      // The wider cloud belongs at the start, on the car. Leave the editor at 0.25.
+      resetWorld(true, source);
     };
 
     const stopProgram = () => {
@@ -412,15 +442,12 @@ export async function mountApp(): Promise<void> {
         stopProgram();
         camera.reset();
       }
-      if (next === "drive") {
-        stopProgram();
-        applyDrive();
-      } else if (next === "code") {
+      if (next === "drive") stopProgram();
+      robot.halt();
+      if (next === "drive") applyDrive();
+      else if (next === "code") {
         code.warmup();
         publishCodeLegend();
-        robot.setCommand(clampCommand({ steering: 0, throttle: 0 }, ACKERMANN_BUGGY.limits), STOP_BRAKE);
-      } else if (prev !== "lessons") {
-        robot.setCommand(clampCommand({ steering: 0, throttle: 0 }, ACKERMANN_BUGGY.limits), STOP_BRAKE);
       }
       setHint();
       requestAnimationFrame(() => {
@@ -663,6 +690,8 @@ export async function mountApp(): Promise<void> {
       pauseButton.setAttribute("aria-pressed", String(next));
       pauseButton.textContent = next ? "Resume" : "Pause";
       pauseButton.title = next ? "Resume physics and the control program" : "Pause physics and the control program";
+      setRunState(code.current);
+      setHint();
     };
     pauseButton.addEventListener("click", () => setPaused(!paused));
 
@@ -696,9 +725,7 @@ export async function mountApp(): Promise<void> {
     });
     window.addEventListener("blur", () => keys.clear());
 
-    loading.hidden = true;
-
-    mountCourse({
+    await mountCourse({
       setWorld: async (id) => {
         await switchWorld(id);
       },
@@ -770,7 +797,10 @@ export async function mountApp(): Promise<void> {
         codeEditor.relayout();
       },
       runProgram,
+      scatterGuesses,
     });
+    loading.hidden = true;
+    document.getElementById("app")?.classList.remove("is-booting");
 
     window.roboSim = {
       ready: true,
@@ -814,7 +844,13 @@ export async function mountApp(): Promise<void> {
             if (handsOn() || manualDrive()) applyDrive();
             robot.preStep(PHYSICS_DT);
             world.step();
-            simTime += PHYSICS_DT;
+            // The kidnapped prior is a 2 s hold on the Time row. Python may
+            // still be loading the program, so the clock stays at 0 until
+            // that first cloud is on screen. Physics still steps, or the
+            // program would never receive a scan. A stopped or failed run
+            // does not pin the clock.
+            const pinningPrior = trackCloud && priorHoldUntil < 0 && (code.current === "loading" || code.current === "running");
+            if (!pinningPrior) simTime += PHYSICS_DT;
             sensorAccumulator += PHYSICS_DT;
             accumulator -= PHYSICS_DT;
             steps += 1;
@@ -829,10 +865,12 @@ export async function mountApp(): Promise<void> {
               };
               studentPose = sensors.odometry.pose;
               if (codeControls()) code.offer(sensors);
+              const widePrior = drawOps.some((op) => op.kind === "ellipse" && Math.max(op.rx, op.ry) > 6);
+              const insetOps = widePrior ? drawOps.filter((op) => op.kind !== "points") : drawOps;
               lidar.update(
                 robot.lidarDebug(),
                 sensors.lidar,
-                codeControls() ? { ops: drawOps, pose: studentPose } : undefined,
+                codeControls() ? { ops: insetOps, pose: studentPose } : undefined,
               );
               const focusNow = robot.focus();
               paths.push(focusNow, robot.telemetry().trueSpeed, odomToWorld(activeSpawn, sensors.odometry.pose));
@@ -862,6 +900,18 @@ function mustGet<T extends HTMLElement>(id: string): T {
   const element = document.getElementById(id);
   if (!element) throw new Error(`Missing #${id}`);
   return element as T;
+}
+
+function bootWorld(): WorldId {
+  const path = location.hash.replace(/^#/, "").replace(/^\//, "");
+  const match = path.match(/^lesson\/([a-z0-9-]+)\/([a-z0-9-]+)/);
+  if (match) {
+    const lesson = lessonById(`${match[1]}/${match[2]}`);
+    if (lesson) return lesson.world;
+  }
+  if (!path) return "city";
+  const saved = localStorage.getItem(WORLD_STORAGE_KEY);
+  return isWorldId(saved) ? saved : "city";
 }
 
 function readSeed(input: HTMLInputElement): number {

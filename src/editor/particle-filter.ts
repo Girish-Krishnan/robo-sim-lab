@@ -65,6 +65,7 @@ import numpy as np
 # @@chunk tunables
 UNKNOWN_START = ${unknown}
 N = ${count}
+TRACK_SPREAD = 0.25
 BEAMS = 40
 SIGMA = 0.5
 LAND_SIGMA = 0.35
@@ -275,8 +276,8 @@ def initial_cloud(m, field, path):
     cloud = np.zeros((N, 3), dtype=float)
     if UNKNOWN_START:
         return kidnapped_cloud(m, field, path)
-    cloud[:, 0] = rng.normal(0.0, 0.25, N)
-    cloud[:, 1] = rng.normal(0.0, 0.25, N)
+    cloud[:, 0] = rng.normal(0.0, TRACK_SPREAD, N)
+    cloud[:, 1] = rng.normal(0.0, TRACK_SPREAD, N)
     cloud[:, 2] = rng.normal(0.0, 0.06, N)
     return cloud
 

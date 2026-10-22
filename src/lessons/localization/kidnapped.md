@@ -9,37 +9,48 @@ prerequisites: localization/pf-pursuit
 status: ready
 ---
 
-A kidnapped robot was moved while it was not measuring. The odometry origin is a fresh zero in a place the robot has not recognised. The prior, the belief before any scan, is spread over free space. The car creeps until one pose owns the scan, then it drives the route.
+A kidnapped robot was moved while it was not measuring. The odometry origin is a fresh zero in a place the robot has not recognised. The prior, the belief before any scan, is spread over free space.
 
-In the sim: overhead on the oval while the cloud is wide. The Key names the same marks as the particle lesson: pink dots are particles, the yellow ring is the 2-sigma spread, the red trail is the estimate, and the blue trail is odometry.
+In the sim, the camera stays overhead and the view holds that first cloud for 2 s. The car stays still during the hold. On seed 1 the guesses are already on the car when the hold ends, and the car then drives the route. It does not creep. The Key names the marks: pink dots are particles, the yellow ring is the 2-sigma spread, the red trail is the estimate, and the blue trail is odometry.
 
-<svg viewBox="0 0 520 250" role="img" aria-label="Two clumps of particles on the two straights of an oval. A cone retires the far clump.">
-  <rect width="520" height="250" rx="12" fill="#0e1418"/>
-  <rect x="70" y="50" width="380" height="150" rx="70" fill="none" stroke="#3d4a44" stroke-width="28"/>
-  <rect x="130" y="86" width="260" height="78" rx="36" fill="#0e1418"/>
-  <circle cx="150" cy="78" r="4" fill="#ff2bd6"/>
-  <circle cx="168" cy="70" r="4" fill="#ff2bd6"/>
-  <circle cx="186" cy="82" r="4" fill="#ff2bd6"/>
-  <circle cx="158" cy="90" r="4" fill="#ff2bd6"/>
-  <circle cx="340" cy="176" r="4" fill="#ff2bd6" opacity="0.7"/>
-  <circle cx="360" cy="184" r="4" fill="#ff2bd6" opacity="0.7"/>
-  <circle cx="378" cy="172" r="4" fill="#ff2bd6" opacity="0.7"/>
-  <circle cx="200" cy="64" r="8" fill="#ffd24a"/>
-  <text x="214" y="60" fill="#ffd24a" font-size="16" font-family="sans-serif">cone</text>
-  <text x="80" y="36" fill="#f4f7f4" font-size="18" font-family="sans-serif">Two straights, one scan</text>
-  <text x="24" y="214" fill="#d5ddd8" font-size="15" font-family="sans-serif">The near clump is the car.</text>
-  <text x="24" y="236" fill="#d5ddd8" font-size="15" font-family="sans-serif">The far clump matches the walls until a cone does not.</text>
+<svg viewBox="0 0 520 260" role="img" aria-label="A wide prior, then a tight clump on a drawn car after the two second hold.">
+  <rect width="520" height="260" rx="12" fill="#0e1418"/>
+  <rect x="70" y="48" width="380" height="140" rx="70" fill="none" stroke="#3d4a44" stroke-width="28"/>
+  <rect x="130" y="82" width="260" height="72" rx="36" fill="#0e1418"/>
+  <circle cx="90" cy="150" r="3" fill="#ff2bd6" opacity="0.35"/>
+  <circle cx="250" cy="40" r="3" fill="#ff2bd6" opacity="0.35"/>
+  <circle cx="430" cy="120" r="3" fill="#ff2bd6" opacity="0.35"/>
+  <circle cx="300" cy="200" r="3" fill="#ff2bd6" opacity="0.35"/>
+  <circle cx="140" cy="188" r="3" fill="#ff2bd6" opacity="0.35"/>
+  <circle cx="390" cy="56" r="3" fill="#ff2bd6" opacity="0.35"/>
+  <g aria-hidden="true">
+    <rect x="148" y="34" width="10" height="6" rx="1" fill="#1a1e22"/>
+    <rect x="184" y="34" width="10" height="6" rx="1" fill="#1a1e22"/>
+    <rect x="148" y="58" width="10" height="6" rx="1" fill="#1a1e22"/>
+    <rect x="184" y="58" width="10" height="6" rx="1" fill="#1a1e22"/>
+    <rect x="152" y="38" width="40" height="22" rx="5" fill="#d7e2dc"/>
+    <rect x="176" y="44" width="12" height="10" rx="2" fill="#8aa0b4"/>
+  </g>
+  <circle cx="168" cy="46" r="3.2" fill="#ff2bd6"/>
+  <circle cx="178" cy="52" r="3.2" fill="#ff2bd6"/>
+  <circle cx="186" cy="44" r="3.2" fill="#ff2bd6"/>
+  <circle cx="174" cy="56" r="3.2" fill="#ff2bd6"/>
+  <text x="24" y="28" fill="#f4f7f4" font-size="18" font-family="sans-serif">Prior shown for 2 s, then the car</text>
+  <text x="24" y="222" fill="#d5ddd8" font-size="15" font-family="sans-serif">Faint dots are the wide prior. The car is the light body on the straight.</text>
+  <text x="24" y="244" fill="#d5ddd8" font-size="15" font-family="sans-serif">After the hold the guesses sit on the car, and the car drives.</text>
 </svg>
 
 `UNKNOWN_START` is true here. Most of the 720 particles start in empty space, each with a random heading. A few sit on the route at twelve headings, so one of them can land on the car. The camera stays overhead while that cloud fills the yard.
 
 {{code:tunables}}
 
-While the weight is spread out, the car creeps with the wall follower and a capped throttle. Pursuit starts once the best clump has about 10% of the weight, and it's on the right straight. The cloud then tightens around that pose.
+On seed 1 the car waits out the 2 s hold. The guesses close on the car during that hold, and when it ends the car drives. By about 4 s it is moving at a few metres per second.
 
-On a roundabout or in the forest, one particle takes almost all of the weight at once. On the oval the best clump has about 10% of the weight, and it's on the right straight. The other straight can still explain a parked scan, so the rest of the weight stays out there for a while. The warehouse bay shares its weight for longer, so the creep lasts longer.
+On a roundabout or in the forest, one particle takes almost all of the weight at once. On the oval the favourite straight holds about 10% of the weight. The warehouse shares its weight for longer, so the hold is the same 2 s but the cloud can stay broad after it.
 
-Going further: Augmented MCL mixes new particles back in when the scan starts fitting badly. It watches the log of the mean likelihood: the average beam likelihood, then its natural log, counted in nats. A short-term average of that log is compared with a long-term one. A drop of several nats adds random particles in empty space, at most a quarter of the cloud. A turn moves the fit by a nat or two and adds none. After the first scans the weights are cubed, so a strong particle looks stronger. The cube goes away once that particle is adopted.
+Going further: when the scan stops fitting, sprinkle fresh guesses.
+
+Note: the filter compares a short-term average of the log mean beam likelihood with a long-term one, counted in nats. A drop of several nats adds random particles in empty space, at most a quarter of the cloud. A turn moves the fit by a nat or two and adds none. After the first scans the weights are cubed, and the cube goes away once a particle is adopted.
 
 The prior that spreads the first cloud, and the steer once a winner exists:
 
@@ -47,14 +58,12 @@ The prior that spreads the first cloud, and the steer once a winner exists:
 
 {{code:pursue}}
 
-## Two straights that look the same until a cone
+## What the two seconds are for
 
-The oval's two straights share the same wall distances, so a second clump can sit on the far straight. The cones are not copies of each other, so rolling past one retires the far clump. Until then the yellow ring stays wide even though the red estimate is already on the true straight.
-
-On seed 1 the view holds that wide cloud for about two seconds, and the car stays still. The filter has already chosen a straight by then. When the hold ends, the pink dots jump to a clump ahead of the car on that straight, and the red estimate sits with the clump. The car creeps. After a cone, the clump slides onto the car and the ring shrinks. The starter steers at one winner, or at the wall beside the car, rather than at the average of the two clumps, which would sit in the wall between them.
+The oval's two straights share wall distances, so a second clump can survive on another seed. Seed 1 does not show that. The view freezes the first wide drawing for 2 s so you can see the prior, while the filter keeps scoring. When the hold ends, the drawing catches up: the dots are on the car, the ring is tight, and the car drives the route. The starter steers at the winner, or at the wall beside the car, rather than at an average that would sit in the infield.
 
 ## Try it
 
-1. Run the kidnapped starter and watch the Time row. For about two seconds the car stays still, the camera stays overhead, and the pink dots cover the yard inside a large yellow ring.
-2. After those two seconds the dots jump to a clump ahead of the car on the straight. The car starts to creep. After it passes a cone, that clump slides onto the car and the ring shrinks.
-3. Turn on Drive it yourself and drive the straight. The cloud should gather on you as the scan changes. In the warehouse the creep lasts longer, because the first scans share their weight.
+1. Run the kidnapped starter and watch the Time row. For 2 s the speed stays 0, the camera stays overhead, and the pink dots cover the yard. That hold is the prior, shown for 2 s.
+2. At 2 s the dots sit on the car and the ring tightens. By about 4 s the car is cruising, not creeping.
+3. Turn on Drive it yourself. Lesson speed stays near 3 m/s. The cloud keeps scoring the scan. In the warehouse the weight can stay shared for longer after the same 2 s hold.

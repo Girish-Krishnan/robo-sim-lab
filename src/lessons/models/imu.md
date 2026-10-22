@@ -15,13 +15,13 @@ In the sim: the circle program on an open pad, so the yaw rate has a steady valu
 
 <svg viewBox="0 0 520 230" role="img" aria-label="A gyro bias adds a little yaw every second, so heading walks off in a fan.">
   <rect width="520" height="230" rx="12" fill="#0e1418"/>
-  <line x1="70" y1="180" x2="220" y2="108" stroke="#f4f7f4" stroke-width="3"/>
-  <line x1="70" y1="180" x2="360" y2="36" stroke="#6ea8ff" stroke-width="3"/>
-  <path d="M168 118 A 120 120 0 0 1 210 78" fill="none" stroke="#ffd24a" stroke-width="3"/>
-  <text x="214" y="108" fill="#ffd24a" font-size="18" font-family="sans-serif">b·t</text>
-  <text x="150" y="168" fill="#f4f7f4" font-size="16" font-family="sans-serif">true heading</text>
-  <text x="292" y="128" fill="#6ea8ff" font-size="16" font-family="sans-serif">integrated gyro</text>
-  <text x="24" y="36" fill="#f4f7f4" font-size="18" font-family="sans-serif">The bias is a heading that grows with time</text>
+  <line x1="64" y1="188" x2="300" y2="152" stroke="#f4f7f4" stroke-width="3"/>
+  <line x1="64" y1="188" x2="380" y2="56" stroke="#6ea8ff" stroke-width="3"/>
+  <path d="M150 176 Q 168 158 142 148" fill="none" stroke="#ffd24a" stroke-width="3"/>
+  <text x="186" y="160" fill="#ffd24a" font-size="18" font-family="sans-serif">b·t</text>
+  <text x="168" y="206" fill="#f4f7f4" font-size="16" font-family="sans-serif">true heading</text>
+  <text x="250" y="78" fill="#6ea8ff" font-size="16" font-family="sans-serif">integrated gyro</text>
+  <text x="24" y="32" fill="#f4f7f4" font-size="18" font-family="sans-serif">The bias is a heading that grows with time</text>
   <text x="24" y="214" fill="#d5ddd8" font-size="16" font-family="sans-serif">b is 0.0012 rad/s, one sigma. Over a minute that is a few degrees.</text>
 </svg>
 

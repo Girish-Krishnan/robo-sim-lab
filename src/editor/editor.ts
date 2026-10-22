@@ -84,6 +84,9 @@ export function createEditor(
     }),
   });
 
+  const observer = new ResizeObserver(() => view.requestMeasure());
+  observer.observe(parent);
+
   return {
     getValue: () => view.state.doc.toString(),
     setValue: (next: string) => {
@@ -120,6 +123,9 @@ export function createEditor(
       });
     },
     relayout: () => view.requestMeasure(),
-    destroy: () => view.destroy(),
+    destroy: () => {
+      observer.disconnect();
+      view.destroy();
+    },
   };
 }

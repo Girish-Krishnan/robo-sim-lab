@@ -47,7 +47,7 @@ Return `(steering, throttle)` or a dict with those keys. Steering is radians, po
   <text x="62" y="210" fill="#f4f7f4" font-size="16" font-family="sans-serif">IMU</text>
   <rect x="250" y="110" width="150" height="64" rx="10" fill="#13211f" stroke="#f4f7f4" stroke-width="2"/>
   <text x="268" y="148" fill="#f4f7f4" font-size="16" font-family="sans-serif">control(sensors)</text>
-  <path d="M154 92 H250" stroke="#7ee0d0" stroke-width="2"/>
+  <path d="M154 92 H200 V124 H250" fill="none" stroke="#7ee0d0" stroke-width="2"/>
   <path d="M154 148 H250" stroke="#6ea8ff" stroke-width="2"/>
   <path d="M154 204 H220 V142 H250" fill="none" stroke="#ffd24a" stroke-width="2"/>
   <path d="M400 142 H500" stroke="#f4f7f4" stroke-width="2"/>
