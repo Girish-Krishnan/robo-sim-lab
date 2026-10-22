@@ -27,7 +27,7 @@ Four controls put something back, and they put back different things.
 - **Reset seed**, in the header, replays the same sensor noise.
 - **Reset camera** puts the view behind the car.
 
-Drag to look around, and scroll to zoom. The **Key** on the view names the colours: the speed-tinted trail is where the car went, amber is the wheel-and-gyro guess, and the lidar inset draws the scan with amber for close hits. You can fold the key up. It stays available on every lesson that draws those overlays.
+Drag to look around, and scroll to zoom. The **Key** on the view names the colours: the speed-tinted trail is where the car went, blue is the wheel-and-gyro guess, and the lidar inset draws the scan with amber for close hits. After the first visit the key starts folded. It stays available on every lesson that draws those overlays.
 
 Switching the **World** menu keeps this lesson's kind of start. A circle lesson stays on an open pad. A wall lesson stays beside a wall.
 

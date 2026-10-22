@@ -1,4 +1,6 @@
-import { readChunks, writeChunk } from "../editor/chunks";
+import { dedent, indentBody, readChunks, writeChunk } from "../editor/chunks";
+import { createSliceEditor, type SliceEditor } from "../editor/slice-editor";
+import type { StudentError } from "../editor/errors";
 import { EXAMPLES } from "../editor/examples";
 import type { WorldId } from "../sim/worlds";
 import type { SpawnPose } from "../sim/vehicle";
@@ -48,6 +50,34 @@ export function mountCourse(host: CourseHost): void {
   let labId: string | null = null;
   let saveTimer = 0;
   let opening = 0;
+  let indexScroll = 0;
+  const slices = new Map<string, SliceEditor>();
+
+  const clearSlices = () => {
+    for (const slice of slices.values()) slice.destroy();
+    slices.clear();
+  };
+
+  const parkDrive = () => {
+    const drive = document.getElementById("drive-self");
+    const bar = document.getElementById("try-bar");
+    if (drive && bar) bar.append(drive);
+  };
+
+  const placeDrive = (manual: boolean) => {
+    const drive = document.getElementById("drive-self");
+    if (!drive) return;
+    if (!manual) {
+      drive.hidden = true;
+      parkDrive();
+      return;
+    }
+    drive.hidden = false;
+    const hint = article.querySelector(".sim-hint");
+    const body = article.querySelector(".lesson-body");
+    if (hint) hint.insertAdjacentElement("afterend", drive);
+    else if (body) body.prepend(drive);
+  };
 
   host.onCodeChange((source) => {
     if (applying || !labId) return;
@@ -56,32 +86,45 @@ export function mountCourse(host: CourseHost): void {
   });
 
   const refillChunks = () => {
+    clearSlices();
     const chunks = readChunks(host.getCode());
+    const lesson = labId ? lessonById(labId) : undefined;
+    const program = lesson?.starter ? `${lesson.starter} program` : "program";
     for (const slot of article.querySelectorAll<HTMLElement>(".code-slot")) {
       const id = slot.dataset.chunk ?? "";
       const body = chunks.get(id);
-      const area = document.createElement("textarea");
-      area.spellcheck = false;
-      area.setAttribute("aria-label", id ? `Lesson code: ${id}` : "Lesson code");
       if (body === undefined) {
-        area.readOnly = true;
-        area.value = "";
         slot.hidden = true;
+        slot.replaceChildren();
         continue;
       }
       slot.hidden = false;
-      area.value = body;
-      area.rows = Math.min(24, Math.max(4, body.split("\n").length + 1));
-      area.addEventListener("input", () => {
-        if (applying) return;
-        const next = writeChunk(host.getCode(), id, area.value);
-        applying = true;
-        host.replaceSource(next);
-        applying = false;
-      });
-      slot.replaceChildren(area);
+      const { text, indent } = dedent(body);
+      const label = document.createElement("p");
+      label.className = "slot-label";
+      label.textContent = `${program} · ${id}`;
+      const mount = document.createElement("div");
+      slot.replaceChildren(label, mount);
+      const slice = createSliceEditor(
+        mount,
+        text,
+        (value) => {
+          if (applying) return;
+          const next = writeChunk(host.getCode(), id, indentBody(value, indent));
+          applying = true;
+          host.replaceSource(next);
+          applying = false;
+        },
+        () => host.runProgram(),
+      );
+      slices.set(id, slice);
     }
   };
+
+  window.addEventListener("robo-student-error", (event) => {
+    const detail = (event as CustomEvent<StudentError>).detail;
+    for (const [id, slice] of slices) slice.highlight(detail?.chunk === id ? detail.local : null);
+  });
 
   document.getElementById("reset-starter")?.addEventListener("click", () => {
     const lesson = labId ? lessonById(labId) : undefined;
@@ -115,7 +158,7 @@ export function mountCourse(host: CourseHost): void {
     const edit = document.getElementById("edit-code");
     if (edit) {
       edit.setAttribute("aria-expanded", "false");
-      edit.textContent = "Edit code";
+      edit.textContent = "Full program";
     }
     const consoleBtn = document.getElementById("toggle-console");
     if (consoleBtn) {
@@ -146,6 +189,9 @@ export function mountCourse(host: CourseHost): void {
     article.hidden = route.mode !== "lessons";
 
     if (!lesson) {
+      parkDrive();
+      const parked = document.getElementById("drive-self");
+      if (parked) parked.hidden = true;
       article.innerHTML = "";
       host.setLessonSpawn(null, null, null);
       host.applyScene(null);
@@ -161,7 +207,9 @@ export function mountCourse(host: CourseHost): void {
       // Progress still works if storage is blocked.
     }
     renderNav(lesson);
+    parkDrive();
     article.innerHTML = lessonHtml(lesson);
+    placeDrive(sceneFor(lesson).manual);
     const scene = sceneFor(lesson);
     host.setMode("lessons");
     host.clearConsole();
@@ -188,13 +236,15 @@ export function mountCourse(host: CourseHost): void {
   };
 
   const renderNav = (lesson: Lesson) => {
+    const scroller = nav.querySelector<HTMLElement>(".lesson-index-body");
+    if (scroller) indexScroll = scroller.scrollTop;
     const indexOpen = nav.querySelector("#lesson-index")?.hasAttribute("open") ?? false;
     const progress = loadProgress();
     const ready = LESSONS.filter((item) => item.status === "ready");
     const doneCount = ready.filter((item) => progress.completed.includes(item.id)).length;
     const index = lessonIndex(lesson.id);
     const prev = index > 0 ? LESSONS[index - 1] : undefined;
-    const next = index >= 0 && index < LESSONS.length - 1 ? LESSONS[index + 1] : undefined;
+    const nextReady = index >= 0 ? LESSONS.slice(index + 1).find((item) => item.status === "ready") : undefined;
     const done = isCompleted(lesson.id);
 
     nav.innerHTML = `
@@ -204,7 +254,7 @@ export function mountCourse(host: CourseHost): void {
       </div>
       <div class="lesson-nav-row">
         <button type="button" id="lesson-prev" ${prev ? "" : "disabled"}>Prev</button>
-        <button type="button" id="lesson-next" ${next ? "" : "disabled"}>Next</button>
+        <button type="button" id="lesson-next" ${nextReady ? "" : ""}>${nextReady ? "Next" : "Done"}</button>
         <button type="button" id="lesson-complete" class="${done ? "is-on" : ""}">${done ? "Completed" : "Mark complete"}</button>
         <span class="lesson-progress" title="Completed lessons">${doneCount}/${ready.length}</span>
       </div>
@@ -221,6 +271,7 @@ export function mountCourse(host: CourseHost): void {
       const option = document.createElement("option");
       option.value = module.id;
       option.textContent = module.soon ? `${module.title} (soon)` : module.title;
+      option.disabled = Boolean(module.soon);
       moduleSelect.append(option);
     }
     moduleSelect.value = lesson.moduleId;
@@ -230,6 +281,7 @@ export function mountCourse(host: CourseHost): void {
         const option = document.createElement("option");
         option.value = item.id;
         option.textContent = item.status === "soon" ? `${item.title} (soon)` : item.title;
+        option.disabled = item.status === "soon";
         lessonSelect.append(option);
       }
     };
@@ -247,7 +299,8 @@ export function mountCourse(host: CourseHost): void {
       if (prev) navigate({ mode: "lessons", id: prev.id });
     });
     nav.querySelector("#lesson-next")?.addEventListener("click", () => {
-      if (next) navigate({ mode: "lessons", id: next.id });
+      if (nextReady) navigate({ mode: "lessons", id: nextReady.id });
+      else article.querySelector(".course-complete")?.scrollIntoView({ block: "nearest" });
     });
     nav.querySelector("#lesson-complete")?.addEventListener("click", () => {
       toggleCompleted(lesson.id);
@@ -277,6 +330,10 @@ export function mountCourse(host: CourseHost): void {
       block.append(list);
       body.append(block);
     }
+    body.scrollTop = indexScroll;
+    body.addEventListener("scroll", () => {
+      indexScroll = body.scrollTop;
+    });
   };
 
   window.addEventListener("hashchange", () => show(parseRoute(location.hash)));
@@ -315,7 +372,20 @@ function lessonHtml(lesson: Lesson): string {
       <h1>${escapeText(lesson.title)}</h1>
       ${prereq ? `<p class="lesson-prereq">Read first: ${prereq}</p>` : ""}
       <div class="lesson-body">${renderMarkdown(lesson.markdown)}</div>
+      ${courseComplete(lesson)}
     </div>
+  `;
+}
+
+function courseComplete(lesson: Lesson): string {
+  const index = lessonIndex(lesson.id);
+  const later = index >= 0 && LESSONS.slice(index + 1).some((item) => item.status === "ready");
+  if (lesson.status !== "ready" || later) return "";
+  return `
+    <aside class="course-complete">
+      <h2>Course complete</h2>
+      <p>You drove the car, read the sensors, and ran a particle filter from a kidnapped start. Mapping, planning, and the later controllers are still being written. Those modules stay grey in the menu until they have a lesson.</p>
+    </aside>
   `;
 }
 

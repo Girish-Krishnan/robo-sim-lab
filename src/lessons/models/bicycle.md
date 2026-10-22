@@ -11,24 +11,30 @@ status: ready
 
 Hold the wheel at a fixed angle and the car draws a circle. The rear axle rolls straight ahead in its own frame. The front axle is steered by an angle $\delta$. A constant $\delta$ is that circle, the way a shopping trolley with the front wheels locked traces one radius around a car park.
 
-In the sim: a fixed steer on an open pad, with the coloured trail showing the circle.
+In the sim: a fixed steer on an open pad, with the coloured trail showing the circle. Positive $\delta$ is a left turn, and the car starts on that circle so the lap stays on the open pad.
 
-Positive $\delta$ is a left turn. The car sits on the west side of the pad, nose along the pad, so a left circle stays in the grass, the infield, the meadow, or the open warehouse bay.
-
-<svg viewBox="0 0 480 270" role="img" aria-label="Top view of the bicycle model with wheelbase L and turning radius R">
-  <rect width="480" height="270" rx="12" fill="#10161a"/>
-  <circle cx="150" cy="168" r="4" fill="#9fd8cf"/>
-  <text x="96" y="156" fill="#9fd8cf" font-size="13" font-family="sans-serif">centre</text>
-  <line x1="150" y1="168" x2="292" y2="168" stroke="#9fd8cf" stroke-width="1.5"/>
-  <text x="200" y="160" fill="#9fd8cf" font-size="14" font-family="sans-serif">R</text>
-  <path d="M292 168 A 142 142 0 0 1 250 70" fill="none" stroke="#355850" stroke-width="8" stroke-linecap="round"/>
-  <line x1="292" y1="168" x2="250" y2="96" stroke="#f4f1ea" stroke-width="3"/>
-  <line x1="236" y1="78" x2="262" y2="58" stroke="#f4d03f" stroke-width="3"/>
-  <text x="258" y="128" fill="#f4f1ea" font-size="14" font-family="sans-serif">L</text>
-  <text x="268" y="54" fill="#f4d03f" font-size="13" font-family="sans-serif">steer</text>
-  <text x="16" y="28" fill="#e7eeea" font-size="14" font-family="sans-serif">Fixed steer, one radius</text>
-  <text x="16" y="232" fill="#8e9b94" font-size="13" font-family="sans-serif">White bar: rear axle to front axle, the wheelbase L.</text>
-  <text x="16" y="252" fill="#8e9b94" font-size="13" font-family="sans-serif">Yellow bar: steered front axle. R = L / tan(steer).</text>
+<svg viewBox="0 0 560 340" role="img" aria-label="Top view: turn centre, radius R, wheelbase L perpendicular to R, and steer angle delta">
+  <rect width="560" height="340" rx="12" fill="#0e1418"/>
+  <circle cx="90" cy="230" r="7" fill="#ffd24a"/>
+  <text x="104" y="218" fill="#ffd24a" font-size="18" font-family="sans-serif">turn centre</text>
+  <line x1="90" y1="230" x2="300" y2="230" stroke="#7ee0d0" stroke-width="3"/>
+  <text x="170" y="218" fill="#7ee0d0" font-size="20" font-family="sans-serif">R</text>
+  <path d="M300 230 A 210 210 0 0 1 300 70" fill="none" stroke="#2a4a44" stroke-width="10"/>
+  <rect x="262" y="78" width="76" height="168" rx="16" fill="none" stroke="#f4f7f4" stroke-width="3"/>
+  <rect x="258" y="214" width="22" height="10" rx="2" fill="#f4f7f4"/>
+  <rect x="320" y="214" width="22" height="10" rx="2" fill="#f4f7f4"/>
+  <line x1="300" y1="220" x2="300" y2="100" stroke="#f4f7f4" stroke-width="4"/>
+  <text x="308" y="168" fill="#f4f7f4" font-size="20" font-family="sans-serif">L</text>
+  <g transform="rotate(-28 300 100)">
+    <rect x="274" y="94" width="52" height="12" rx="2" fill="#ffd24a"/>
+  </g>
+  <path d="M300 78 A 22 22 0 0 1 286 92" fill="none" stroke="#ffd24a" stroke-width="3"/>
+  <text x="248" y="70" fill="#ffd24a" font-size="20" font-family="sans-serif">δ</text>
+  <text x="214" y="248" fill="#c9d4ce" font-size="16" font-family="sans-serif">rear axle</text>
+  <text x="360" y="108" fill="#ffd24a" font-size="16" font-family="sans-serif">front wheels</text>
+  <text x="16" y="32" fill="#f4f7f4" font-size="18" font-family="sans-serif">L is perpendicular to R</text>
+  <text x="16" y="300" fill="#d5ddd8" font-size="16" font-family="sans-serif">White bar: wheelbase L, rear axle up to the front axle.</text>
+  <text x="16" y="324" fill="#d5ddd8" font-size="16" font-family="sans-serif">Teal bar: turning radius R. Yellow: steered front axle, angle δ.</text>
 </svg>
 
 ## Why the rear axle is the reference point
@@ -55,9 +61,13 @@ $$x \leftarrow x + v\cos\theta\,\Delta t,\quad y \leftarrow y + v\sin\theta\,\De
 
 Later lessons call this a motion model. The real car adds three small effects the formula leaves out: the command is held between 20 Hz ticks, the steering slews, and the tires slip. The body can sit a few tenths of a metre inside or outside the kinematic circle.
 
-The amber odometry trail is a different integral. Its heading comes from the gyro. A steering bias is reported on `steering_angle` and stays out of the pose. Folding that bias into the heading would walk one lap of the oval tens of metres off the car.
+The blue odometry trail is a different integral. Its heading comes from the gyro. A steering bias is reported on `steering_angle` and stays out of the pose. Folding that bias into the heading would walk one lap of the oval tens of metres off the car.
 
-Note: the formula has $\tan\delta$ in the denominator of $R$. A bigger steer angle is a smaller circle, which is the opposite of how the steering wheel feels in your hands. The wheel asks for angle. The road answers with radius.
+Three frames show up from here on. The **robot frame** has x forward, y left, and z up. Positive steering is a left turn. The **world** is the ground plane: at yaw 0 the nose points along +Z and the driver's left is +X. **Odometry** starts at the origin on reset, with +x along the heading the car had then. `sensors.task.path` and `draw` live there. The host places those drawings with the spawn transform, the shift from that origin onto the map. Stay in the odometry frame when you write a controller.
+
+Ackermann geometry splits the one bicycle angle across the two front wheels so both roll around the same centre. The inner wheel takes the larger angle. The number you return is the bicycle angle. The simulator does the split. The track width is 1.42 m.
+
+Note: $R = L / \tan\delta$, so $\tan\delta$ sits in the denominator. A bigger steer angle is a smaller circle. That matches the wheel: more steer, tighter turn. The wheel asks for an angle. The road answers with a radius.
 
 ## Try it
 

@@ -52,3 +52,51 @@ export function writeChunk(source: string, id: string, body: string): string {
   }
   return found ? out.join("\n") : source;
 }
+
+/** Map a 1-based line of the full program to the slice that contains it. */
+export function chunkAtLine(source: string, line1: number): { id: string; local: number } | null {
+  const lines = source.split("\n");
+  let id: string | null = null;
+  let local = 0;
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index] ?? "";
+    const open = OPEN.exec(line);
+    if (open) {
+      id = open[1] ?? null;
+      local = 0;
+      continue;
+    }
+    if (id && CLOSE.test(line)) {
+      id = null;
+      local = 0;
+      continue;
+    }
+    if (!id) continue;
+    local += 1;
+    if (index + 1 === line1) return { id, local };
+  }
+  return null;
+}
+
+/** Shared leading indent, so a slice can be shown flush with column 1. */
+export function dedent(body: string): { text: string; indent: string } {
+  const lines = body.split("\n");
+  let indent: string | null = null;
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    const match = /^[ \t]*/.exec(line)?.[0] ?? "";
+    if (indent === null || match.length < indent.length) indent = match;
+  }
+  if (!indent) return { text: body, indent: "" };
+  const pad = indent;
+  const text = lines.map((line) => (line.startsWith(pad) ? line.slice(pad.length) : line)).join("\n");
+  return { text, indent };
+}
+
+export function indentBody(text: string, indent: string): string {
+  if (!indent) return text;
+  return text
+    .split("\n")
+    .map((line) => (line.trim() ? indent + line : line))
+    .join("\n");
+}

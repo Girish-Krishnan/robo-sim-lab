@@ -62,6 +62,7 @@ import base64
 import math
 import numpy as np
 
+# @@chunk tunables
 UNKNOWN_START = ${unknown}
 N = ${count}
 BEAMS = 40
@@ -69,6 +70,7 @@ SIGMA = 0.5
 LAND_SIGMA = 0.35
 WHEELBASE = ${wheelbase}
 LOOKAHEAD = 3.2
+# @@end
 LIDAR_FORWARD = 0.46
 A1, A2, A3, A4 = 0.03, 0.04, 0.06, 0.03
 

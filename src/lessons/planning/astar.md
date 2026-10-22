@@ -1,5 +1,5 @@
 ---
-title: A star
+title: A*
 order: 1
 status: soon
 world: warehouse

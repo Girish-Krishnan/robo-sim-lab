@@ -1,12 +1,27 @@
 # Robotics Sandbox
 
-A browser lab for learning how a wheeled robot steers, senses, and finds itself on a map. You drive a small car, or you write Python that sees only lidar, wheel odometry, and an IMU, and you watch that program run in the same 3D world.
-
-It is for students and engineers who want the bicycle model, obstacle avoidance, pure pursuit, and particle filters without installing a robotics stack. The page is a static site. There is no account and no backend.
+A browser lab for a small car. You drive it, or you write Python that sees only lidar, wheel odometry, and an IMU, and you watch that program run in the same 3D world. There is no install and no account.
 
 **Live site:** https://girish-krishnan.github.io/robo-sim-lab/
 
 ![The sandbox lesson, with the car in the city and the key naming the trails](docs/sandbox.png)
+
+## How to use the lab
+
+Open the live site. The first page is the sandbox lesson, with the car in the city.
+
+- **Drive** uses the keyboard. W forward, S back, A and D steer, Space brakes. R resets while you are driving by hand.
+- **Code** opens a Python editor. `control(sensors)` returns a steering angle and a throttle, twenty times a second. Browse examples sits over the editor and does not shrink it. The Sensor API panel lists the names on `sensors`. Python starts loading with the page. Until it is ready, the panel says "Loading Python (first run takes a moment)".
+- **Lessons** is the course. Each lesson sets the world, the start, and the drawings. A lesson with a program shows the lines you are asked to change, and **Full program** opens the rest. **Run** is on the bar. The console opens if the program throws, and the message names the slice and the line.
+- **World** switches city streets, an oval, a forest trail, and a warehouse. A running program starts again. The lesson keeps its kind of start.
+- **Seed** is the sensor-noise draw. Type a number and press Enter to restart with that bias. Reset run replays the seed already in the box.
+- **Pause** freezes physics, the program, and the Time row on the readout. Resume continues them.
+- **Key** names the colours on the view. It starts open the first time, then folded. Pink dots are particle guesses, the yellow ring is their spread, the red trail is the filter's estimate, and the blue trail is odometry. Amber in the lidar inset means a close hit.
+- **Paths** and **Lidar** turn those drawings on and off. The button says on or off.
+
+The course runs from the sandbox through a kidnapped particle filter. The last lesson ends on a course-complete card. Mapping, planning, and the later controllers are listed in the menu and greyed out until they have a lesson.
+
+## For contributors
 
 ## Quick start
 
@@ -70,7 +85,7 @@ Pyodide stays loaded across Run and Stop. Each Run loads the editor buffer under
 - **CodeMirror 6** for the editor, with Python highlighting.
 - **Pyodide 0.29.5** for the student interpreter, plus NumPy. `scripts/fetch-pyodide.mjs` copies the runtime out of `node_modules/pyodide` into `public/pyodide/` and downloads the NumPy wheel beside it (checksummed against `pyodide-lock.json`). Those files are same-origin in `dist/`, so COEP does not depend on a CDN when the page is open. The wheel itself is fetched from jsDelivr only at build time; that host sends `Cross-Origin-Resource-Policy: cross-origin` and `Access-Control-Allow-Origin: *`.
 
-Cross-origin isolation (COOP/COEP) is turned on because Pyodide can use `SharedArrayBuffer`. Dev and `vite preview` send the headers themselves. The runtime is lazy: it downloads when you first open **Code**, and the panel shows “Loading Python and NumPy…” until it is ready.
+Cross-origin isolation (COOP/COEP) is turned on because Pyodide can use `SharedArrayBuffer`. Dev and `vite preview` send the headers themselves. The runtime starts loading as soon as the page does. The panel shows “Loading Python (first run takes a moment)” until it is ready.
 
 ## Student API
 
@@ -104,12 +119,12 @@ All of these are noisy. None of them is the body's true pose.
 | Channel | Contents |
 | --- | --- |
 | Lidar | 270 planar beams over 270°, 12 m max range, 2 cm one-sigma range noise. Angle 0 is forward, positive is left. `max_range` means no return. The ray starts at the roof puck and does not hit the chassis. In Python this is `sensors.lidar.ranges` and `sensors.lidar.angles`. |
-| Wheel odometry | Rear-wheel speed, the actuator steering angle, and a pose. Physics already slips the tires. Each reset draws a speed bias (1.2% one-sigma) and a steering bias (0.004 rad one-sigma), plus white noise of 2 cm/s and 0.003 rad. Heading is the integral of the gyro yaw rate, not `(speed / wheelbase) * tan(steer)`. The steering bias is reported on `steering_angle` and is not integrated. A bicycle-model heading turned that small steer bias into a curvature bias, which walked one oval lap about 50 m off the car. The gyro bias is 0.0012 rad/s one-sigma (about 0.07 deg/s); over 60 s that is a few degrees and a few metres of cross-track, under 5% of distance, and still visible on the amber trail. The speed bias is what scales distance. `pose` starts at the origin on reset. It is not where the car is in the world. |
-| IMU | Yaw rate about body +z, and specific force in the robot frame (about +9.81 m/s² on +z when level and still). Gyro white noise is 0.002 rad/s with a 0.0015 rad/s bias chosen at reset. Accelerometer white noise is 0.04 m/s² with a 0.02 m/s² bias. |
+| Wheel odometry | Rear-wheel speed, the actuator steering angle, and a pose. Physics already slips the tires. Each reset draws a speed bias (1.2% one-sigma) and a steering bias (0.004 rad one-sigma), plus white noise of 2 cm/s and 0.003 rad. Heading is the integral of the gyro yaw rate, not `(speed / wheelbase) * tan(steer)`. The steering bias is reported on `steering_angle` and is not integrated. A bicycle-model heading turned that small steer bias into a curvature bias, which walked one oval lap about 50 m off the car. The gyro bias is 0.0012 rad/s one-sigma (about 0.07 deg/s); over 60 s that is a few degrees and a few metres of cross-track, under 5% of distance, and still visible on the blue trail. The speed bias is what scales distance. `pose` starts at the origin on reset. It is not where the car is in the world. |
+| IMU | Yaw rate about body +z, and specific force in the robot frame (about +9.81 m/s² on +z when level and still). Gyro white noise is 0.002 rad/s with a 0.0012 rad/s bias chosen at reset. Accelerometer white noise is 0.04 m/s² with a 0.02 m/s² bias. |
 | Camera | Stub, `{ available: false }`. A later version can attach pixels here without changing the call shape. |
 | Task | `sensors.task.path`, a list of `{x, y}` waypoints in the odometry frame. Each world publishes one: the oval centerline, the city roundabout, the forest trail (out through the trunks, back on the west lane), and the warehouse loop on the open floor south of the bay rack. `sensors.task.map` is a known floor plan in that same frame: `resolution`, `corner` (the cell-(0, 0) anchor — not a pose), `width`, `height`, `field` (base64 centimetres of distance to the nearest occupied cell; 0 is occupied), `segments` (wall edges packed `x0, y0, x1, y1`), and `stamp`. The grid covers the path plus the lidar's reach. This is a map the robot is given. It is not the car's pose. |
 
-The numbers live in `src/api/descriptor.ts` (`ACKERMANN_BUGGY.sensors`). That is the only sensor config. A Hokuyo UST-10LX, the usual F1TENTH lidar, is 270°, 1081 beams (0.25°), 10 m, ±40 mm, and 40 Hz. This sandbox keeps the 270° field and a 12 m range, publishes one scan per 20 Hz control tick, and keeps every fourth hardware angle (about 1°) so the raycasts stay interactive. Range noise of 2 cm sits inside the 1–3 cm band of that sensor. On a real F1TENTH car, wheel odometry plus a gyro is typically 1–5% of distance, a few metres per lap, not tens of metres. The pose here is built the same way: distance from the biased wheel speed, heading from the biased gyro. **Reset seed** replays the same noise. **Paths** draws the true trail (coloured by speed) and the odometry trail (amber) in the view. Both are render-only: they are not fields on the sensor frame and they are not posted to the worker.
+The numbers live in `src/api/descriptor.ts` (`ACKERMANN_BUGGY.sensors`). That is the only sensor config. A Hokuyo UST-10LX, the usual F1TENTH lidar, is 270°, 1081 beams (0.25°), 10 m, ±40 mm, and 40 Hz. This sandbox keeps the 270° field and a 12 m range, publishes one scan per 20 Hz control tick, and keeps every fourth hardware angle (about 1°) so the raycasts stay interactive. Range noise of 2 cm sits inside the 1–3 cm band of that sensor. On a real F1TENTH car, wheel odometry plus a gyro is typically 1–5% of distance, a few metres per lap, not tens of metres. The pose here is built the same way: distance from the biased wheel speed, heading from the biased gyro. **Reset seed** replays the same noise. **Paths** draws the true trail (coloured by speed) and the odometry trail (blue) in the view. Both are render-only: they are not fields on the sensor frame and they are not posted to the worker.
 
 The HUD shows true forward speed next to odometry speed, and commanded steering next to the slewed actuator angle. True speed is for the person watching. It is not sent to the program.
 

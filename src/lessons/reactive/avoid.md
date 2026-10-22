@@ -13,6 +13,18 @@ Avoidance looks at the scan and steers toward a gap the car fits through. There 
 
 In the sim: the forest, aimed into the trees, with the lidar drawn.
 
+<svg viewBox="0 0 520 240" role="img" aria-label="Each lidar hit blocks a wedge about as wide as the car. The starter aims at the opening that remains.">
+  <rect width="520" height="240" rx="12" fill="#0e1418"/>
+  <polygon points="250,180 120,40 160,36" fill="#1a3a34" stroke="#7ee0d0" stroke-width="2"/>
+  <polygon points="250,180 200,34 250,30" fill="#1a3a34" stroke="#7ee0d0" stroke-width="2"/>
+  <polygon points="250,180 310,32 360,40" fill="#3a2420" stroke="#e36d5c" stroke-width="2"/>
+  <circle cx="250" cy="186" r="10" fill="#f4f7f4"/>
+  <text x="230" y="214" fill="#f4f7f4" font-size="16" font-family="sans-serif">car</text>
+  <text x="118" y="28" fill="#7ee0d0" font-size="16" font-family="sans-serif">open gap</text>
+  <text x="300" y="24" fill="#e36d5c" font-size="16" font-family="sans-serif">blocked</text>
+  <text x="20" y="232" fill="#d5ddd8" font-size="16" font-family="sans-serif">A hit paints a wedge of half-width HALF. The car steers into what is left.</text>
+</svg>
+
 Each hit blocks a wedge about as wide as the car, a single ray thickened until the bumper would fit. Among the openings that remain in front of the car, the starter aims at the widest one, and it slows down when the nearest forward return is close. Speed follows that nearest return, because a cone off to the side is still on the bumper's path.
 
 If the car is boxed in, or if it has barely moved for a couple of seconds, it backs up a short way and yaws toward the clearer side, then tries again. That escape is part of the starter. The rear scan is a thin wedge, so the backup stays short.
@@ -26,6 +38,10 @@ Let the forward beams be those with $|\alpha| < \alpha_{\max}$. The longest sing
 $$\alpha \in \big[\alpha - \arctan(w / r),\; \alpha + \arctan(w / r)\big]$$
 
 for a half-width $w$ a bit larger than the car, and then picks the opening with the best score. The starter writes that idea as a pass over the beams.
+
+The half-width of each wedge, in metres. `HALF` is how wide a hit is painted.
+
+{{code:tunables}}
 
 The helper that paints those wedges:
 
@@ -41,4 +57,4 @@ A gap on the left has positive angle, and positive steering turns left. Negating
 
 1. Run the starter in the forest. You should thread the corridor and keep moving.
 2. On the oval, watch it treat cones as blockers. A one-beam gap between cones should stay closed.
-3. Halve `HALF` in the block above and run the forest again. The car should start accepting gaps it cannot fit.
+3. Halve `HALF` in the tunables block and run the forest again. The car should start accepting gaps it cannot fit.

@@ -6,12 +6,11 @@ import type { Atmosphere, GraphicsQuality } from "../scene";
 import { forestGroundMaterial, loadPropKit, tileUvs } from "../surfaces";
 import { hashYaw, loadProps, scatter, type PropTemplate, type ScatterSolid } from "../props";
 import { bladeTexture } from "../textures";
-import type { SpawnPose } from "../vehicle";
 import { ballSolid, cuboid, logSolid, pillar } from "./factory";
 
-type Rapier = typeof RAPIER;
+export { FOREST_SPAWN } from "../spawns";
 
-export const FOREST_SPAWN: SpawnPose = { x: 0, y: 0.84, z: -4, yaw: 0 };
+type Rapier = typeof RAPIER;
 
 export const FOREST_ATMOSPHERE: Atmosphere = {
   background: "#9aada0",

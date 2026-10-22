@@ -56,10 +56,14 @@ Here is that helper. `wide` is the scan after each return has blocked its neighb
 
 {{code:inflate}}
 
+A beam at `max_range` missed. This line keeps that value, so empty air stays far. The right-hand side is the place to experiment.
+
+{{code:misses}}
+
 Curbs, floor paint, and the start chevron sit below the scan plane. A map or a controller that expects them will drive over the paint and meet the wall behind it.
 
 ## Try it
 
 1. Run the avoid starter and watch the inset. Find a beam at the edge of the fan and confirm the rear is empty of rays.
 2. Print the angle and range of the shortest beam once a second. The range should fall as you approach a wall, then sit at a small number when you are close.
-3. Temporarily treat `max_range` as a real hit at 12 m and watch the car brake for empty space. Put the check back.
+3. In the misses block, change the right-hand side from `sensors.lidar.max_range` to `1.0`, so an empty beam looks like a wall a metre away. The car should brake in open space. Put `sensors.lidar.max_range` back.

@@ -1,4 +1,6 @@
-import { LESSONS, resolveSpawn } from "../course/catalog";
+import { LESSONS, resolveSpawn, resolveSpawnIn } from "../course/catalog";
+import { worldSpawn } from "../sim/spawns";
+import type { WorldId } from "../sim/worlds";
 import type { RunMetrics } from "./simulate";
 import { spawnFor, type EvalWorld } from "./scenarios";
 
@@ -216,7 +218,7 @@ const DEMO_DISTANCE = 15;
  * Scripted lessons share the 60 s seed-1 matrix. A ready lesson with a
  * starter has to finish that minute with no real contact and no stuck time.
  */
-export function lessonDemoReport(rows: RunMetrics[]): { errors: string[]; markdown: string } {
+export function lessonDemoReport(rows: RunMetrics[], extras: RunMetrics[] = []): { errors: string[]; markdown: string } {
   const errors: string[] = [];
   const lines = [
     "| Lesson | World | Program | Contacts | Stuck s | Distance m |",
@@ -245,8 +247,54 @@ export function lessonDemoReport(rows: RunMetrics[]): { errors: string[]; markdo
       `| ${lesson.title} | ${row.world} | ${row.example} | ${row.collisionCount} | ${row.stuckTime.toFixed(2)} | ${row.distance.toFixed(1)} |`,
     );
   }
+  const switchLines = [
+    "| Lesson | World | Spawn kind | Matches scenario |",
+    "| --- | --- | --- | --- |",
+  ];
+  for (const lesson of LESSONS) {
+    if (lesson.status !== "ready") continue;
+    for (const world of ["city", "track", "forest", "warehouse"] as WorldId[]) {
+      const pose = resolveSpawnIn(lesson, world);
+      const expected = lesson.spawn === "default" ? worldSpawn(world) : spawnFor(world, lesson.spawn, "scenario");
+      const yawGap = Math.atan2(Math.sin(pose.yaw - expected.yaw), Math.cos(pose.yaw - expected.yaw));
+      const same = Math.hypot(pose.x - expected.x, pose.z - expected.z) < 0.05 && Math.abs(yawGap) < 0.05;
+      if (!same) errors.push(`${lesson.id} in ${world} left its ${lesson.spawn} start`);
+      switchLines.push(`| ${lesson.title} | ${world} | ${lesson.spawn} | ${same ? "yes" : "NO"} |`);
+    }
+  }
+  const seedLines = [
+    "| World | Program | Seed | Contacts | Stuck s | Distance m |",
+    "| --- | --- | ---: | ---: | ---: | ---: |",
+  ];
+  for (const row of extras) {
+    if (row.collisionCount !== 0) errors.push(`${row.world}/${row.example} seed ${row.seed} contacts ${row.collisionCount}`);
+    if (row.stuckTime !== 0) errors.push(`${row.world}/${row.example} seed ${row.seed} stuck ${row.stuckTime.toFixed(2)} s`);
+    if (row.distance < DEMO_DISTANCE) errors.push(`${row.world}/${row.example} seed ${row.seed} travelled ${row.distance.toFixed(1)} m`);
+    seedLines.push(
+      `| ${row.world} | ${row.example} | ${row.seed} | ${row.collisionCount} | ${row.stuckTime.toFixed(2)} | ${row.distance.toFixed(1)} |`,
+    );
+  }
   return {
     errors,
-    markdown: ["# Lesson demos", "", "Each scripted lesson is the matching 60 s seed-1 eval run in that lesson's world.", "", ...lines, ""].join("\n"),
+    markdown: [
+      "# Lesson demos",
+      "",
+      "Each scripted lesson is the matching 60 s seed-1 eval run in that lesson's world.",
+      "",
+      ...lines,
+      "",
+      "## World switches",
+      "",
+      "Changing the yard keeps the lesson's kind of start.",
+      "",
+      ...switchLines,
+      "",
+      "## Extra seeds",
+      "",
+      "Seeds 2 and 3 repeat each scripted lesson's world and program.",
+      "",
+      ...seedLines,
+      "",
+    ].join("\n"),
   };
 }

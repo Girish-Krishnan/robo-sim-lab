@@ -33,9 +33,9 @@ const ROWS: Record<string, LegendRow> = {
     text: "Where the car actually drove. The colour follows speed.",
   },
   odom: {
-    swatch: "#e3a23a",
+    swatch: "#6ea8ff",
     name: "Odometry",
-    text: "Where the wheel sensors think the car went.",
+    text: "The blue trail is where the wheel sensors think the car went.",
   },
   route: {
     swatch: "#7dcea0",
@@ -49,18 +49,37 @@ const ROWS: Record<string, LegendRow> = {
   },
 };
 
+const LEGEND_SEEN = "robo-sim-lab.legend-seen";
+
 /** Compact key for whatever the lesson is drawing. Hidden when nothing applies. */
 export function mountLegend(root: HTMLElement): { show: (spec: LegendSpec | null) => void } {
   const list = root.querySelector<HTMLElement>("#legend-list");
   const toggle = root.querySelector<HTMLButtonElement>("#legend-toggle");
   if (!list || !toggle) return { show: () => undefined };
   let open = true;
+  const seen = () => {
+    try {
+      return localStorage.getItem(LEGEND_SEEN) === "1";
+    } catch {
+      return false;
+    }
+  };
+  const markSeen = () => {
+    try {
+      localStorage.setItem(LEGEND_SEEN, "1");
+    } catch {
+      // The key still collapses for this page view.
+    }
+  };
   const paint = () => {
     root.classList.toggle("is-open", open);
     toggle.setAttribute("aria-expanded", String(open));
+    toggle.textContent = open ? "Key" : "Key";
+    toggle.title = open ? "Fold the colour key" : "Open the colour key";
   };
   toggle.addEventListener("click", () => {
     open = !open;
+    markSeen();
     paint();
   });
   return {
@@ -71,7 +90,8 @@ export function mountLegend(root: HTMLElement): { show: (spec: LegendSpec | null
         return;
       }
       root.hidden = false;
-      open = true;
+      open = !seen();
+      markSeen();
       paint();
       list.replaceChildren(
         ...keys.map((key) => {

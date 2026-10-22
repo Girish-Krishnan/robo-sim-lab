@@ -5,8 +5,10 @@ import { mountSolids, type WorldMount } from "../course";
 import type { Atmosphere, GraphicsQuality } from "../scene";
 import { loadProps, placeCargo } from "../props";
 import { loadPropKit, tileUvs, TILES_PER_METER } from "../surfaces";
-import type { SpawnPose } from "../vehicle";
+import { TRACK_SPAWN } from "../spawns";
 import { coneSolid, cuboid } from "./factory";
+
+export { TRACK_SPAWN };
 
 type Rapier = typeof RAPIER;
 
@@ -16,8 +18,6 @@ const Z_IN = 36;
 const Z_OUT = 48;
 const WALL_H = 1.58;
 const WALL_T = 0.42;
-
-export const TRACK_SPAWN: SpawnPose = { x: 16, y: 0.84, z: -20, yaw: 0 };
 
 export const TRACK_ATMOSPHERE: Atmosphere = {
   background: "#9eb6cc",

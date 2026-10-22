@@ -258,9 +258,7 @@ export class CodeSandbox {
   }
 
   private logError(message: string): void {
-    for (const line of message.split("\n")) {
-      if (line.trim()) this.callbacks.onLog(line, "error");
-    }
+    if (message.trim()) this.callbacks.onLog(message, "error");
   }
 
   private clearTimer(): void {

@@ -9,7 +9,7 @@ prerequisites: models/bicycle
 status: ready
 ---
 
-Open loop means the command ignores the sensors. The circle starter returns the same steering and the same throttle on every tick, like holding a garden hose at one angle and letting the water draw the arc. When it fails, the failure is the plant: slip, a tight steer, the wrong pad. The feedback has nothing to debug because there is none.
+Open loop means the command ignores the sensors. The circle starter returns the same steering and the same throttle on every tick, like holding a garden hose at one angle and letting the water draw the arc. When it fails, the failure is the plant: the car itself, tires and steering and inertia, as distinct from the controller. Slip, a tight steer, or the wrong pad shows up there. The feedback has nothing to debug because there is none.
 
 In the sim: the same fixed command, with the camera far enough back to see the whole lap.
 
@@ -31,7 +31,7 @@ The discrete command is held for $\Delta t = 0.05$ s. Returning $(0.34,\ 0.5)$ i
 
 A circle that meets something is a pad, a steer, or a speed. The avoid lesson is the one that reacts. A positive steer is left. A circle that goes right is a negative number in the return.
 
-Open loop leaves the gyro bias alone, and the geometric circle in the world is still the circle. Odometry is a passenger. Paths will show the amber trail leaving a perfectly good lap.
+Open loop leaves the gyro bias alone, and the geometric circle in the world is still the circle. Odometry is a passenger. Paths will show the blue trail leaving a perfectly good lap.
 
 ## Try it
 

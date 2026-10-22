@@ -28,30 +28,31 @@
         </div>
 
         <div class="mode-switch" role="tablist" aria-label="Control mode">
-          <button id="mode-drive" type="button" role="tab" aria-selected="true">Drive</button>
-          <button id="mode-code" type="button" role="tab" aria-selected="false">Code</button>
-          <button id="mode-lessons" type="button" role="tab" aria-selected="false">Lessons</button>
+          <button id="mode-drive" type="button" role="tab" aria-selected="true" title="Drive the car with the keyboard">Drive</button>
+          <button id="mode-code" type="button" role="tab" aria-selected="false" title="Write and run a Python program">Code</button>
+          <button id="mode-lessons" type="button" role="tab" aria-selected="false" title="Read a lesson beside the simulator">Lessons</button>
         </div>
 
         <div class="header-actions">
-          <label class="header-select">
+          <label class="header-select" title="Which yard the car is in">
             World
-            <select id="world" aria-label="Environment"></select>
+            <select id="world" aria-label="World" title="Switch the yard. A running program starts again."></select>
           </label>
-          <label class="header-select">
+          <label class="header-select" title="Lighting and texture detail">
             Graphics
-            <select id="quality" aria-label="Graphics quality">
+            <select id="quality" aria-label="Graphics quality" title="High keeps shadows and extra maps. Low is lighter.">
               <option value="high">High</option>
               <option value="low">Low</option>
             </select>
           </label>
-          <button id="lidar-toggle" type="button" class="is-on" aria-pressed="true">Lidar on</button>
-          <button id="paths-toggle" type="button" aria-pressed="false">Paths</button>
-          <label class="header-select">
+          <button id="lidar-toggle" type="button" class="is-on" aria-pressed="true" title="Show or hide the lidar beams and the corner inset">Lidar on</button>
+          <button id="paths-toggle" type="button" aria-pressed="false" title="Show or hide the true path and the odometry trail">Paths off</button>
+          <label class="header-select" title="Sensor-noise seed. Press Enter to restart with this bias.">
             Seed
-            <input id="seed" type="number" min="0" step="1" value="1" aria-label="Noise seed" />
+            <input id="seed" type="number" min="0" step="1" value="1" aria-label="Noise seed" title="Type a seed and press Enter. The car restarts with that bias." />
           </label>
-          <button id="reset-seed" type="button" title="Replay the same sensor noise">Reset seed</button>
+          <button id="reset-seed" type="button" title="Restart the car with the seed in the box">Reset seed</button>
+          <button id="pause" type="button" aria-pressed="false" title="Pause physics and the control program">Pause</button>
           <button id="camera-reset" type="button" title="Put the camera behind the car">Reset camera</button>
         </div>
       </header>
@@ -64,7 +65,8 @@
             <p id="loading-text">Starting physics…</p>
           </div>
           <div id="hint"></div>
-          <div id="drive-hint" hidden>Click this view, then WASD or the arrows. The filter keeps running on the sensors.</div>
+          <div id="run-banner" hidden>Program stopped. Press Run.</div>
+          <div id="drive-hint" hidden>The program keeps driving. Click the 3D view to take the wheel.</div>
           <div id="legend" hidden>
             <button id="legend-toggle" type="button" aria-expanded="true">Key</button>
             <ul id="legend-list"></ul>
@@ -87,7 +89,7 @@
           <article id="lesson" hidden></article>
           <div id="code-chrome">
             <div class="panel-bar">
-              <button id="browse-examples" type="button">Browse examples</button>
+              <button id="browse-examples" type="button" title="Open example programs over the editor">Browse examples</button>
               <select id="example" hidden aria-label="Loaded example"></select>
             </div>
             <div id="example-browser" hidden>
@@ -104,10 +106,21 @@
               <code>(steering, throttle)</code>. Steering is radians, positive left.
               Throttle is −1…1. Python sees sensors only.
             </p>
+            <details id="sensor-api">
+              <summary>Sensor API</summary>
+              <ul>
+                <li><code>sensors.time</code>, <code>sensors.dt</code> — seconds.</li>
+                <li><code>sensors.lidar.ranges</code>, <code>.angles</code>, <code>.max_range</code> — a beam at max range missed.</li>
+                <li><code>sensors.odometry.speed</code>, <code>.steering_angle</code>, <code>.pose.x</code>, <code>.pose.y</code>, <code>.pose.yaw</code>.</li>
+                <li><code>sensors.imu.yaw_rate</code>, <code>.accel.x</code>, <code>.accel.y</code>, <code>.accel.z</code>.</li>
+                <li><code>sensors.task.path</code>, <code>sensors.task.map</code> — a route and a floor plan, not a measurement of the car.</li>
+                <li>There is no true pose on <code>sensors</code>.</li>
+              </ul>
+            </details>
           </div>
           <div id="python-status" hidden>
             <div class="spinner" aria-hidden="true"></div>
-            <span>Loading Python and NumPy…</span>
+            <span>Loading Python (first run takes a moment)</span>
           </div>
           <div
             id="lab-split"
@@ -119,20 +132,20 @@
           <div id="editor"></div>
           <div id="try-bar">
             <span id="try-label">Try it</span>
-            <button id="run" type="button" class="primary" title="Run the program">Run</button>
-            <button id="stop" type="button" title="Stop the program">Stop</button>
-            <button id="reset" type="button" title="Put the car back at the start and run again">Reset run</button>
-            <button id="reset-starter" type="button" hidden title="Restore this lesson's program">Starter</button>
-            <button id="drive-self" type="button" hidden aria-pressed="false">Drive it yourself</button>
-            <span id="run-state" data-state="idle">Idle</span>
-            <button id="edit-code" type="button" aria-expanded="false">Edit code</button>
-            <button id="toggle-console" type="button" aria-expanded="false">Console</button>
+            <button id="run" type="button" class="primary" title="Run the program from the top">Run</button>
+            <button id="stop" type="button" title="Stop the program. The car brakes.">Stop</button>
+            <button id="reset" type="button" title="Put the car back at the start and run the program again">Reset run</button>
+            <button id="reset-starter" type="button" hidden title="Restore this lesson's program and run it">Starter</button>
+            <button id="drive-self" type="button" hidden aria-pressed="false" title="Take the wheel. The program keeps scoring the sensors.">Drive it yourself</button>
+            <span id="run-state" data-state="idle" title="Whether a program is running">Idle</span>
+            <button id="edit-code" type="button" aria-expanded="false" title="Open the full program, not only the slices in the lesson">Full program</button>
+            <button id="toggle-console" type="button" aria-expanded="false" title="Show or hide the console">Console</button>
             <span class="shortcut">Ctrl/⌘ Enter</span>
           </div>
           <div class="console-wrap">
             <div class="console-bar">
               <span>Console</span>
-              <button id="clear-console" type="button">Clear</button>
+              <button id="clear-console" type="button" title="Clear the console">Clear</button>
             </div>
             <div id="console" role="log"></div>
           </div>

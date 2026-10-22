@@ -11,13 +11,23 @@ status: ready
 
 Monte Carlo localization represents the belief with $N$ poses, the particles. Each one is a guess of where the car is and which way it faces. The weight is how well that guess explains the current scan. Low-variance resampling keeps the guesses that earned their weight and copies them forward. On the oval the cloud starts near the car, a small crowd that already knows the neighbourhood.
 
-In the sim: the tracking cloud on the oval, a little above the car, so the dots, the ellipse, and the walls share one picture. Open the **Key** on the view if the colours are new. Pink dots are the guesses. The yellow ring is their 2-sigma spread. The red trail is the filter's estimate. Amber is odometry. The speed-tinted trail is where the car actually went. Green is the route.
+In the sim: the tracking cloud on the oval. Open the **Key** if the colours are new. It uses these names, and the picture matches them:
 
-The starter keeps a few hundred particles and scores a few dozen lidar beams against a distance field that was built ahead of time. That fits in the 20 Hz tick. Every beam and thousands of particles make the car stutter. Walls are large next to a 0.5 m cell, so the thinner scan is enough.
+- **Particles** are the pink dots. Each dot is one guess of where the car is and which way it faces.
+- **Uncertainty** is the yellow ring, the 2-sigma spread of those guesses. Covariance is that spread, written as how far the weighted guesses sit from their mean. A small ring means the filter is sure.
+- **Estimate** is the red trail, the filter's best pose, moment by moment.
+- **Odometry** is the blue trail.
+- The speed-tinted trail is where the car actually went. Green is the route.
 
-The blocks below are the three steps. They are slices of the same program that is driving the oval.
+The dots are drawn small and partly see-through, so the car and the yellow ring stay visible when the cloud has pulled in tight.
 
-Each particle is a saturated magenta dot a few centimetres off the ground, about 8 px across, with a dark outline so it stays visible on asphalt, grass, and dirt. The marks are drawn after the scene's color grade. A short tick, about 28 cm, shows its heading. Brighter dots earned more weight. The weighted-mean estimate is a yellow heading mark. A yellow ellipse around that mean is the 2-sigma contour of the cloud's covariance. The trail of the mean is red. The same marks appear in the lidar inset. The drawings are a picture for you. The estimate the controller uses is a variable in the program.
+The starter keeps a few hundred particles and scores a few dozen lidar beams against a distance field built ahead of time. Control runs at 20 Hz, twenty times a second, and the filter has to finish inside that tick. Every beam and thousands of particles make the car stutter. The known map is a grid of 0.5 m cells. Walls are large next to a cell that size, so the thinner scan is enough.
+
+Low-variance resampling draws one random number and then walks the weights in even steps, copying the heavy guesses and dropping the light ones. The blocks below are that cycle. They are slices of the same program that is driving the oval.
+
+How many particles, and how far ahead pursuit looks:
+
+{{code:tunables}}
 
 **Drive it yourself** runs this filter on whatever path you drive. Click the view, then use WASD or the arrows. Space brakes. The cloud keeps scoring the live scan.
 
@@ -79,6 +89,6 @@ Note: global localization, the kidnapped starter, is this same filter with a dif
 
 ## Try it
 
-1. Run the starter on the oval. You should see a magenta cloud on the car, a tight yellow ellipse, and a red trail that stays with the car while the amber trail walks away.
-2. Cut `N` to `40` and run again. The mean should jump more. Put `360` back.
+1. Run the starter on the oval. You should see pink dots on the car, a tight yellow ring, and a red trail that stays with the car while the blue trail walks away.
+2. In the tunables block, cut `N` to `40` and run again. The mean should jump more. Put `360` back.
 3. Turn on Drive it yourself, click the view, and drive onto the infield. The ellipse should swell while the scan is ambiguous, then tighten when a wall or a cone picks a winner.

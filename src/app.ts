@@ -1,6 +1,7 @@
 import RAPIER from "@dimforge/rapier3d-compat";
 import { ACKERMANN_BUGGY, CONTROL_DT, PHYSICS_DT, clampCommand, odomToWorld, worldToOdom, type DrawOp } from "./api";
-import { solidsFor, spawnFor } from "./eval/scenarios";
+import { formatStudentError } from "./editor/errors";
+import { spawnFor } from "./sim/spawns";
 import { EXAMPLES } from "./editor/examples";
 import { BLANK_SOURCE, loadScratch, saveScratch } from "./editor/blank";
 import { createEditor, type CodeEditor } from "./editor/editor";
@@ -12,6 +13,7 @@ import { bindTextureLoader } from "./sim/surfaces";
 import { DebugDraw } from "./sim/debug-draw";
 import { PathOverlay } from "./sim/path-overlay";
 import { buildKnownMap } from "./sim/known-map";
+import type { Solid } from "./sim/course";
 import { referenceRoute } from "./sim/routes";
 import { AckermannBuggy, SERVICE_BRAKE, STOP_BRAKE, type SpawnPose } from "./sim/vehicle";
 import {
@@ -82,6 +84,7 @@ export async function mountApp(): Promise<void> {
       simArmed = true;
       view.renderer.domElement.focus({ preventScroll: true });
       driveHint.classList.toggle("is-armed", true);
+      refreshDriveHint();
     };
     viewport.addEventListener("pointerdown", (event) => {
       if (event.target instanceof HTMLElement && event.target.closest("#legend, #drive-hint")) return;
@@ -129,7 +132,7 @@ export async function mountApp(): Promise<void> {
 
     sandbox = new CodeSandbox({
       onCommand: (command) => {
-        if (driveSelf) return;
+        if (driveSelf && simArmed) return;
         if (codeControls() && code.current === "running") robot.setCommand(command, 0);
       },
       onDraw: (ops) => {
@@ -138,12 +141,17 @@ export async function mountApp(): Promise<void> {
         frameKidnappedCloud();
       },
       onLog: (line, level) => {
-        consolePanel.log(line, level);
         if (level === "error") {
+          const formatted = formatStudentError(line, editor?.getValue() ?? "");
+          consolePanel.log(formatted.text, "error");
+          editor?.highlightLine(formatted.chunk ? null : formatted.line);
+          window.dispatchEvent(new CustomEvent("robo-student-error", { detail: formatted }));
           document.getElementById("app")?.classList.add("console-open");
           document.getElementById("toggle-console")?.setAttribute("aria-expanded", "true");
           document.getElementById("toggle-console")?.classList.add("is-on");
+          return;
         }
+        consolePanel.log(line, level);
       },
       onState: (state) => {
         setRunState(state);
@@ -154,6 +162,7 @@ export async function mountApp(): Promise<void> {
       },
     });
     const code = sandbox;
+    code.warmup();
 
     let scratch = loadScratch();
     editor = createEditor(mustGet("editor"), scratch, () => runProgram(), (source) => {
@@ -215,8 +224,8 @@ export async function mountApp(): Promise<void> {
         if (driveSelf) {
           driveHint.hidden = false;
           driveHint.textContent = simArmed
-            ? "Driving · WASD or arrows · Space brakes · The filter keeps scoring the scan"
-            : "Click this view, then WASD or the arrows. The filter keeps running on the sensors.";
+            ? "You are driving. WASD or arrows, Space brakes. The filter still scores the scan."
+            : "The program keeps driving. Click the 3D view to take the wheel. WASD or arrows, Space brakes.";
         }
         return;
       }
@@ -228,11 +237,26 @@ export async function mountApp(): Promise<void> {
     };
     refreshDriveHint = setHint;
     let mapCache: { key: string; map: ReturnType<typeof buildKnownMap> } | null = null;
+    let solidsReady: ((world: WorldId) => Solid[]) | null = null;
+    const emptyMap = (): ReturnType<typeof buildKnownMap> => ({
+      resolution: 0.5,
+      corner: { x: 0, y: 0 },
+      width: 1,
+      height: 1,
+      field: "AA==",
+      segments: [],
+      stamp: 0,
+    });
+    void import("./eval/scenarios").then((mod) => {
+      solidsReady = mod.solidsFor;
+      mapCache = null;
+    });
     const taskMap = () => {
       const key = `${yard.id}|${activeSpawn.x.toFixed(2)}|${activeSpawn.z.toFixed(2)}|${activeSpawn.yaw.toFixed(3)}`;
       if (mapCache?.key === key) return mapCache.map;
+      if (!solidsReady) return mapCache?.map ?? emptyMap();
       const map = buildKnownMap(
-        solidsFor(yard.id),
+        solidsReady(yard.id),
         activeSpawn,
         referenceRoute(yard.id).map((point) => worldToOdom(activeSpawn, point)),
       );
@@ -251,8 +275,9 @@ export async function mountApp(): Promise<void> {
       return yard.spawn;
     };
 
+    let trackCloud = false;
     const frameKidnappedCloud = (force = false) => {
-      if (!codeEditor.getValue().includes("UNKNOWN_START = True")) {
+      if (!trackCloud) {
         if (kidnappedDistance >= 0) {
           kidnappedDistance = -1;
           applyLessonCamera();
@@ -277,8 +302,17 @@ export async function mountApp(): Promise<void> {
       view.frameFog(fogDistance);
     };
 
-    const resetWorld = () => {
-      if (code.current === "running" || code.current === "loading") stopProgram();
+    const runBanner = mustGet<HTMLElement>("run-banner");
+    const showStopped = (message = "Program stopped. Press Run.") => {
+      runBanner.textContent = message;
+      runBanner.hidden = false;
+    };
+    const hideStopped = () => {
+      runBanner.hidden = true;
+    };
+    const resetWorld = (rerun = false) => {
+      const wasRunning = code.current === "running" || code.current === "loading";
+      if (wasRunning) stopProgram();
       activeSpawn = currentSpawn();
       paths.clear();
       drawOps = [];
@@ -291,19 +325,25 @@ export async function mountApp(): Promise<void> {
       frameKidnappedCloud(true);
       camera.snap(robot.focus());
       if (handsOn()) applyDrive();
+      if (rerun && wasRunning && (codeControls() || driveSelf)) runProgram();
+      else if (wasRunning && (codeControls() || driveSelf)) showStopped();
     };
 
     const resetToSeed = (seed = readSeed(seedInput)) => {
       noiseSeed = seed >>> 0;
       seedInput.value = String(noiseSeed);
       robot.setNoiseSeed(noiseSeed);
-      resetWorld();
+      resetWorld(true);
     };
 
     const manualDrive = () => driveSelf && simArmed;
     const runProgram = () => {
       if (!codeControls() && !driveSelf) return;
+      hideStopped();
+      consolePanel.clear();
       consolePanel.log("— running —", "log");
+      editor?.highlightLine(null);
+      window.dispatchEvent(new CustomEvent("robo-student-error", { detail: { text: "", line: null, chunk: null, local: null } }));
       code.run(codeEditor.getValue());
     };
 
@@ -324,6 +364,7 @@ export async function mountApp(): Promise<void> {
       if (next !== "lessons") {
         lessonCodeActive = false;
         lessonCamera = null;
+        trackCloud = next === "code" && exampleSelect.value === "mcl-global";
         driveSelf = false;
         simArmed = false;
         driveHint.hidden = true;
@@ -344,6 +385,7 @@ export async function mountApp(): Promise<void> {
         applyDrive();
       } else if (next === "code") {
         code.warmup();
+        publishCodeLegend();
         robot.setCommand(clampCommand({ steering: 0, throttle: 0 }, ACKERMANN_BUGGY.limits), STOP_BRAKE);
       } else if (prev !== "lessons") {
         robot.setCommand(clampCommand({ steering: 0, throttle: 0 }, ACKERMANN_BUGGY.limits), STOP_BRAKE);
@@ -356,7 +398,7 @@ export async function mountApp(): Promise<void> {
     };
     mustGet("run").addEventListener("click", () => runProgram());
     mustGet("stop").addEventListener("click", () => stopProgram());
-    mustGet("reset").addEventListener("click", () => resetWorld());
+    mustGet("reset").addEventListener("click", () => resetWorld(true));
     mustGet("clear-console").addEventListener("click", () => consolePanel.clear());
     mustGet("camera-reset").addEventListener("click", () => camera.reset());
     const worldSelect = mustGet<HTMLSelectElement>("world");
@@ -373,6 +415,7 @@ export async function mountApp(): Promise<void> {
       switchingWorld = true;
       worldSelect.disabled = true;
       try {
+        const wasRunning = code.current === "running" || code.current === "loading";
         if (codeControls()) stopProgram();
         disposeWorld(world, yard);
         yard = await mountWorld(id, RAPIER, world, view.scene, graphics);
@@ -388,6 +431,8 @@ export async function mountApp(): Promise<void> {
         camera.snap(robot.focus());
         localStorage.setItem(WORLD_STORAGE_KEY, id);
         if (handsOn()) applyDrive();
+        if (wasRunning && (codeControls() || driveSelf)) runProgram();
+        else if (wasRunning) showStopped();
       } finally {
         worldSelect.disabled = false;
         switchingWorld = false;
@@ -417,6 +462,7 @@ export async function mountApp(): Promise<void> {
       lidarButton.setAttribute("aria-pressed", String(enabled));
       lidarButton.classList.toggle("is-on", enabled);
       lidarButton.textContent = enabled ? "Lidar on" : "Lidar off";
+      if (mode === "code") publishCodeLegend();
     };
     setLidarButton(true);
     lidarButton.addEventListener("click", () => setLidarButton(!lidar.isEnabled));
@@ -432,7 +478,7 @@ export async function mountApp(): Promise<void> {
       const open = !appEl()?.classList.contains("lab-open");
       appEl()?.classList.toggle("lab-open", open);
       editCode.setAttribute("aria-expanded", String(open));
-      editCode.textContent = open ? "Hide code" : "Edit code";
+      editCode.textContent = open ? "Hide full program" : "Full program";
       requestAnimationFrame(() => codeEditor.relayout());
     });
     toggleConsole.addEventListener("click", () => {
@@ -441,6 +487,27 @@ export async function mountApp(): Promise<void> {
       toggleConsole.setAttribute("aria-expanded", String(open));
       toggleConsole.classList.toggle("is-on", open);
     });
+    const legendForExample = (id: string): { lidar: boolean; paths: boolean; particles: boolean; route: boolean } | null => {
+      if (id === "mcl" || id === "mcl-global") return { lidar: true, paths: true, particles: true, route: true };
+      if (id === "pursuit") return { lidar: false, paths: true, particles: false, route: true };
+      if (id === "circle") return { lidar: false, paths: true, particles: false, route: false };
+      if (id === "avoid" || id === "wall") return { lidar: true, paths: false, particles: false, route: false };
+      return null;
+    };
+    const publishCodeLegend = () => {
+      if (mode !== "code") return;
+      const spec = legendForExample(exampleSelect.value);
+      if (!spec && !lidar.isEnabled && !paths.visible) {
+        legend.show(null);
+        return;
+      }
+      legend.show({
+        lidar: Boolean(spec?.lidar) || lidar.isEnabled,
+        paths: Boolean(spec?.paths) || paths.visible,
+        particles: Boolean(spec?.particles),
+        route: Boolean(spec?.route),
+      });
+    };
     const browser = mustGet<HTMLElement>("example-browser");
     const exampleList = mustGet<HTMLElement>("example-list");
     const confirmBox = mustGet<HTMLElement>("example-confirm");
@@ -456,6 +523,8 @@ export async function mountApp(): Promise<void> {
       saveScratch(scratch);
       browser.hidden = true;
       confirmBox.hidden = true;
+      trackCloud = id === "mcl-global";
+      publishCodeLegend();
       if (mode === "code") resetWorld();
     };
     for (const example of EXAMPLES) {
@@ -494,6 +563,7 @@ export async function mountApp(): Promise<void> {
       simArmed = false;
       driveButton.setAttribute("aria-pressed", String(on));
       driveButton.classList.toggle("is-on", on);
+      driveButton.textContent = on ? "You are driving" : "Drive it yourself";
       driveHint.hidden = !on;
       driveHint.classList.remove("is-armed");
       setHint();
@@ -505,11 +575,26 @@ export async function mountApp(): Promise<void> {
       paths.setVisible(enabled);
       pathsButton.setAttribute("aria-pressed", String(enabled));
       pathsButton.classList.toggle("is-on", enabled);
-      pathsButton.textContent = enabled ? "Paths on" : "Paths";
+      pathsButton.textContent = enabled ? "Paths on" : "Paths off";
+      if (mode === "code") publishCodeLegend();
     };
     setPaths(false);
     pathsButton.addEventListener("click", () => setPaths(!paths.visible));
     mustGet("reset-seed").addEventListener("click", () => resetToSeed());
+    seedInput.addEventListener("change", () => resetToSeed());
+    seedInput.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter") return;
+      event.preventDefault();
+      resetToSeed();
+    });
+    const pauseButton = mustGet<HTMLButtonElement>("pause");
+    const setPaused = (next: boolean) => {
+      paused = next;
+      pauseButton.setAttribute("aria-pressed", String(next));
+      pauseButton.textContent = next ? "Resume" : "Pause";
+      pauseButton.title = next ? "Resume physics and the control program" : "Pause physics and the control program";
+    };
+    pauseButton.addEventListener("click", () => setPaused(!paused));
 
     window.addEventListener(
       "keydown",
@@ -551,6 +636,7 @@ export async function mountApp(): Promise<void> {
       applyScene: (scene) => {
         lessonCodeActive = Boolean(scene?.run);
         lessonCamera = scene?.camera ?? null;
+        trackCloud = scene?.camera === "overhead";
         document.getElementById("app")?.classList.toggle("lesson-has-code", lessonCodeActive);
         if (!scene) {
           driveSelf = false;
@@ -565,6 +651,7 @@ export async function mountApp(): Promise<void> {
         driveButton.hidden = !scene.manual;
         driveButton.classList.remove("is-on");
         driveButton.setAttribute("aria-pressed", "false");
+        driveButton.textContent = "Drive it yourself";
         driveHint.hidden = true;
         legend.show({
           lidar: scene.lidar,
@@ -612,7 +699,7 @@ export async function mountApp(): Promise<void> {
       resetToSeed,
       setPathOverlay: setPaths,
       pause: (next) => {
-        paused = next;
+        setPaused(next);
       },
       teleport: (pose) => {
         activeSpawn = pose;
@@ -646,7 +733,7 @@ export async function mountApp(): Promise<void> {
           accumulator = Math.min(accumulator + frameDt, PHYSICS_DT * 5);
           let steps = 0;
           while (accumulator >= PHYSICS_DT && steps < 5) {
-            if (handsOn() || driveSelf) applyDrive();
+            if (handsOn() || manualDrive()) applyDrive();
             robot.preStep(PHYSICS_DT);
             world.step();
             simTime += PHYSICS_DT;
@@ -678,7 +765,7 @@ export async function mountApp(): Promise<void> {
         const focus = robot.focus();
         camera.update(frameDt, focus);
         view.followSun(focus.x, focus.z);
-        hud.update(robot.telemetry(), mode, code.current);
+        hud.update(robot.telemetry(), mode, code.current, simTime, paused);
         view.render();
       } catch (error) {
         console.error(error);

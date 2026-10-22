@@ -40,8 +40,12 @@ function post(message: WorkerToHost): void {
 
 function errorText(error: unknown): string {
   if (error && typeof error === "object" && "message" in error) {
-    const message = String((error as { message: unknown }).message);
-    if (message.includes("Traceback") || message.includes("Error")) return message.slice(0, 4000);
+    let message = String((error as { message: unknown }).message);
+    const lineno = (error as { lineno?: unknown }).lineno;
+    if (typeof lineno === "number" && Number.isFinite(lineno) && !/line \d+/.test(message)) {
+      message = `File "student.py", line ${lineno}\n${message}`;
+    }
+    if (message.includes("Traceback") || message.includes("Error") || message.includes("line ")) return message.slice(0, 4000);
   }
   if (error instanceof Error) return (error.message || error.stack || "Error").slice(0, 4000);
   return String(error).slice(0, 4000);

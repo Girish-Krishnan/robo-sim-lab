@@ -1,4 +1,4 @@
-import { spawnFor, worldSpawn, type EvalWorld } from "../eval/scenarios";
+import { spawnFor, worldSpawn } from "../sim/spawns";
 import type { WorldId } from "../sim/worlds";
 import { isWorldId } from "../sim/worlds";
 import type { SpawnPose } from "../sim/vehicle";
@@ -90,7 +90,7 @@ export function resolveSpawn(lesson: Lesson): SpawnPose {
  */
 export function resolveSpawnIn(lesson: Lesson, world: WorldId): SpawnPose {
   if (lesson.spawn === "default") return worldSpawn(world);
-  return spawnFor(world as EvalWorld, lesson.spawn, "scenario");
+  return spawnFor(world, lesson.spawn, "scenario");
 }
 
 /**
@@ -133,7 +133,7 @@ export function sceneFor(lesson: Lesson): LessonScene {
     paths,
     particles,
     route,
-    manual: lesson.moduleId === "localization" && Boolean(lesson.starter),
+    manual: lesson.slug === "bayes" || lesson.slug === "particles" || lesson.slug === "pf-pursuit" || lesson.slug === "kidnapped",
     camera,
     seed: 1,
     run: Boolean(lesson.starter),

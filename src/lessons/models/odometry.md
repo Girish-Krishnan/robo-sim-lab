@@ -11,13 +11,13 @@ status: ready
 
 Wheel odometry is a running guess of the pose. Each tick it adds "how far the rear wheels turned" and "how much the gyro says we yawed." Picture pacing a room with your eyes closed, counting steps and turns. The count is careful. The room you imagine still slides away from the room you are in.
 
-In the sim: pure pursuit on the oval. The amber trail is that guess leaving the car.
+In the sim: pure pursuit on the oval. The blue trail is that guess leaving the car. Watch the Time row. Pause freezes both the car and the clock.
 
 Each reset, the pose starts at $(0, 0, 0)$ in its own frame. Forward is the direction the car faced at that instant. After that, the only inputs are noisy wheel speed and the gyro yaw rate. A bias in either one walks the guess off the car, and the guess has no way to notice.
 
-The amber trail is this pose, dropped into the world with the spawn transform. At the first tick it lies on the car. A minute later, on the oval, it has peeled away.
+The blue trail is this pose, dropped into the world with the spawn transform (the shift from the odometry origin onto the map). At the first tick it lies on the car. A minute later, on the oval, it has peeled away.
 
-The steering angle is measured and published, with its own small bias, and the pose leaves it out. Heading comes from the gyro. Folding the steer measurement into the heading would turn a small bias into a constant curve, and one oval lap would leave the amber trail tens of metres from the car. A gyro bias of about 0.001 rad/s is a few degrees per minute, which is what a calibrated MEMS gyro actually does.
+The steering angle is measured and published, with its own small bias, and the pose leaves it out. Heading comes from the gyro. Folding the steer measurement into the heading would turn a small bias into a constant curve, and one oval lap would leave the blue trail tens of metres from the car. A gyro bias of 0.0012 rad/s, one sigma, is a few degrees per minute. MEMS means the gyro is a small sensor etched onto a chip. That is the class of part this bias is standing in for.
 
 <svg viewBox="0 0 480 230" role="img" aria-label="True path and odometry trail separating over one lap">
   <rect width="480" height="230" rx="12" fill="#10161a"/>
@@ -46,10 +46,10 @@ The program driving this lesson is that pursuit law. The pose it steers from is 
 
 {{code:lookahead}}
 
-Resetting the world resets the pose to the origin and draws a new bias. Compare two runs with the same seed, or you are comparing different biases. The pose lives in the odometry frame. Adding it to a world coordinate, or to the camera yaw, gives a number in a mixed frame.
+Reset run puts the car back at the start and replays the bias of the seed in the box. It does not draw a new bias. Type a new seed and press Enter to draw a different one. The pose lives in the odometry frame. Adding it to a world coordinate, or to the camera yaw, gives a number in a mixed frame.
 
 ## Try it
 
-1. Run pure pursuit on the oval. The amber trail should leave the coloured one as the lap goes on.
+1. Run pure pursuit on the oval. The blue trail should leave the coloured one as the lap goes on. The Time row is the clock for that lap.
 2. Print `sensors.odometry.pose.yaw` and a sum of `yaw_rate * dt`. They should stay close. They are the same integral.
-3. Change the seed from 1 to 2 and run again. The amber trail should leave on a different side or at a different rate. The bias was redrawn.
+3. Type `2` in the Seed box and press Enter. The blue trail should leave on a different side or at a different rate. Reset run with the same seed replays the bias you already have.

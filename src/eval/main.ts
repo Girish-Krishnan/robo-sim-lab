@@ -5,6 +5,7 @@ import RAPIER from "@dimforge/rapier3d-compat";
 import { EXAMPLES } from "../editor/examples";
 import { paintPathPlot, rasterToPng, renderContactSheet } from "./plot";
 import { loadStudentPolicy, loadStudentRuntime } from "./python";
+import { LESSONS } from "../course/catalog";
 import { referenceRoute } from "../sim/routes";
 import { EVAL_EXAMPLES, EVAL_WORLDS, solidsFor, spawnFor, type EvalExample, type EvalWorld } from "./scenarios";
 import { runEpisode, type RunMetrics } from "./simulate";
@@ -71,9 +72,40 @@ async function main(): Promise<void> {
   });
   writeFileSync(path.join(outDir, "summary.md"), renderSummary(compared));
 
-  const fullMatrix = !only && rows.length === EVAL_WORLDS.length * EVAL_EXAMPLES.length;
+  const fullMatrix = !only && rows.length === EVAL_WORLDS.length * EVAL_EXAMPLES.length && seed === 1;
+  const extras: RunMetrics[] = [];
+  if (ci && fullMatrix) {
+    const seen = new Set<string>();
+    for (const lesson of LESSONS) {
+      if (lesson.status !== "ready" || !lesson.starter) continue;
+      const key = `${lesson.world}/${lesson.starter}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      for (const extraSeed of [2, 3]) {
+        const started = Date.now();
+        const source = EXAMPLES.find((item) => item.id === lesson.starter)?.source;
+        if (!source) throw new Error(`Missing example ${lesson.starter}`);
+        const policy = loadStudentPolicy(pyodide, source);
+        const solids = solidsFor(lesson.world as EvalWorld);
+        const spawn = spawnFor(lesson.world as EvalWorld, lesson.starter, "scenario");
+        const episode = runEpisode(RAPIER, solids, {
+          world: lesson.world as EvalWorld,
+          example: lesson.starter as EvalExample,
+          spawn,
+          seconds,
+          seed: extraSeed,
+          policy,
+        });
+        extras.push(episode.metrics);
+        const m = episode.metrics;
+        process.stdout.write(
+          `${lesson.world}/${lesson.starter} seed ${extraSeed}  dist ${m.distance.toFixed(1)}  real ${m.collisionCount}  stuck ${m.stuckTime.toFixed(1)}  ${(Date.now() - started) / 1000}s\n`,
+        );
+      }
+    }
+  }
   if (fullMatrix) {
-    const demos = lessonDemoReport(rows);
+    const demos = lessonDemoReport(rows, extras);
     writeFileSync(path.join(outDir, "lesson-demos.md"), demos.markdown);
     process.stdout.write(`\n${demos.markdown}\n`);
     if (ci && demos.errors.length) {

@@ -13,7 +13,7 @@ Pure pursuit picks a point on the path a fixed distance ahead of the pose it bel
 
 In the sim: the plan, the car, and the odometry trail are all drawn. The green line is the reference path.
 
-Each tick the starter finds the nearest point along the route, then walks forward until the point is at least `LOOKAHEAD` metres away. It transforms that point into the body frame of the odometry pose, computes a curvature, and converts curvature to a steering angle with the bicycle model. A small speed PID slows down when the steer is large, so the corner is slower than the straight.
+Each tick the starter finds the nearest point along the route, then walks forward until the point is at least `LOOKAHEAD` metres away. It transforms that point into the body frame of the odometry pose, computes a curvature, and converts curvature to a steering angle with the bicycle model. A small speed controller slows down when the steer is large: throttle follows the speed error (the P), and a little memory of that error (the I) keeps a long straight from winding the command up. That is the PI in PID. The corner is slower than the straight.
 
 The starter draws the path, the lookahead point, and the arc implied by the command. All three are in the odometry frame. While the pose is still good, the arc sits on the real car. As the gyro bias accumulates, the drawn lookahead walks off the car even though the math is the same.
 
@@ -29,11 +29,11 @@ A short reverse runs if the bumper is in an obstacle and the speed is already ne
   <line x1="150" y1="162" x2="150" y2="78" stroke="#f4f1ea" stroke-width="1.5"/>
   <path d="M150 120 A 42 42 0 0 1 176 132" fill="none" stroke="#e3a23a" stroke-width="1.5"/>
   <text x="158" y="146" fill="#f4f1ea" font-size="13" font-family="sans-serif">Ld</text>
-  <text x="168" y="112" fill="#e3a23a" font-size="13" font-family="sans-serif">alpha</text>
+  <text x="168" y="112" fill="#e3a23a" font-size="18" font-family="sans-serif">α</text>
   <text x="360" y="74" fill="#7dcea0" font-size="13" font-family="sans-serif">reference path</text>
   <text x="228" y="108" fill="#f4d03f" font-size="12" font-family="sans-serif">lookahead</text>
   <text x="16" y="220" fill="#8e9b94" font-size="13" font-family="sans-serif">The dashed circle has radius Ld around the rear axle.</text>
-  <text x="16" y="240" fill="#8e9b94" font-size="13" font-family="sans-serif">alpha is the heading error to the point where that circle meets the path.</text>
+  <text x="16" y="240" fill="#d5ddd8" font-size="15" font-family="sans-serif">α is the heading error to the point where that circle meets the path.</text>
 </svg>
 
 ## The arc that passes through the lookahead point
@@ -47,6 +47,10 @@ The bicycle model turns curvature into a steering angle with $\kappa = \tan\delt
 $$\delta = \arctan\left(L \cdot \frac{2\sin\alpha}{L_d}\right).$$
 
 $L$ is the wheelbase, 1.9 m. The starter clamps $\delta$ to the vehicle limit. In code, $\alpha = \operatorname{atan2}(y_{\mathrm{left}}, x_{\mathrm{forward}})$ after rotating the lookahead offset by the odometry yaw.
+
+`LOOKAHEAD` is the distance, in metres, from the car to the point it steers toward.
+
+{{code:tunables}}
 
 The loop that walks out to `LOOKAHEAD` and turns it into a steer command:
 

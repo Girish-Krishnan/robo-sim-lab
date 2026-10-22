@@ -9,60 +9,53 @@ prerequisites: localization/pf-pursuit
 status: ready
 ---
 
-A kidnapped robot was moved while its eyes were shut. The odometry origin is a fresh zero in a place the robot has yet to recognise. The prior is spread over free space. The car creeps until one pose owns the scan, then it drives the route. It is the difference between "I started in the garage" and "I woke up in the building."
+A kidnapped robot was moved while it was not measuring. The odometry origin is a fresh zero in a place the robot has not recognised. The prior, the belief before any scan, is spread over free space. The car creeps until one pose owns the scan, then it drives the route.
 
-In the sim: overhead on the oval until the cloud collapses onto the car. The key names the cloud, the yellow ring, and the trails.
+In the sim: overhead on the oval while the cloud is wide. The Key names the same marks as the particle lesson: pink dots are particles, the yellow ring is the 2-sigma spread, the red trail is the estimate, and the blue trail is odometry.
 
-`UNKNOWN_START` in the kidnapped starter is true. Most of the 720 particles are free cells with a random heading. A minority sit on the known route at twelve headings. A few hundred uniform poses leave gaps in $x$, $y$, and yaw, so a route lattice is there so that some particle can land on the car. The camera frames the known map from above, because a chase camera behind the bumper shows the bumper, and the cloud fills the yard.
+<svg viewBox="0 0 520 250" role="img" aria-label="Two clumps of particles on the two straights of an oval. A cone retires the far clump.">
+  <rect width="520" height="250" rx="12" fill="#0e1418"/>
+  <rect x="70" y="50" width="380" height="150" rx="70" fill="none" stroke="#3d4a44" stroke-width="28"/>
+  <rect x="130" y="86" width="260" height="78" rx="36" fill="#0e1418"/>
+  <circle cx="150" cy="78" r="4" fill="#ff2bd6"/>
+  <circle cx="168" cy="70" r="4" fill="#ff2bd6"/>
+  <circle cx="186" cy="82" r="4" fill="#ff2bd6"/>
+  <circle cx="158" cy="90" r="4" fill="#ff2bd6"/>
+  <circle cx="340" cy="176" r="4" fill="#ff2bd6" opacity="0.7"/>
+  <circle cx="360" cy="184" r="4" fill="#ff2bd6" opacity="0.7"/>
+  <circle cx="378" cy="172" r="4" fill="#ff2bd6" opacity="0.7"/>
+  <circle cx="200" cy="64" r="8" fill="#ffd24a"/>
+  <text x="214" y="60" fill="#ffd24a" font-size="16" font-family="sans-serif">cone</text>
+  <text x="80" y="36" fill="#f4f7f4" font-size="18" font-family="sans-serif">Two straights, one scan</text>
+  <text x="24" y="228" fill="#d5ddd8" font-size="16" font-family="sans-serif">The near clump is the car. The far clump matches the walls until a cone does not.</text>
+</svg>
 
-Each particle is a saturated magenta dot, about 8 px, with a dark outline and a heading tick of about 28 cm. The yellow ellipse is the 2-sigma contour of the cloud. While that ellipse is still the size of the yard, the camera stays overhead. Once it tightens onto the car, the camera comes in.
+`UNKNOWN_START` is true here. Most of the 720 particles are free cells with a random heading. A few sit on the route at twelve headings, so one of them can land on the car. The camera stays overhead while that cloud fills the yard.
 
-While the weight is spread out, the car creeps with the right-wall follower from the wall lesson. The gains are the same. The throttle is capped, so the car stays slow while the guess is still a guess. Pursuit starts once the best particle holds about a tenth of the weight: the cloud is replaced by a tight tracking cloud around that pose, and the rest of the minute is the same pure pursuit as the known-start filter.
+{{code:tunables}}
 
-On the city roundabout and in the forest that peak is there on the first scans, almost all of the weight on one particle. On the oval the best particle holds about a tenth, because the other straight still explains a parked scan. That tenth is already the true straight on this route, known to the width of the corridor. The warehouse bay is flatter still. The peak stays near a few percent until the car has rolled, so the creep continues and pursuit waits.
+While the weight is spread out, the car creeps with the wall follower and a capped throttle. Pursuit starts once the best particle holds about a tenth of the weight, and the cloud tightens around that pose.
 
-Augmented MCL keeps a short-term and a long-term average of the log of the mean likelihood. When the recent scans fit worse than the filter has been used to, the short-term average falls first and the resample mixes in random free-space particles, at most a quarter of the cloud. A full replacement on a small dip is how a symmetric aisle flips to the other copy of itself. If the published pose has left the route, the wall follower takes the wheel again.
+On a roundabout or in the forest, one particle takes almost all of the weight at once. On the oval the best holds about a tenth, because the other straight still explains a parked scan, and that tenth is already the true straight. The warehouse bay shares its weight for longer, so the creep lasts longer.
 
-**Drive it yourself** is the kidnapped experiment with your hands on the wheel. Click the view, then drive. The cloud should tighten onto the car as the scan picks up a corner, a cone, or the end of a straight. The filter is the same sensor-only pipeline, running in the worker while you steer.
+Augmented MCL mixes new particles back in when the scan starts fitting badly. It watches the log of the mean likelihood: the average beam likelihood, then its natural log, counted in nats. A short-term average of that log is compared with a long-term one. A drop of several nats adds random free-space particles, at most a quarter of the cloud. A turn moves the fit by a nat or two and adds none.
 
-The prior that spreads the first cloud:
+After the first scans the weights are cubed, so a strong particle looks stronger. The cube goes away once that particle is adopted.
+
+The prior that spreads the first cloud, and the steer once a winner exists:
 
 {{code:prior}}
 
-Once a winner exists, this is the steer it follows:
-
 {{code:pursue}}
-
-## A prior, and the signal that injects new particles
-
-The belief starts as free space plus a route lattice. The free part is
-
-$$x^{[i]} \sim \mathrm{Uniform}(\mathcal{F}),\quad \theta^{[i]} \sim \mathrm{Uniform}(-\pi, \pi).$$
-
-The lattice puts the remaining particles on the path vertices at twelve headings. After the first scans the weights are cubed, which is a way to see whether one particle owns the cloud. After that particle is adopted, the cube goes away.
-
-Let $\bar\ell_t$ be the log of the average beam likelihood, so the particles that fit dominate it. Two smoothers track it:
-
-$$\ell_{\mathrm{slow}} \leftarrow \ell_{\mathrm{slow}} + \alpha_{\mathrm{slow}}(\bar\ell_t - \ell_{\mathrm{slow}}),$$
-
-$$\ell_{\mathrm{fast}} \leftarrow \ell_{\mathrm{fast}} + \alpha_{\mathrm{fast}}(\bar\ell_t - \ell_{\mathrm{fast}}),$$
-
-with $\alpha_{\mathrm{slow}} \ll \alpha_{\mathrm{fast}}$. A drop of several nats injects new free-space particles. A turn moves $\bar\ell_t$ by a nat or two and injects nothing. The normalized weights always average $1/N$, so they are the wrong signal for "the scan suddenly fits badly."
-
-The yellow ellipse is the 2-sigma contour of the weighted covariance. A cloud that still covers the yard draws a large ellipse. After the collapse it sits on the car.
 
 ## Two straights that look the same until a cone
 
-The oval has two straights with the same wall distances. A scan taken while parked matches both, so the weight stays split until something breaks the symmetry. The cones and the crates sit on the outer lanes, and they are mirrored poorly. The best particle on the first scans is already one straight. Rolling past a cone is what retires the other one. Along the straight, parallel walls are quiet about distance travelled. The cones speak. The Bayes lesson's one-dimensional search slides the whole cloud along the route tangent until those short edges agree with the scan.
+The oval's two straights share the same wall distances, so a second clump can sit on the far straight. The cones are not copies of each other, so rolling past one retires the far clump. Until then the yellow ring stays wide even though the red estimate is already on the true straight.
 
-On the oval the cloud tightens in the first second: the yellow ring shrinks under half a metre and the estimate stays on the car. A long straight wall is quiet about distance travelled. A cone changes the scan as you roll past it, and that is what pulls the estimate along the straight.
-
-The warehouse aisles are even less distinct at the first scan. Collapsing immediately adopts a particle that shares the weight with many others, and pursuit of that particle drives into the racks. Waiting for a peak, while the wall follower creeps, is what turns the minute into a lap.
-
-The mean of two modes lies in the wall between them. The starter steers at one winner, or at the wall beside the car.
+On seed 1 the red estimate locks onto that straight in the first second. The whole cloud does not. A second clump can still be about 15 m off at 15 s, and the ring covers both until the cone removes it. The starter steers at one winner, or at the wall beside the car, rather than at the average of the two clumps, which would sit in the wall between them.
 
 ## Try it
 
-1. Run the kidnapped starter. The first frame should be hundreds of magenta dots across the free space, with a large yellow ellipse. The camera is overhead, and it comes in once the ellipse tightens.
-2. On the oval, look for a second clump on the far straight at the start. After the car passes a cone, the along-track error should come down. The known-start filter on this oval ends in the same band.
-3. Turn on Drive it yourself, click the view, and drive yourself along the straight. The cloud should collapse onto you as the scan changes. Switch to the warehouse and the creep lasts longer, because the first scans share their weight.
+1. Run the kidnapped starter. The first frame should be hundreds of pink dots across the free space, with a large yellow ring. The camera is overhead. On the Time row, the red trail should be on the car within the first second. The ring may stay wide.
+2. Look for a second clump on the far straight. After the car passes a cone, that clump should thin out and the ring should shrink.
+3. Turn on Drive it yourself. The program keeps driving until you click the view. Then drive the straight. The cloud should gather on you as the scan changes. In the warehouse the creep lasts longer, because the first scans share their weight.

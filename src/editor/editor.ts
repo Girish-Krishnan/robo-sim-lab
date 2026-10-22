@@ -1,12 +1,36 @@
 import { python } from "@codemirror/lang-python";
-import { EditorState, Prec } from "@codemirror/state";
+import { EditorState, Prec, StateEffect, StateField } from "@codemirror/state";
 import { oneDark } from "@codemirror/theme-one-dark";
-import { EditorView, keymap } from "@codemirror/view";
+import { Decoration, EditorView, keymap } from "@codemirror/view";
 import { basicSetup } from "codemirror";
+
+const setErrorLine = StateEffect.define<number | null>();
+
+const errorField = StateField.define({
+  create() {
+    return Decoration.none;
+  },
+  update(marks, transaction) {
+    let next = marks.map(transaction.changes);
+    for (const effect of transaction.effects) {
+      if (!effect.is(setErrorLine)) continue;
+      if (effect.value == null) {
+        next = Decoration.none;
+        continue;
+      }
+      const lineNo = Math.min(Math.max(1, effect.value), transaction.state.doc.lines);
+      const line = transaction.state.doc.line(lineNo);
+      next = Decoration.set([Decoration.line({ class: "cm-error-line" }).range(line.from)]);
+    }
+    return next;
+  },
+  provide: (field) => EditorView.decorations.from(field),
+});
 
 export interface CodeEditor {
   getValue: () => string;
   setValue: (source: string) => void;
+  highlightLine: (line: number | null) => void;
   relayout: () => void;
   destroy: () => void;
 }
@@ -30,6 +54,8 @@ export function createEditor(
         basicSetup,
         python(),
         oneDark,
+        errorField,
+        EditorView.lineWrapping,
         EditorView.updateListener.of((update) => {
           if (mute || !update.docChanged || !onChange) return;
           onChange(update.state.doc.toString());
@@ -65,6 +91,13 @@ export function createEditor(
         changes: { from: 0, to: view.state.doc.length, insert: next },
       });
       mute = false;
+    },
+    highlightLine: (line: number | null) => {
+      view.dispatch({ effects: setErrorLine.of(line) });
+      if (line != null) {
+        const at = view.state.doc.line(Math.min(line, view.state.doc.lines));
+        view.dispatch({ selection: { anchor: at.from }, scrollIntoView: true });
+      }
     },
     relayout: () => view.requestMeasure(),
     destroy: () => view.destroy(),

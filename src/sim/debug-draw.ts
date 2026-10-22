@@ -124,11 +124,11 @@ function markers(spawn: SpawnPose, points: { x: number; y: number; yaw?: number;
   const halo = pointCloud(
     positions,
     new THREE.PointsMaterial({
-      size: count >= 24 ? 14 : 16,
+      size: count >= 24 ? 6 : 8,
       sizeAttenuation: false,
       color: "#140014",
       transparent: true,
-      opacity: 1,
+      opacity: 0.18,
       depthTest: false,
       depthWrite: false,
       toneMapped: false,
@@ -143,11 +143,11 @@ function markers(spawn: SpawnPose, points: { x: number; y: number; yaw?: number;
   const dots = new THREE.Points(
     geometry,
     new THREE.PointsMaterial({
-      size: count >= 24 ? 8 : 10,
+      size: count >= 24 ? 3.5 : 5,
       sizeAttenuation: false,
       vertexColors: true,
       transparent: true,
-      opacity: 1,
+      opacity: 0.45,
       depthTest: false,
       depthWrite: false,
       toneMapped: false,

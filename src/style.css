@@ -5,7 +5,7 @@
   --panel-2: #1b2228;
   --line: rgba(255, 255, 255, 0.08);
   --text: #e7eeea;
-  --muted: #8e9b94;
+  --muted: #a8b6ae;
   --accent: #2fbfa8;
   --accent-ink: #06241f;
   --amber: #e3a23a;
@@ -19,6 +19,7 @@
 html, body, #app {
   margin: 0;
   height: 100%;
+  overflow: hidden;
 }
 
 body {
@@ -51,13 +52,20 @@ button.primary {
   font-weight: 620;
 }
 button.primary:hover { background: #49d0ba; }
-#lidar-toggle.is-on {
+#lidar-toggle,
+#paths-toggle {
+  background: transparent;
+  color: var(--muted);
+}
+#lidar-toggle.is-on,
+#paths-toggle.is-on {
   background: var(--accent);
   color: var(--accent-ink);
   border-color: transparent;
   font-weight: 620;
 }
-#lidar-toggle.is-on:hover { background: #49d0ba; }
+#lidar-toggle.is-on:hover,
+#paths-toggle.is-on:hover { background: #49d0ba; }
 
 :focus-visible {
   outline: 2px solid var(--accent);
@@ -66,7 +74,7 @@ button.primary:hover { background: #49d0ba; }
 
 #app {
   display: grid;
-  grid-template-rows: 60px minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
 }
 
 #shell {
@@ -102,9 +110,10 @@ button.primary:hover { background: #49d0ba; }
 .lesson-nav-row button.is-on { background: var(--amber); color: #2a1c08; border-color: transparent; }
 .lesson-progress {
   margin-left: auto;
+  padding-right: 12px;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
-  font-size: 12px;
+  font-size: 13px;
 }
 #lesson-index { font-size: 13px; }
 #lesson-index summary {
@@ -112,7 +121,7 @@ button.primary:hover { background: #49d0ba; }
   color: var(--muted);
   padding: 2px 2px 4px;
 }
-.lesson-index-body { max-height: 220px; overflow: auto; padding-bottom: 6px; }
+.lesson-index-body { max-height: min(50vh, 420px); overflow: auto; padding-bottom: 6px; }
 .lesson-index-body h2 {
   margin: 8px 4px 2px;
   font-size: 11px;
@@ -242,7 +251,7 @@ button.primary:hover { background: #49d0ba; }
 }
 
 #app.mode-lessons #code-chrome { display: none !important; }
-#code-chrome { flex: none; }
+#code-chrome { flex: none; position: relative; }
 
 #try-bar {
   display: none;
@@ -269,7 +278,7 @@ button.primary:hover { background: #49d0ba; }
 #app.mode-code #toggle-console,
 #app.mode-lessons #try-bar .shortcut,
 #app.mode-lessons #try-label,
-#app.mode-lessons #edit-code { display: none; }
+#try-bar #drive-self { display: none; }
 #drive-self.is-on {
   background: var(--accent);
   color: var(--accent-ink);
@@ -281,8 +290,9 @@ header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 0 12px;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 8px 12px;
   border-bottom: 1px solid var(--line);
   background: rgba(12, 16, 19, 0.92);
   min-width: 0;
@@ -334,6 +344,7 @@ header {
 .header-actions {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   justify-content: flex-end;
   min-width: 0;
@@ -344,7 +355,7 @@ header {
   align-items: center;
   gap: 6px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .header-select select,
@@ -359,13 +370,6 @@ header {
 }
 
 .header-select input { width: 64px; }
-
-#paths-toggle.is-on {
-  background: var(--amber);
-  color: #2a1c08;
-  border-color: transparent;
-  font-weight: 620;
-}
 
 main {
   display: grid;
@@ -382,6 +386,7 @@ main {
   position: relative;
   min-width: 0;
   min-height: 0;
+  overflow: hidden;
   background: #101418;
   touch-action: none;
 }
@@ -450,9 +455,11 @@ main {
 #hud {
   position: absolute;
   left: 14px;
-  bottom: 14px;
+  bottom: 8px;
   z-index: 2;
   width: 230px;
+  max-height: calc(100% - 56px);
+  overflow: auto;
   padding: 10px 12px;
   border-radius: 14px;
   background: rgba(10, 14, 16, 0.72);
@@ -466,8 +473,8 @@ main {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  font-size: 13px;
-  line-height: 1.55;
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 .hud-row span { color: var(--muted); }
@@ -605,29 +612,17 @@ body.splitter-drag iframe { pointer-events: none; }
   color: #d5e6df;
 }
 
-#editor { flex: 1 1 auto; min-height: 0; overflow: hidden; }
-#app.mode-lessons #code-panel { overflow-y: auto; }
+#editor { flex: 1 1 200px; min-height: 200px; overflow: hidden; }
+#app.mode-lessons #code-panel { overflow: hidden; }
 #app.mode-lessons #lesson-chrome {
-  position: sticky;
-  top: 0;
+  flex: none;
   z-index: 5;
   background: #0e1316;
 }
 #app.mode-lessons #lesson {
-  min-height: 240px;
-  flex: 1 0 auto;
-  overflow: visible;
-}
-#app.mode-lessons.lesson-has-code #try-bar {
-  position: sticky;
-  bottom: 0;
-  z-index: 4;
-}
-#app.mode-lessons.lesson-has-code.console-open .console-wrap {
-  position: sticky;
-  bottom: 36px;
-  z-index: 4;
-  box-shadow: 0 -8px 16px rgba(0, 0, 0, 0.28);
+  flex: 1 1 0;
+  min-height: 140px;
+  overflow: auto;
 }
 #app.mode-lessons.lesson-has-code #lesson-chrome { order: 0; }
 #app.mode-lessons.lesson-has-code #lesson { order: 1; }
@@ -645,15 +640,22 @@ body.splitter-drag iframe { pointer-events: none; }
 #app.mode-lessons.lesson-has-code.lab-open #lab-split { display: block !important; }
 #app.mode-lessons.lesson-has-code.lab-open #editor {
   display: block !important;
-  flex: 0 0 var(--lab-editor, 156px);
-  height: var(--lab-editor, 156px);
-  min-height: 100px;
-  max-height: var(--lab-editor, 156px);
+  flex: 1 1 200px;
+  height: auto;
+  min-height: 200px;
+  max-height: none;
 }
 #app.mode-lessons.lesson-has-code.console-open .console-wrap {
   display: flex !important;
+  position: static;
   height: 112px;
-  flex: none;
+  flex: 0 0 112px;
+  min-height: 72px;
+  max-height: 140px;
+}
+#app.mode-code .console-wrap {
+  flex: 0 0 120px;
+  min-height: 72px;
 }
 #app.mode-code #lesson-chrome,
 #app.mode-code #lesson,
@@ -667,11 +669,12 @@ body.splitter-drag iframe { pointer-events: none; }
 .shortcut { color: var(--muted); margin-left: 4px; }
 
 .console-wrap {
-  height: 168px;
-  flex: none;
+  height: auto;
+  flex: 0 1 168px;
+  max-height: 180px;
+  min-height: 72px;
   display: flex;
   flex-direction: column;
-  min-height: 0;
   border-top: 1px solid var(--line);
   background: #0c1012;
 }
@@ -734,16 +737,23 @@ body.splitter-drag iframe { pointer-events: none; }
 
 #legend {
   position: absolute;
-  left: 12px;
-  bottom: 12px;
+  top: 10px;
+  left: 10px;
   z-index: 3;
-  width: min(300px, calc(100% - 200px));
+  width: min(280px, calc(100% - 20px));
+  max-height: max(40px, calc(100% - 168px));
+  overflow: auto;
   background: rgba(12, 16, 19, 0.9);
   border: 1px solid var(--line);
   border-radius: 10px;
   color: var(--text);
-  font-size: 12px;
+  font-size: 12.5px;
   line-height: 1.35;
+}
+#legend:not(.is-open) {
+  width: auto;
+  max-width: 88px;
+  overflow: hidden;
 }
 #legend[hidden] { display: none; }
 #legend-toggle {
@@ -780,12 +790,18 @@ body.splitter-drag iframe { pointer-events: none; }
 #legend-list strong { font-weight: 650; }
 
 #example-browser {
-  margin: 0 10px 8px;
+  position: absolute;
+  z-index: 6;
+  left: 10px;
+  right: 10px;
+  top: 46px;
+  margin: 0;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: #0e1316;
-  max-height: min(320px, 46vh);
+  max-height: min(360px, 50vh);
   overflow: auto;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.45);
 }
 #example-browser[hidden] { display: none; }
 .example-intro {
@@ -816,9 +832,76 @@ body.splitter-drag iframe { pointer-events: none; }
 #example-confirm p { margin: 0 0 8px; font-size: 13px; }
 #example-confirm button { margin-right: 6px; }
 
+.code-slot { margin: 10px 0 16px; }
+.slot-label {
+  margin: 0 0 4px;
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+.code-slot .cm-editor { height: auto; }
+.cm-error-line { background: rgba(227, 109, 92, 0.28); }
+
+#drive-self[hidden] { display: none !important; }
+.lesson-body #drive-self {
+  display: inline-flex;
+  margin: 4px 0 14px;
+  padding: 8px 14px;
+  font-size: 15px;
+  font-weight: 650;
+}
+
+#run-banner {
+  position: absolute;
+  top: 52px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(42, 24, 16, 0.92);
+  border: 1px solid rgba(227, 162, 58, 0.75);
+  color: #f4ead6;
+  font-size: 14px;
+}
+#run-banner[hidden] { display: none; }
+
+#sensor-api {
+  margin: 0 12px 8px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+#sensor-api summary { cursor: pointer; color: var(--text); }
+#sensor-api ul { margin: 6px 0 0; padding-left: 18px; }
+#sensor-api code { font-family: var(--mono); color: #d5e6df; }
+
+.course-complete {
+  margin: 18px 0 8px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(47, 191, 168, 0.45);
+  background: #13211f;
+}
+.course-complete h2 { margin: 0 0 6px; font-size: 18px; }
+.course-complete p { margin: 0; color: var(--text); }
+.lesson-index-body a.is-soon { pointer-events: none; opacity: 0.45; }
+#lesson-module option:disabled { color: #6d7872; }
+
 @media (max-width: 1360px) {
-  .subtitle { display: none; }
+  .title, .subtitle { display: none; }
   .mode-switch button { padding: 6px 10px; }
+  .header-select { font-size: 0; gap: 0; }
+  .header-select select,
+  .header-select input { font-size: 13px; }
+}
+
+@media (max-width: 1100px) {
+  .title, .subtitle { display: none; }
+  .header-select { font-size: 0; gap: 0; }
+  .header-select select,
+  .header-select input { font-size: 13px; }
+  .header-actions { gap: 6px; }
+  header button { padding: 6px 8px; }
 }
 
 @media (max-width: 1180px) {
@@ -830,15 +913,18 @@ body.splitter-drag iframe { pointer-events: none; }
   .title, .header-select span { display: none; }
   header, .header-actions, .brand { min-width: 0; }
   .header-select { font-size: 0; }
-  .header-select select { font-size: 13px; max-width: 112px; }
+  .header-select select,
+  .header-select input { font-size: 13px; max-width: 112px; }
   #app.mode-code main,
   #app.mode-lessons main {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(220px, 42vh) minmax(0, 1fr);
+    grid-template-rows: minmax(160px, 32vh) minmax(280px, 1fr);
   }
   #app.mode-code #splitter,
   #app.mode-lessons #splitter { display: none; }
   #code-panel { border-top: 1px solid var(--line); }
+  #app.mode-lessons #code-panel,
+  #app.mode-code #code-panel { overflow: auto; }
   #hint { font-size: 12px; }
   #radar { width: 120px; height: 120px; }
 }

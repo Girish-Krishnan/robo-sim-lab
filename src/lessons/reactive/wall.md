@@ -33,8 +33,8 @@ The side beam and the diagonal beam come from one small helper. Centre $-90^\cir
   <line x1="130" y1="40" x2="130" y2="210" stroke="#355850" stroke-width="1" stroke-dasharray="4 3"/>
   <text x="78" y="150" fill="#e3a23a" font-size="13" font-family="sans-serif">d</text>
   <text x="96" y="36" fill="#8e9b94" font-size="12" font-family="sans-serif">target 3.2 m</text>
-  <text x="228" y="120" fill="#9fd8cf" font-size="13" font-family="sans-serif">alpha</text>
-  <text x="16" y="232" fill="#8e9b94" font-size="13" font-family="sans-serif">d is the -90 deg beam. alpha comes from comparing it with the -45 deg beam.</text>
+  <text x="228" y="120" fill="#9fd8cf" font-size="18" font-family="sans-serif">α</text>
+  <text x="16" y="232" fill="#d5ddd8" font-size="15" font-family="sans-serif">d is the −90° beam. α comes from comparing it with the −45° beam.</text>
 </svg>
 
 ## Distance now, and distance a step ahead
@@ -53,6 +53,14 @@ These three lines are that error. `future` is the distance the car will have if 
 
 {{code:error}}
 
+The numbers in that law:
+
+{{code:tunables}}
+
+And the line that turns them into a steering command. $K_d$ is the damping gain on $\alpha$. $K_p$ is the gain on the distance error.
+
+{{code:steer}}
+
 This is a PD law on distance. The derivative is the angle between two beams, available in one scan, which is steadier than a noisy range difference at 20 Hz.
 
 The right-hand wall is a negative lidar angle. The $+90^\circ$ beam is the left wall, and the same gains wind you into it. At a corner the side range jumps to max range because the wall ended. The starter treats "side beam lost, diagonal beam still there" as a corner, and it coasts for a few ticks so the rear axle reaches the turn before the steer comes in.
@@ -62,5 +70,5 @@ The oval should complete a lap with the car clear of the wall. If you raise $K_p
 ## Try it
 
 1. Run the starter on the oval. It should stay off the wall and the cones and finish a lap.
-2. Set $K_d$ to 0 and run the same straight. The car should wander toward and away from the wall.
-3. Swap the sign of the $K_d \alpha$ term only. The corner should throw the car off the wall. Put the minus sign back.
+2. In the tunables block, set `KD` to `0` and run the same straight. The car should wander toward and away from the wall.
+3. In the steer block, change `- KD * alpha` to `+ KD * alpha`. The corner should throw the car off the wall. Put the minus sign back.

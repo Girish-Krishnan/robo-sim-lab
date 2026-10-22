@@ -5,12 +5,11 @@ import { mountSolids, type WorldMount } from "../course";
 import type { Atmosphere, GraphicsQuality } from "../scene";
 import { loadProps, placeCargo } from "../props";
 import { loadPropKit, tileUvs, TILES_PER_METER } from "../surfaces";
-import type { SpawnPose } from "../vehicle";
 import { cuboid } from "./factory";
 
-type Rapier = typeof RAPIER;
+export { WAREHOUSE_SPAWN } from "../spawns";
 
-export const WAREHOUSE_SPAWN: SpawnPose = { x: 0, y: 0.84, z: -10, yaw: 0 };
+type Rapier = typeof RAPIER;
 
 export const WAREHOUSE_ATMOSPHERE: Atmosphere = {
   background: "#8d98a3",

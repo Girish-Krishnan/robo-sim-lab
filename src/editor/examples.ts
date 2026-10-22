@@ -101,7 +101,9 @@ const avoid = `# Lidar avoid
 import math
 import numpy as np
 
+# @@chunk tunables
 HALF = 1.35
+# @@end
 aim = 0.0
 reverse = 0
 phase = "run"
@@ -129,6 +131,10 @@ def control(sensors):
     global anchor_x, anchor_y, anchor_t, saw_anchor
     ranges = np.asarray(sensors.lidar.ranges, dtype=float)
     angles = np.asarray(sensors.lidar.angles, dtype=float)
+    # @@chunk misses
+    # A beam at max_range did not hit anything. Leave it there so it counts as far, not as a wall.
+    ranges = np.where(ranges >= sensors.lidar.max_range - 1e-6, sensors.lidar.max_range, ranges)
+    # @@end
     wide = inflate(ranges, angles)
 
     front = np.abs(angles) < 0.95
@@ -282,10 +288,12 @@ const wall = `# Wall follow
 import math
 import numpy as np
 
+# @@chunk tunables
 TARGET = 3.2
 LOOK = 1.8
 KP = 0.16
 KD = 0.55
+# @@end
 WHEELBASE = 1.9
 # follow the wall, coast past the corner, then arc onto the next face.
 phase = "follow"
@@ -417,7 +425,9 @@ def control(sensors):
         return 0.0, throttle
 
     if side < 9.0 and diag < 11.0:
+        # @@chunk steer
         steering = KP * (TARGET - future) - KD * alpha
+        # @@end
     else:
         steering = 0.0
     if dist > TARGET + 1.0:
@@ -463,7 +473,9 @@ const pursuit = `# Pure pursuit
 import math
 
 WHEELBASE = ${wheelbase}
+# @@chunk tunables
 LOOKAHEAD = 3.2
+# @@end
 
 def control(sensors):
     path = sensors.task.path

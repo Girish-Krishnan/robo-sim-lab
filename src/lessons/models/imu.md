@@ -13,6 +13,18 @@ The IMU in this sandbox is a yaw gyro and a three-axis accelerometer. There is n
 
 In the sim: the circle program on an open pad, so the yaw rate has a steady value to compare.
 
+<svg viewBox="0 0 520 230" role="img" aria-label="A gyro bias adds a little yaw every second, so heading walks off in a fan.">
+  <rect width="520" height="230" rx="12" fill="#0e1418"/>
+  <line x1="70" y1="180" x2="250" y2="70" stroke="#f4f7f4" stroke-width="3"/>
+  <line x1="70" y1="180" x2="300" y2="48" stroke="#6ea8ff" stroke-width="3"/>
+  <path d="M210 96 A 150 150 0 0 1 236 78" fill="none" stroke="#ffd24a" stroke-width="3"/>
+  <text x="248" y="90" fill="#ffd24a" font-size="18" font-family="sans-serif">b·t</text>
+  <text x="160" y="150" fill="#f4f7f4" font-size="16" font-family="sans-serif">true heading</text>
+  <text x="250" y="56" fill="#6ea8ff" font-size="16" font-family="sans-serif">integrated gyro</text>
+  <text x="24" y="36" fill="#f4f7f4" font-size="18" font-family="sans-serif">The bias is a heading that grows with time</text>
+  <text x="24" y="214" fill="#d5ddd8" font-size="16" font-family="sans-serif">b is 0.0012 rad/s, one sigma. Over a minute that is a few degrees.</text>
+</svg>
+
 `sensors.imu.yaw_rate` is radians per second about body +z. Positive is a left turn, the same sign as positive steering and as the odometry yaw. White noise is about 0.002 rad/s. A bias drawn once per reset has standard deviation 0.0012 rad/s. The odometry lesson integrates this rate. If you integrate it yourself, use the same sample the odometry used, and the two headings stay in step.
 
 `sensors.imu.accel` is specific force in the robot frame, in m/s². At rest on level ground the z component is about $+9.81$. The sensor feels the ground pushing up. In a hard brake, x (forward) changes. In a tight left turn, y (left) shows the lateral specific force.

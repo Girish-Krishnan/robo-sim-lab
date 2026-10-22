@@ -11,13 +11,24 @@ status: ready
 
 The plots look jittery, and they also look slowly wrong. Those are two different animals. White noise is a fresh coin flip every sample. Bias is one coin flip at the start of the run, then held, so the late error is that single draw, grown up.
 
-In the sim: pure pursuit on the oval, seed 1. The late amber trail is that held bias.
+In the sim: pure pursuit on the oval, seed 1. The late blue trail is that held bias. The Time row under the view is the clock these sentences use. Pause stops the car and the clock together.
+
+<svg viewBox="0 0 520 240" role="img" aria-label="White noise jitters around the truth. A bias walks away and stays walked away.">
+  <rect width="520" height="240" rx="12" fill="#0e1418"/>
+  <line x1="40" y1="150" x2="490" y2="150" stroke="#3d4a44" stroke-width="2"/>
+  <text x="400" y="142" fill="#d5ddd8" font-size="15" font-family="sans-serif">truth</text>
+  <path d="M40 146 L70 158 L100 140 L130 162 L160 144 L190 156 L220 138 L250 160 L280 148 L310 142 L340 158 L370 146 L400 154 L430 148 L460 152" fill="none" stroke="#ffd24a" stroke-width="2"/>
+  <path d="M40 150 C 140 148, 220 120, 300 90 S 430 40, 490 28" fill="none" stroke="#6ea8ff" stroke-width="3"/>
+  <text x="48" y="36" fill="#f4f7f4" font-size="18" font-family="sans-serif">Two kinds of wrong</text>
+  <text x="48" y="200" fill="#ffd24a" font-size="16" font-family="sans-serif">Yellow: white noise, a fresh error every sample.</text>
+  <text x="48" y="224" fill="#6ea8ff" font-size="16" font-family="sans-serif">Blue: a bias, drawn once, then held.</text>
+</svg>
 
 **White noise** is a fresh random number every sample. On the lidar it is about 2 cm. On wheel speed it is about 2 cm/s. On the gyro it is about 0.002 rad/s. Averaged over a second of 20 Hz control, a lot of it shrinks.
 
-**Bias** is drawn once when you reset and then held. Speed bias scales every metre you travel. Gyro bias turns every second into a little extra yaw. Steering bias shows up on `steering_angle` and stays out of the pose. A heading you build from $\tan(\delta)$ puts that bias back into the curvature, and the amber trail leaves the oval.
+**Bias** is drawn once from the seed and then held. Reset run replays that same draw. Speed bias scales every metre you travel. Gyro bias turns every second into a little extra yaw. Steering bias shows up on `steering_angle` and stays out of the pose. A heading you build from $\tan(\delta)$ puts that bias back into the curvature, and the blue trail leaves the oval.
 
-**Reset seed** replays the same draw. A different number in the seed box is a different car, in the sensor sense, on the same track.
+Type a new number in the Seed box and press Enter to draw a different bias. Reset run, with the box left alone, replays the one you have.
 
 ## Each sensor, written as an equation
 
@@ -59,16 +70,16 @@ Cross-track on a path tracker that trusts $\theta$ then grows with time even whe
 
 Lidar noise stays local. A wall that was 3.20 m away is still about 3.20 m away a minute later, plus or minus 2 cm. A map plus a lidar can therefore correct a pose that odometry has walked away.
 
-The program below is the pursuit law riding that drifting pose. The amber trail leaving the car is the lesson the gains are there to show.
+The program below is the pursuit law riding that drifting pose. The gains stay put. The blue trail leaves because the pose they steer from is biased.
 
 {{code:lookahead}}
 
-On the view, the coloured line is where the car went and the amber line is odometry. The key in the corner uses the same colours.
+On the view, the coloured line is where the car went and the blue line is odometry. The key on the view uses the same colours.
 
 Note: smoothing the gyro to "take the bias out" also takes the turn out, until another sensor says which part was the turn. The particle filter later in the course is that other sensor.
 
 ## Try it
 
-1. Run pure pursuit on the oval for a full minute. The amber trail should be subtle at 10 seconds and obvious late.
-2. Reset the seed and run the same program. The direction of the drift should change, or its size should. The controller source stayed put.
+1. Run pure pursuit on the oval. At about 10 s on the Time row the blue trail should still be subtle. Late in the minute it should be obvious. Pause if you want to look.
+2. Type `2` in the Seed box and press Enter. The direction of the drift should change, or its size should. The controller source stayed put. Reset run with seed 2 replays that new bias.
 3. Print the forward lidar range once a second on a straight. The number should jitter by centimetres. That is the contrast with yaw.

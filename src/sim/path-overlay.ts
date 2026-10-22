@@ -85,7 +85,7 @@ export class PathOverlay {
     odomGeometry.setAttribute("position", new THREE.BufferAttribute(odomPositions, 3));
     this.odomLine = new THREE.Line(
       odomGeometry,
-      new THREE.LineBasicMaterial({ color: 0xe3a23a }),
+      new THREE.LineBasicMaterial({ color: 0x6ea8ff }),
     );
     this.group.add(this.odomLine);
   }

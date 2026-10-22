@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { LESSONS, MODULES, lessonById, resolveSpawnIn } from "../src/course/catalog";
 import { renderMarkdown } from "../src/course/markdown";
-import { readChunks } from "../src/editor/chunks";
+import { chunkAtLine, readChunks } from "../src/editor/chunks";
+import { formatStudentError } from "../src/editor/errors";
 import { EXAMPLES } from "../src/editor/examples";
+import { spawnFor, worldSpawn } from "../src/sim/spawns";
+import type { WorldId } from "../src/sim/worlds";
 
 describe("course catalog", () => {
   it("lists modules 0-4 as real lessons and the later modules as coming soon", () => {
@@ -44,6 +47,18 @@ describe("course catalog", () => {
     expect(rendered).toContain('data-chunk="drive"');
   });
 
+  it("keeps every ready lesson's kind of start in every world", () => {
+    const worlds: WorldId[] = ["city", "track", "forest", "warehouse"];
+    for (const lesson of LESSONS) {
+      if (lesson.status !== "ready") continue;
+      for (const world of worlds) {
+        const pose = resolveSpawnIn(lesson, world);
+        const expected = lesson.spawn === "default" ? worldSpawn(world) : spawnFor(world, lesson.spawn, "scenario");
+        expect(Math.hypot(pose.x - expected.x, pose.z - expected.z), `${lesson.id} ${world}`).toBeLessThan(0.05);
+      }
+    }
+  });
+
   it("keeps a lesson's kind of start when the world changes", () => {
     const bicycle = lessonById("models/bicycle");
     expect(bicycle?.spawn).toBe("circle");
@@ -65,5 +80,25 @@ describe("course catalog", () => {
       expect(ids.length, lesson.id).toBeGreaterThan(0);
       for (const id of ids) expect(chunks.has(id), `${lesson.id} missing ${id}`).toBe(true);
     }
+  });
+
+  it("maps a student traceback onto the slice that contains the line", () => {
+    const source = ["# @@chunk tunables", "N = 40", "# @@end", "def control(sensors):", "    return sensors.missing", "# @@chunk drive", "    return 0.34, 0.5", "# @@end"].join("\n");
+    expect(chunkAtLine(source, 2)).toEqual({ id: "tunables", local: 1 });
+    expect(chunkAtLine(source, 7)).toEqual({ id: "drive", local: 1 });
+    const formatted = formatStudentError(
+      'Traceback (most recent call last):\n  File "/lib/python3.13/_pyodide/_base.py", line 1, in eval\n  File "student.py", line 5, in _robo_step\nAttributeError: missing',
+      source,
+    );
+    expect(formatted.text.startsWith("AttributeError: missing")).toBe(true);
+    expect(formatted.text).toContain("line 5 of the program");
+    expect(formatted.text).toContain("sensors has time");
+    expect(formatted.text).not.toContain("_pyodide");
+    expect(formatted.text).not.toContain("_robo_step");
+    const inSlice = formatStudentError('File "student.py", line 2\nSyntaxError: bad', source);
+    expect(inSlice.chunk).toBe("tunables");
+    expect(inSlice.local).toBe(1);
+    expect(inSlice.text.startsWith("SyntaxError: bad")).toBe(true);
+    expect(inSlice.text).toContain("line 1 of tunables");
   });
 });
