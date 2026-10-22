@@ -130,12 +130,14 @@ export async function mountApp(): Promise<void> {
     const observer = new ResizeObserver(resize);
     observer.observe(viewport);
 
-    const openConsole = () => {
-      document.getElementById("app")?.classList.add("console-open");
+    let consoleByUser = false;
+    const setConsoleOpen = (open: boolean) => {
+      document.getElementById("app")?.classList.toggle("console-open", open);
       const consoleBtn = document.getElementById("toggle-console");
-      consoleBtn?.setAttribute("aria-expanded", "true");
-      consoleBtn?.classList.add("is-on");
+      consoleBtn?.setAttribute("aria-expanded", String(open));
+      consoleBtn?.classList.toggle("is-on", open);
     };
+    const openConsole = () => setConsoleOpen(true);
     sandbox = new CodeSandbox({
       onCommand: (command) => {
         if (driveSelf && simArmed) return;
@@ -368,6 +370,7 @@ export async function mountApp(): Promise<void> {
         priorHoldUntil = -1;
       }
       consolePanel.clear();
+      if (!consoleByUser) setConsoleOpen(false);
       consolePanel.log("— running —", "log");
       editor?.highlightLine(null);
       window.dispatchEvent(new CustomEvent("robo-student-error", { detail: { text: "", line: null, chunk: null, local: null } }));
@@ -385,6 +388,7 @@ export async function mountApp(): Promise<void> {
       if (mode === "code" && next !== "code") scratch = codeEditor.getValue();
       const prev = mode;
       mode = next;
+      if (next === "lessons") consoleByUser = false;
       hideStopped();
       const app = document.getElementById("app");
       app?.classList.remove("mode-drive", "mode-code", "mode-lessons", "code-mode", "lesson-lab");
@@ -530,10 +534,8 @@ export async function mountApp(): Promise<void> {
       });
     });
     toggleConsole.addEventListener("click", () => {
-      const open = !appEl()?.classList.contains("console-open");
-      appEl()?.classList.toggle("console-open", open);
-      toggleConsole.setAttribute("aria-expanded", String(open));
-      toggleConsole.classList.toggle("is-on", open);
+      consoleByUser = !appEl()?.classList.contains("console-open");
+      setConsoleOpen(consoleByUser);
     });
     const legendForExample = (id: string): { lidar: boolean; paths: boolean; particles: boolean; route: boolean } | null => {
       if (id === "mcl" || id === "mcl-global") return { lidar: true, paths: true, particles: true, route: true };
