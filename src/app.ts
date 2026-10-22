@@ -1,5 +1,6 @@
 import RAPIER from "@dimforge/rapier3d-compat";
 import { ACKERMANN_BUGGY, CONTROL_DT, PHYSICS_DT, clampCommand, odomToWorld, worldToOdom, type DrawOp } from "./api";
+import { chunkOpenLine } from "./editor/chunks";
 import { formatStudentError } from "./editor/errors";
 import { spawnFor } from "./sim/spawns";
 import { EXAMPLES } from "./editor/examples";
@@ -16,6 +17,7 @@ import { buildKnownMap } from "./sim/known-map";
 import type { Solid } from "./sim/course";
 import { referenceRoute } from "./sim/routes";
 import { AckermannBuggy, SERVICE_BRAKE, STOP_BRAKE, type SpawnPose } from "./sim/vehicle";
+import type { VehicleTelemetry } from "./robots/types";
 import {
   QUALITY_STORAGE_KEY,
   WORLD_STORAGE_KEY,
@@ -91,11 +93,6 @@ export async function mountApp(): Promise<void> {
       if (driveSelf) armSim();
     });
     let refreshDriveHint = () => {};
-    view.renderer.domElement.addEventListener("blur", () => {
-      simArmed = false;
-      driveHint.classList.remove("is-armed");
-      refreshDriveHint();
-    });
     bindTextureLoader(view.renderer);
     bindPropLoader(view.renderer);
     void view.loadHdri().catch((error: unknown) => console.warn("[robo-sim] HDRI unavailable", error));
@@ -111,6 +108,8 @@ export async function mountApp(): Promise<void> {
     const paths = new PathOverlay(view.scene);
     const drawings = new DebugDraw(view.overlay);
     let drawOps: DrawOp[] = [];
+    let heldPrior: DrawOp[] | null = null;
+    let priorHoldUntil = -1;
     let studentPose = { x: 0, y: 0, yaw: 0 };
     const seedInput = mustGet<HTMLInputElement>("seed");
     let noiseSeed = readSeed(seedInput);
@@ -118,6 +117,7 @@ export async function mountApp(): Promise<void> {
     let activeSpawn: SpawnPose = yard.spawn;
     robot.reset(activeSpawn);
     let paused = false;
+    let pausedView: VehicleTelemetry | null = null;
     let simTime = 0;
     let accumulator = 0;
     let sensorAccumulator = 0;
@@ -130,12 +130,33 @@ export async function mountApp(): Promise<void> {
     const observer = new ResizeObserver(resize);
     observer.observe(viewport);
 
+    const openConsole = () => {
+      document.getElementById("app")?.classList.add("console-open");
+      const consoleBtn = document.getElementById("toggle-console");
+      consoleBtn?.setAttribute("aria-expanded", "true");
+      consoleBtn?.classList.add("is-on");
+    };
     sandbox = new CodeSandbox({
       onCommand: (command) => {
         if (driveSelf && simArmed) return;
+        // The kidnapped prior is held on screen for two seconds. The filter
+        // keeps scoring, and the car stays put unless the learner is driving.
+        if (trackCloud && (priorHoldUntil < 0 || simTime < priorHoldUntil)) {
+          robot.setCommand(clampCommand({ steering: 0, throttle: 0 }, ACKERMANN_BUGGY.limits), STOP_BRAKE);
+          return;
+        }
         if (codeControls() && code.current === "running") robot.setCommand(command, 0);
       },
       onDraw: (ops) => {
+        if (trackCloud && priorHoldUntil < 0) priorHoldUntil = simTime + 2;
+        if (trackCloud && simTime < priorHoldUntil) {
+          if (!heldPrior) heldPrior = ops;
+          drawOps = heldPrior;
+          drawings.set(heldPrior, activeSpawn);
+          frameKidnappedCloud();
+          return;
+        }
+        heldPrior = null;
         drawOps = ops;
         drawings.set(ops, activeSpawn);
         frameKidnappedCloud();
@@ -146,12 +167,12 @@ export async function mountApp(): Promise<void> {
           consolePanel.log(formatted.text, "error");
           editor?.highlightLine(formatted.chunk ? null : formatted.line);
           window.dispatchEvent(new CustomEvent("robo-student-error", { detail: formatted }));
-          document.getElementById("app")?.classList.add("console-open");
-          document.getElementById("toggle-console")?.setAttribute("aria-expanded", "true");
-          document.getElementById("toggle-console")?.classList.add("is-on");
+          openConsole();
           return;
         }
         consolePanel.log(line, level);
+        const status = line.trim() === "— running —" || line.includes("Python runtime ready");
+        if (line.trim() && !status) openConsole();
       },
       onState: (state) => {
         setRunState(state);
@@ -225,7 +246,7 @@ export async function mountApp(): Promise<void> {
           driveHint.hidden = false;
           driveHint.textContent = simArmed
             ? "You are driving. WASD or arrows, Space brakes. The filter still scores the scan."
-            : "The program keeps driving. Click the 3D view to take the wheel. WASD or arrows, Space brakes.";
+            : "Press a drive key to take the wheel. WASD or arrows, Space brakes.";
         }
         return;
       }
@@ -316,6 +337,8 @@ export async function mountApp(): Promise<void> {
       activeSpawn = currentSpawn();
       paths.clear();
       drawOps = [];
+      heldPrior = null;
+      priorHoldUntil = -1;
       drawings.clear();
       simTime = 0;
       accumulator = 0;
@@ -340,6 +363,10 @@ export async function mountApp(): Promise<void> {
     const runProgram = () => {
       if (!codeControls() && !driveSelf) return;
       hideStopped();
+      if (trackCloud) {
+        heldPrior = null;
+        priorHoldUntil = -1;
+      }
       consolePanel.clear();
       consolePanel.log("— running —", "log");
       editor?.highlightLine(null);
@@ -358,6 +385,7 @@ export async function mountApp(): Promise<void> {
       if (mode === "code" && next !== "code") scratch = codeEditor.getValue();
       const prev = mode;
       mode = next;
+      hideStopped();
       const app = document.getElementById("app");
       app?.classList.remove("mode-drive", "mode-code", "mode-lessons", "code-mode", "lesson-lab");
       app?.classList.add(next === "drive" ? "mode-drive" : next === "code" ? "mode-code" : "mode-lessons");
@@ -414,6 +442,11 @@ export async function mountApp(): Promise<void> {
       if (switchingWorld || (!force && id === yard.id)) return;
       switchingWorld = true;
       worldSelect.disabled = true;
+      simTime = 0;
+      accumulator = 0;
+      sensorAccumulator = 0;
+      heldPrior = null;
+      priorHoldUntil = -1;
       try {
         const wasRunning = code.current === "running" || code.current === "loading";
         if (codeControls()) stopProgram();
@@ -424,7 +457,12 @@ export async function mountApp(): Promise<void> {
         activeSpawn = currentSpawn();
         paths.clear();
         drawOps = [];
+        heldPrior = null;
+        priorHoldUntil = -1;
         drawings.clear();
+        simTime = 0;
+        accumulator = 0;
+        sensorAccumulator = 0;
         robot.reset(activeSpawn);
         applyLessonCamera();
         frameKidnappedCloud(true);
@@ -432,7 +470,8 @@ export async function mountApp(): Promise<void> {
         localStorage.setItem(WORLD_STORAGE_KEY, id);
         if (handsOn()) applyDrive();
         if (wasRunning && (codeControls() || driveSelf)) runProgram();
-        else if (wasRunning) showStopped();
+        else if (wasRunning && (codeControls() || driveSelf)) showStopped();
+        else hideStopped();
       } finally {
         worldSelect.disabled = false;
         switchingWorld = false;
@@ -479,7 +518,16 @@ export async function mountApp(): Promise<void> {
       appEl()?.classList.toggle("lab-open", open);
       editCode.setAttribute("aria-expanded", String(open));
       editCode.textContent = open ? "Hide full program" : "Full program";
-      requestAnimationFrame(() => codeEditor.relayout());
+      requestAnimationFrame(() => {
+        codeEditor.relayout();
+        requestAnimationFrame(() => {
+          if (!open) return;
+          const slot = document.querySelector<HTMLElement>("#lesson .code-slot:not([hidden])");
+          const id = slot?.dataset.chunk;
+          const line = id ? chunkOpenLine(codeEditor.getValue(), id) : null;
+          if (line) codeEditor.revealLine(line);
+        });
+      });
     });
     toggleConsole.addEventListener("click", () => {
       const open = !appEl()?.classList.contains("console-open");
@@ -550,6 +598,14 @@ export async function mountApp(): Promise<void> {
       browser.hidden = !browser.hidden;
       confirmBox.hidden = true;
     });
+    document.addEventListener("pointerdown", (event) => {
+      if (browser.hidden) return;
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (browser.contains(target) || mustGet("browse-examples").contains(target)) return;
+      browser.hidden = true;
+      confirmBox.hidden = true;
+    });
     mustGet("example-confirm-yes").addEventListener("click", () => {
       if (pendingExample) loadExample(pendingExample);
     });
@@ -560,13 +616,16 @@ export async function mountApp(): Promise<void> {
     const driveButton = mustGet<HTMLButtonElement>("drive-self");
     const setDriveSelf = (on: boolean) => {
       driveSelf = on;
-      simArmed = false;
       driveButton.setAttribute("aria-pressed", String(on));
       driveButton.classList.toggle("is-on", on);
       driveButton.textContent = on ? "You are driving" : "Drive it yourself";
       driveHint.hidden = !on;
-      driveHint.classList.remove("is-armed");
-      setHint();
+      if (on) armSim();
+      else {
+        simArmed = false;
+        driveHint.classList.remove("is-armed");
+        setHint();
+      }
       if (on && code.current !== "running" && code.current !== "loading") runProgram();
     };
     driveButton.addEventListener("click", () => setDriveSelf(!driveSelf));
@@ -589,6 +648,15 @@ export async function mountApp(): Promise<void> {
     });
     const pauseButton = mustGet<HTMLButtonElement>("pause");
     const setPaused = (next: boolean) => {
+      if (next && !paused) {
+        const live = robot.telemetry();
+        pausedView = {
+          ...live,
+          commandedSteering: live.actuatorSteering,
+          commandedThrottle: 0,
+        };
+      }
+      if (!next) pausedView = null;
       paused = next;
       pauseButton.setAttribute("aria-pressed", String(next));
       pauseButton.textContent = next ? "Resume" : "Pause";
@@ -612,6 +680,7 @@ export async function mountApp(): Promise<void> {
           return;
         }
         if (isTypingTarget(event.target)) return;
+        if (driveSelf && !simArmed && DRIVE_KEYS.has(event.code)) armSim();
         const driving = handsOn() || manualDrive();
         if (handsOn() && event.code === "KeyR" && !event.repeat) resetWorld();
         if (!driving) return;
@@ -637,6 +706,13 @@ export async function mountApp(): Promise<void> {
         lessonCodeActive = Boolean(scene?.run);
         lessonCamera = scene?.camera ?? null;
         trackCloud = scene?.camera === "overhead";
+        heldPrior = null;
+        priorHoldUntil = -1;
+        drawOps = [];
+        drawings.clear();
+        code.invalidateDraws();
+        hideStopped();
+        if (!lessonCodeActive && (code.current === "running" || code.current === "loading")) stopProgram();
         document.getElementById("app")?.classList.toggle("lesson-has-code", lessonCodeActive);
         if (!scene) {
           driveSelf = false;
@@ -765,7 +841,7 @@ export async function mountApp(): Promise<void> {
         const focus = robot.focus();
         camera.update(frameDt, focus);
         view.followSun(focus.x, focus.z);
-        hud.update(robot.telemetry(), mode, code.current, simTime, paused);
+        hud.update(pausedView ?? robot.telemetry(), mode, code.current, simTime, paused);
         view.render();
       } catch (error) {
         console.error(error);
@@ -790,6 +866,18 @@ function readSeed(input: HTMLInputElement): number {
   const value = Number(input.value);
   return Number.isFinite(value) ? value >>> 0 : 1;
 }
+
+const DRIVE_KEYS = new Set([
+  "KeyW",
+  "KeyA",
+  "KeyS",
+  "KeyD",
+  "ArrowUp",
+  "ArrowDown",
+  "ArrowLeft",
+  "ArrowRight",
+  "Space",
+]);
 
 function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;

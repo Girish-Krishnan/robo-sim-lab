@@ -21,7 +21,7 @@ A tight roundabout still has some cross-track, because the body slides even with
 
 The steer below is computed from the filter's mean. The rest of the program is the filter from the previous lessons, still loaded so the cloud stays on screen.
 
-**Drive it yourself**, beside the sim note above, keeps this filter and lets you be the driver. Until you click the view, the program keeps driving. After the click, you steer. The red estimate should stay near the car while the blue trail still peels away.
+**Drive it yourself**, beside the sim note above, keeps this filter and lets you be the driver. Turn it on and the keys steer at once. The red estimate should stay near the car while the blue trail still peels away.
 
 ## The same arc, measured from the mean
 
@@ -53,4 +53,4 @@ The motion model already used the odometry delta. Mixing `odometry.pose` back in
 
 1. Run the starter on the oval for a full minute. The blue trail should still leave. The car and the red estimate should stay near the centreline. Late cross-track is about 0.34 m. The estimate finishes about 0.38 m from the car.
 2. In the tunables block, increase `LOOKAHEAD` to `6`. The cloud should look the same. The path should cut corners more, which is pursuit.
-3. Turn on Drive it yourself, click the view, and drive the straight. The particles should ride with the car, and the blue trail should keep its own opinion.
+3. Turn on Drive it yourself and drive the straight. The particles should ride with the car, and the blue trail should keep its own opinion.

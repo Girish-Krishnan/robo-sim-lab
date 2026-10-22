@@ -50,6 +50,8 @@ export class CodeSandbox {
   private ignoreCommands = false;
   private waiting: { id: number; sentAt: number; kind: "boot" | "load" | "tick" } | null = null;
   private tickId = 0;
+  private drawEpoch = 0;
+  private epochByTick = new Map<number, number>();
   private timer = 0;
   private readonly workerFactory: () => SandboxWorker;
   private readonly tickTimeoutMs: number;
@@ -81,7 +83,13 @@ export class CodeSandbox {
     this.boot();
   }
 
+  /** Drop draw messages from a run that has already been left. */
+  invalidateDraws(): void {
+    this.drawEpoch += 1;
+  }
+
   run(code: string): void {
+    this.drawEpoch += 1;
     this.pendingCode = code;
     this.ignoreCommands = false;
     if (!this.runtimeReady) {
@@ -93,6 +101,7 @@ export class CodeSandbox {
   }
 
   stop(): void {
+    this.drawEpoch += 1;
     this.pendingCode = null;
     this.ignoreCommands = true;
     const inFlight = this.waiting?.kind === "tick" || this.waiting?.kind === "load";
@@ -112,6 +121,7 @@ export class CodeSandbox {
     const sensors = publishSensorFrame(frame);
     assertNoBannedKeys(sensors);
     const id = ++this.tickId;
+    this.epochByTick.set(id, this.drawEpoch);
     this.arm(id, "tick", this.tickTimeoutMs);
     this.worker.postMessage({ type: "tick", id, sensors });
   }
@@ -204,6 +214,9 @@ export class CodeSandbox {
     if (message.type === "result") {
       this.waiting = null;
       this.clearTimer();
+      const epoch = this.epochByTick.get(message.id);
+      this.epochByTick.delete(message.id);
+      if (epoch !== this.drawEpoch) return;
       if (this.ignoreCommands || this.state !== "running") return;
       this.callbacks.onCommand(message.command);
       this.callbacks.onDraw?.(message.draw ?? []);

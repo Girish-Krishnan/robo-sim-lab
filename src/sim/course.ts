@@ -1153,19 +1153,38 @@ function buildShelf(group: THREE.Group, solid: Solid, mats: Materials): void {
   const d = solid.hz * 2;
   const postGeo = new THREE.BoxGeometry(0.08, h, 0.08);
   tileBox(postGeo, 0.08, h, 0.08, 2);
-  for (const x of [-solid.hx + 0.04, solid.hx - 0.04]) {
-    for (const z of [-solid.hz + 0.04, solid.hz - 0.04]) {
+  const xs: number[] = [];
+  const zs: number[] = [];
+  for (let x = -solid.hx + 0.06; x <= solid.hx - 0.04; x += Math.max(1.6, w / 6)) xs.push(x);
+  for (let z = -solid.hz + 0.06; z <= solid.hz - 0.04; z += Math.max(1.6, d / 6)) zs.push(z);
+  if (xs[xs.length - 1] !== solid.hx - 0.04) xs.push(solid.hx - 0.04);
+  if (zs[zs.length - 1] !== solid.hz - 0.04) zs.push(solid.hz - 0.04);
+  for (const x of xs) {
+    for (const z of zs) {
       const post = new THREE.Mesh(postGeo, mats.steel);
       post.position.set(x, 0, z);
       group.add(post);
     }
   }
+  // A low rail, not a floor-height slab, so the bay reads as a rack with a gap.
+  const railGeo = new THREE.BoxGeometry(w, 0.08, 0.08);
+  const railZ = new THREE.BoxGeometry(0.08, 0.08, d);
+  for (const z of [-solid.hz + 0.04, solid.hz - 0.04]) {
+    const rail = new THREE.Mesh(railGeo, mats.steel);
+    rail.position.set(0, -solid.hy + 0.42, z);
+    group.add(rail);
+  }
+  for (const x of [-solid.hx + 0.04, solid.hx - 0.04]) {
+    const rail = new THREE.Mesh(railZ, mats.steel);
+    rail.position.set(x, -solid.hy + 0.42, 0);
+    group.add(rail);
+  }
   const levels = 4;
   for (let i = 0; i < levels; i++) {
-    const boardGeo = new THREE.BoxGeometry(w * 0.96, 0.05, d * 0.96);
+    const boardGeo = new THREE.BoxGeometry(w * 0.92, 0.05, d * 0.92);
     tileBox(boardGeo, w, 0.05, d, 0.8);
     const board = new THREE.Mesh(boardGeo, mats.crate);
-    board.position.y = -solid.hy + 0.1 + (i * (h - 0.25)) / (levels - 1);
+    board.position.y = -solid.hy + 0.7 + (i * (h - 0.9)) / (levels - 1);
     group.add(board);
     if (i < levels - 1) {
       for (const side of [-1, 1]) {

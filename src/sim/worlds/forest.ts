@@ -78,12 +78,13 @@ export function buildForestSolids(): Solid[] {
   // Corridor around the trail. The outer yard fence is far enough that a
   // gap follower leaves the trees and laps empty grass. This one keeps
   // that run among the trunks, and gives wall follow a continuous edge.
-  // West fence is set out so the return lane clears the pine row. The north
-  // and south fences stay on the original line and just reach the new corner.
+  // The west fence sits out from the return lane (x=-20.1). A noisy lap
+  // drifts about 2 m off that line, and the body still has to clear the
+  // boards. North and south fences reach the same corner.
   solids.push(cuboid(16.5, 11, 0.45, 1.6, 54, "fence"));
-  solids.push(cuboid(-22.8, 11, 0.45, 1.6, 54, "fence"));
-  solids.push(cuboid(-3.15, 38, 40.2, 1.6, 0.45, "fence"));
-  solids.push(cuboid(-3.15, -16, 40.2, 1.6, 0.45, "fence"));
+  solids.push(cuboid(-24.2, 11, 0.45, 1.6, 54, "fence"));
+  solids.push(cuboid(-3.875, 38, 41.65, 1.6, 0.45, "fence"));
+  solids.push(cuboid(-3.875, -16, 41.65, 1.6, 0.45, "fence"));
 
   // Yard boundary, tall enough for the lidar. Keeps an open-space
   // follower from driving off the ground plane.

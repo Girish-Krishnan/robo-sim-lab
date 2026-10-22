@@ -31,6 +31,13 @@ export function markVisited(id: string): void {
   saveProgress(progress);
 }
 
+export function markCompleted(id: string): void {
+  const progress = loadProgress();
+  if (!progress.completed.includes(id)) progress.completed.push(id);
+  if (!progress.visited.includes(id)) progress.visited.push(id);
+  saveProgress(progress);
+}
+
 export function isCompleted(id: string): boolean {
   return loadProgress().completed.includes(id);
 }

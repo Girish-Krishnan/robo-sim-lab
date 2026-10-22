@@ -10,7 +10,8 @@ export const CIRCLE_STEER = 0.34;
 
 export const TRACK_SPAWN: SpawnPose = { x: 16, y: 0.84, z: -20, yaw: 0 };
 export const FOREST_SPAWN: SpawnPose = { x: 0, y: 0.84, z: -4, yaw: 0 };
-export const WAREHOUSE_SPAWN: SpawnPose = { x: 0, y: 0.84, z: -10, yaw: 0 };
+/** Side lane of the south bay, nose north, clear of the central rack. */
+export const WAREHOUSE_SPAWN: SpawnPose = { x: -12, y: 0.84, z: -10, yaw: 0 };
 
 export function circleRadius(): number {
   return ACKERMANN_BUGGY.wheelbase / Math.tan(CIRCLE_STEER);

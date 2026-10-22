@@ -15,13 +15,15 @@ In the sim: the forest, aimed into the trees, with the lidar drawn.
 
 <svg viewBox="0 0 520 240" role="img" aria-label="Each lidar hit blocks a wedge about as wide as the car. The starter aims at the opening that remains.">
   <rect width="520" height="240" rx="12" fill="#0e1418"/>
-  <polygon points="250,180 120,40 160,36" fill="#1a3a34" stroke="#7ee0d0" stroke-width="2"/>
-  <polygon points="250,180 200,34 250,30" fill="#1a3a34" stroke="#7ee0d0" stroke-width="2"/>
-  <polygon points="250,180 310,32 360,40" fill="#3a2420" stroke="#e36d5c" stroke-width="2"/>
+  <polygon points="250,180 80,56 150,40" fill="#3a2420" stroke="#e36d5c" stroke-width="2"/>
+  <polygon points="250,180 330,36 420,52" fill="#3a2420" stroke="#e36d5c" stroke-width="2"/>
+  <path d="M250 180 L168 38" fill="none" stroke="#7ee0d0" stroke-width="2" stroke-dasharray="5 4"/>
+  <path d="M250 180 L312 34" fill="none" stroke="#7ee0d0" stroke-width="2" stroke-dasharray="5 4"/>
   <circle cx="250" cy="186" r="10" fill="#f4f7f4"/>
   <text x="230" y="214" fill="#f4f7f4" font-size="16" font-family="sans-serif">car</text>
-  <text x="118" y="28" fill="#7ee0d0" font-size="16" font-family="sans-serif">open gap</text>
-  <text x="300" y="24" fill="#e36d5c" font-size="16" font-family="sans-serif">blocked</text>
+  <text x="188" y="28" fill="#7ee0d0" font-size="16" font-family="sans-serif">open gap</text>
+  <text x="78" y="48" fill="#e36d5c" font-size="16" font-family="sans-serif">hit</text>
+  <text x="360" y="36" fill="#e36d5c" font-size="16" font-family="sans-serif">hit</text>
   <text x="20" y="232" fill="#d5ddd8" font-size="16" font-family="sans-serif">A hit paints a wedge of half-width HALF. The car steers into what is left.</text>
 </svg>
 

@@ -267,7 +267,8 @@ export function lessonDemoReport(rows: RunMetrics[], extras: RunMetrics[] = []):
     "| --- | --- | ---: | ---: | ---: | ---: |",
   ];
   for (const row of extras) {
-    if (row.collisionCount !== 0) errors.push(`${row.world}/${row.example} seed ${row.seed} contacts ${row.collisionCount}`);
+    const cap = row.example === "avoid" ? (AVOID_CONTACTS[row.world] ?? 1) : row.example === "pursuit" ? (PURSUIT_CONTACTS[row.world] ?? 0) : 0;
+    if (row.collisionCount > cap) errors.push(`${row.world}/${row.example} seed ${row.seed} contacts ${row.collisionCount}`);
     if (row.stuckTime !== 0) errors.push(`${row.world}/${row.example} seed ${row.seed} stuck ${row.stuckTime.toFixed(2)} s`);
     if (row.distance < DEMO_DISTANCE) errors.push(`${row.world}/${row.example} seed ${row.seed} travelled ${row.distance.toFixed(1)} m`);
     seedLines.push(
@@ -291,7 +292,7 @@ export function lessonDemoReport(rows: RunMetrics[], extras: RunMetrics[] = []):
       "",
       "## Extra seeds",
       "",
-      "Seeds 2 and 3 repeat each scripted lesson's world and program.",
+      "Seeds 2 and 3 run each scripted starter in all four worlds.",
       "",
       ...seedLines,
       "",

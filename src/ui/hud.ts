@@ -15,12 +15,12 @@ export class Hud {
   constructor(root: HTMLElement) {
     root.replaceChildren();
     this.speed = row(root, "Speed");
-    this.odom = row(root, "Odom");
+    this.odom = row(root, "Odom", true);
     this.steerCmd = row(root, "Steer +left");
-    this.steerAct = row(root, "Steer act");
-    this.throttle = row(root, "Throttle");
+    this.steerAct = row(root, "Steer act", true);
+    this.throttle = row(root, "Throttle", true);
     this.time = row(root, "Time");
-    this.mode = row(root, "Mode");
+    this.mode = row(root, "Mode", true);
   }
 
   update(telemetry: VehicleTelemetry, mode: AppMode, run: SandboxState, simTime = 0, paused = false): void {
@@ -31,13 +31,13 @@ export class Hud {
     this.throttle.textContent = telemetry.commandedThrottle.toFixed(2);
     this.time.textContent = paused ? `${simTime.toFixed(1)} s · paused` : `${simTime.toFixed(1)} s`;
     const name = mode === "drive" ? "Drive" : mode === "lessons" ? "Lesson" : "Code";
-    this.mode.textContent = mode === "drive" ? name : `${name} · ${label(run)}`;
+    this.mode.textContent = paused ? "paused" : mode === "drive" ? name : `${name} · ${label(run)}`;
   }
 }
 
-function row(root: HTMLElement, labelText: string): HTMLElement {
+function row(root: HTMLElement, labelText: string, fold = false): HTMLElement {
   const line = document.createElement("div");
-  line.className = "hud-row";
+  line.className = fold ? "hud-row hud-fold" : "hud-row";
   const name = document.createElement("span");
   name.textContent = labelText;
   const value = document.createElement("strong");

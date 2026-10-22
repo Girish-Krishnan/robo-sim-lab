@@ -96,4 +96,4 @@ A cone, a crate, or a corner breaks that tie. Roll past it and the endpoint that
 
 1. In the motion block, name $\delta_{\mathrm{rot1}}$, $\delta_{\mathrm{trans}}$, and $\delta_{\mathrm{rot2}}$.
 2. In the likelihood block, find $\sigma$ and the floor added to each beam. A floor of 0 lets one missed beam zero that particle.
-3. Turn on Drive it yourself, click the view, and drive a slow arc. The yellow ring should stay small once the cloud has settled, and grow if you spin in place.
+3. Turn on Drive it yourself and drive a slow arc. The yellow ring should stay small once the cloud has settled, and grow if you spin in place.

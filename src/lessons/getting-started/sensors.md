@@ -37,8 +37,8 @@ The noise on these sensors has a written model. Lidar range is a Gaussian of 2 c
 
 Return `(steering, throttle)` or a dict with those keys. Steering is radians, positive left, clamped to $\pm 0.55$. Throttle is $-1$ to $1$.
 
-<svg viewBox="0 0 520 250" role="img" aria-label="The sensor contract: lidar, odometry, and IMU go in. The true pose stays out.">
-  <rect width="520" height="250" rx="12" fill="#0e1418"/>
+<svg viewBox="0 0 520 268" role="img" aria-label="The sensor contract: lidar, odometry, and IMU go in. The true pose stays out.">
+  <rect width="520" height="268" rx="12" fill="#0e1418"/>
   <rect x="24" y="70" width="130" height="44" rx="8" fill="#16302c" stroke="#7ee0d0" stroke-width="2"/>
   <rect x="24" y="126" width="130" height="44" rx="8" fill="#1a2740" stroke="#6ea8ff" stroke-width="2"/>
   <rect x="24" y="182" width="130" height="44" rx="8" fill="#2a2414" stroke="#ffd24a" stroke-width="2"/>
@@ -50,10 +50,10 @@ Return `(steering, throttle)` or a dict with those keys. Steering is radians, po
   <path d="M154 92 H250" stroke="#7ee0d0" stroke-width="2"/>
   <path d="M154 148 H250" stroke="#6ea8ff" stroke-width="2"/>
   <path d="M154 204 H220 V142 H250" fill="none" stroke="#ffd24a" stroke-width="2"/>
-  <text x="412" y="148" fill="#f4f7f4" font-size="16" font-family="sans-serif">steer, throttle</text>
-  <path d="M400 142 H430" stroke="#f4f7f4" stroke-width="2"/>
+  <path d="M400 142 H500" stroke="#f4f7f4" stroke-width="2"/>
+  <text x="404" y="188" fill="#f4f7f4" font-size="15" font-family="sans-serif">steer, throttle</text>
   <text x="24" y="40" fill="#f4f7f4" font-size="18" font-family="sans-serif">What the program is allowed to see</text>
-  <text x="250" y="210" fill="#e36d5c" font-size="16" font-family="sans-serif">no true pose</text>
+  <text x="24" y="248" fill="#e36d5c" font-size="15" font-family="sans-serif">The program cannot read the true pose.</text>
 </svg>
 
 ## Two signs worth learning once

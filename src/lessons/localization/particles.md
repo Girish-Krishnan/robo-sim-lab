@@ -9,27 +9,21 @@ prerequisites: localization/bayes
 status: ready
 ---
 
-Monte Carlo localization represents the belief with $N$ poses, the particles. Each one is a guess of where the car is and which way it faces. The weight is how well that guess explains the current scan. Low-variance resampling keeps the guesses that earned their weight and copies them forward. On the oval the cloud starts near the car, a small crowd that already knows the neighbourhood.
+Each dot is a guess. Guesses that match the lidar survive. On the oval the cloud starts near the car, a small crowd that already knows the neighbourhood. Open the **Key** on the view for the colour names: pink dots, yellow ring, red trail, and blue odometry.
 
-In the sim: the tracking cloud on the oval. Open the **Key** if the colours are new. It uses these names, and the picture matches them:
+In the sim: the tracking cloud on the oval. The Key uses those same names.
 
-- **Particles** are the pink dots. Each dot is one guess of where the car is and which way it faces.
-- **Uncertainty** is the yellow ring, the 2-sigma spread of those guesses. Covariance is that spread, written as how far the weighted guesses sit from their mean. A small ring means the filter is sure.
-- **Estimate** is the red trail, the filter's best pose, moment by moment.
-- **Odometry** is the blue trail.
-- The speed-tinted trail is where the car actually went. Green is the route.
-
-The dots are drawn small and partly see-through, so the car and the yellow ring stay visible when the cloud has pulled in tight.
+The yellow ring is two standard deviations of the cloud, how far the guesses sit from their mean. A small ring means the guesses agree.
 
 The starter keeps a few hundred particles and scores a few dozen lidar beams against a distance field built ahead of time. Control runs at 20 Hz, twenty times a second, and the filter has to finish inside that tick. Every beam and thousands of particles make the car stutter. The known map is a grid of 0.5 m cells. Walls are large next to a cell that size, so the thinner scan is enough.
 
-Low-variance resampling draws one random number and then walks the weights in even steps, copying the heavy guesses and dropping the light ones. The blocks below are that cycle. They are slices of the same program that is driving the oval.
+The blocks below are one tick of that filter. They are slices of the same program that is driving the oval.
 
 How many particles, and how far ahead pursuit looks:
 
 {{code:tunables}}
 
-**Drive it yourself** runs this filter on whatever path you drive. Click the view, then use WASD or the arrows. Space brakes. The cloud keeps scoring the live scan.
+**Drive it yourself** runs this filter on whatever path you drive. Turn it on, then use WASD or the arrows. Space brakes. The cloud keeps scoring the live scan.
 
 <svg viewBox="0 0 480 250" role="img" aria-label="Predict, update, and resample as a cycle">
   <rect width="480" height="250" rx="12" fill="#10161a"/>
@@ -83,7 +77,7 @@ $$\bar\theta = \operatorname{atan2}\left(\sum_i w^{[i]}\sin\theta^{[i]},\; \sum_
 
 The starter adds a little noise even when the odometry delta is small, and it resamples when $N_{\mathrm{eff}}$ drops. Resampling every tick with the noise turned off copies one survivor until the cloud is a single point. That collapse is called sample impoverishment.
 
-The mean can sit between two disagreeing clumps, including inside a wall, when the cloud is split. On these maps one corridor usually wins. A magenta cloud in two blobs grows the yellow ellipse until it covers both, and the red mean sits between them until one blob dies.
+The mean can sit between two disagreeing clumps, including inside a wall, when the cloud is split. On these maps one corridor usually wins. A pink cloud in two blobs grows the yellow ring until it covers both, and the red mean sits between them until one blob dies.
 
 Note: global localization, the kidnapped starter, is this same filter with a different initial cloud. A cloud that started on the answer and a cloud that found the answer are different experiments. This lesson is the first one.
 
@@ -91,4 +85,4 @@ Note: global localization, the kidnapped starter, is this same filter with a dif
 
 1. Run the starter on the oval. You should see pink dots on the car, a tight yellow ring, and a red trail that stays with the car while the blue trail walks away.
 2. In the tunables block, cut `N` to `40` and run again. The mean should jump more. Put `360` back.
-3. Turn on Drive it yourself, click the view, and drive onto the infield. The ellipse should swell while the scan is ambiguous, then tighten when a wall or a cone picks a winner.
+3. Turn on Drive it yourself and drive onto the infield. The yellow ring should swell while the scan is ambiguous, then tighten when a wall or a cone picks a winner.

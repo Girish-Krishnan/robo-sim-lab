@@ -78,6 +78,16 @@ export function chunkAtLine(source: string, line1: number): { id: string; local:
   return null;
 }
 
+/** 1-based line of a `# @@chunk id` marker, for scrolling the full program. */
+export function chunkOpenLine(source: string, id: string): number | null {
+  const lines = source.split("\n");
+  for (let index = 0; index < lines.length; index += 1) {
+    const open = OPEN.exec(lines[index] ?? "");
+    if (open?.[1] === id) return index + 1;
+  }
+  return null;
+}
+
 /** Shared leading indent, so a slice can be shown flush with column 1. */
 export function dedent(body: string): { text: string; indent: string } {
   const lines = body.split("\n");

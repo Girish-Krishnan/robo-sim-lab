@@ -2,9 +2,20 @@
 
 A browser lab for a small car. You drive it, or you write Python that sees only lidar, wheel odometry, and an IMU, and you watch that program run in the same 3D world. There is no install and no account.
 
-**Live site:** https://girish-krishnan.github.io/robo-sim-lab/
+**[Start here →](https://girish-krishnan.github.io/robo-sim-lab/)**
 
 ![The sandbox lesson, with the car in the city and the key naming the trails](docs/sandbox.png)
+
+## What you'll learn
+
+- **Getting started.** The sandbox, the robot, and why the program never sees the true pose.
+- **Robot models and sensors.** The bicycle model, lidar, wheel odometry, the IMU, and the drift in the plots.
+- **Reactive control.** Open-loop circles, lidar avoidance, and a PD wall follower.
+- **Path tracking.** Pure pursuit, and why odometry drift bends it off the path.
+- **Localization.** A particle filter that keeps a known map and the lidar in agreement, including a kidnapped start.
+- **Mapping** (soon). Occupancy grids and SLAM.
+- **Planning** (soon). A* and RRT.
+- **Advanced control** (soon). Stanley and MPC.
 
 ## How to use the lab
 
@@ -12,7 +23,7 @@ Open the live site. The first page is the sandbox lesson, with the car in the ci
 
 - **Drive** uses the keyboard. W forward, S back, A and D steer, Space brakes. R resets while you are driving by hand.
 - **Code** opens a Python editor. `control(sensors)` returns a steering angle and a throttle, twenty times a second. Browse examples sits over the editor and does not shrink it. The Sensor API panel lists the names on `sensors`. Python starts loading with the page. Until it is ready, the panel says "Loading Python (first run takes a moment)".
-- **Lessons** is the course. Each lesson sets the world, the start, and the drawings. A lesson with a program shows the lines you are asked to change, and **Full program** opens the rest. **Run** is on the bar. The console opens if the program throws, and the message names the slice and the line.
+- **Lessons** is the course. Each lesson sets the world, the start, and the drawings. A lesson with a program shows the lines you are asked to change, and **Full program** opens the rest, scrolled to this lesson's first slice. **Run** is on the bar. The console stays closed until the program prints or throws, and an error names the slice and the line.
 - **World** switches city streets, an oval, a forest trail, and a warehouse. A running program starts again. The lesson keeps its kind of start.
 - **Seed** is the sensor-noise draw. Type a number and press Enter to restart with that bias. Reset run replays the seed already in the box.
 - **Pause** freezes physics, the program, and the Time row on the readout. Resume continues them.
@@ -20,8 +31,6 @@ Open the live site. The first page is the sandbox lesson, with the car in the ci
 - **Paths** and **Lidar** turn those drawings on and off. The button says on or off.
 
 The course runs from the sandbox through a kidnapped particle filter. The last lesson ends on a course-complete card. Mapping, planning, and the later controllers are listed in the menu and greyed out until they have a lesson.
-
-## For contributors
 
 ## Quick start
 

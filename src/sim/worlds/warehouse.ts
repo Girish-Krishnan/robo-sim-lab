@@ -53,13 +53,13 @@ export function buildWarehouseSolids(): Solid[] {
   solids.push(cuboid(-17.8, 8, 0.4, 3.2, 56, "concrete"));
   solids.push(cuboid(17.8, 8, 0.4, 3.2, 56, "concrete"));
 
-  // A loose slalom in the centre aisle. Each gap is several metres, so
-  // lidar-avoid can weave without planting on a pallet. The rack's
-  // outside lane stays empty for wall follow.
+  // A loose slalom in the centre aisle. Gaps stay wider than a reverse
+  // arc, so a noisy scan can back out of the end shelf without planting
+  // on the next pallet. The rack's outside lane stays empty for wall follow.
   solids.push(cuboid(5.0, 23.2, 1.2, 1.35, 1.05, "pallet", 0.08));
-  solids.push(cuboid(-5.0, 26.8, 1.15, 1.4, 1.1, "pallet", -0.12));
+  solids.push(cuboid(-6.5, 29.5, 1.15, 1.4, 1.1, "pallet", -0.12));
   solids.push(cuboid(4.2, 30.2, 1.05, 1.45, 1.05, "crate", 0.15));
-  solids.push(cuboid(0.2, 24.6, 1.15, 1.4, 1.05, "barrel"));
+  solids.push(cuboid(-2.5, 22.8, 1.15, 1.4, 1.05, "barrel"));
   return solids;
 }
 
@@ -88,12 +88,13 @@ export async function mountWarehouse(
   // Roof the north aisles only. The south bay stays open so the chase
   // camera (about 6 m up, behind the driving spawn) is not inside a plane,
   // and the bay reads as a building instead of a gray fog box.
+  // A thin box over the north aisles only. A large plane's diagonal
+  // reads as a dark triangle when the chase camera looks up the bay.
   const ceiling = new THREE.Mesh(
-    new THREE.PlaneGeometry(40, 26),
-    new THREE.MeshStandardMaterial({ color: 0x4a525a, roughness: 0.9, side: THREE.DoubleSide }),
+    new THREE.BoxGeometry(34, 0.18, 14),
+    new THREE.MeshStandardMaterial({ color: 0x4a525a, roughness: 0.9 }),
   );
-  ceiling.rotation.x = Math.PI / 2;
-  ceiling.position.set(0, 8.5, 31);
+  ceiling.position.set(0, 9.4, 33);
   group.add(ceiling);
 
   const lampMat = new THREE.MeshStandardMaterial({

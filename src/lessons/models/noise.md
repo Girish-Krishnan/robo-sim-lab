@@ -18,7 +18,7 @@ In the sim: pure pursuit on the oval, seed 1. The late blue trail is that held b
   <line x1="40" y1="150" x2="490" y2="150" stroke="#3d4a44" stroke-width="2"/>
   <text x="400" y="142" fill="#d5ddd8" font-size="15" font-family="sans-serif">truth</text>
   <path d="M40 146 L70 158 L100 140 L130 162 L160 144 L190 156 L220 138 L250 160 L280 148 L310 142 L340 158 L370 146 L400 154 L430 148 L460 152" fill="none" stroke="#ffd24a" stroke-width="2"/>
-  <path d="M40 150 C 140 148, 220 120, 300 90 S 430 40, 490 28" fill="none" stroke="#6ea8ff" stroke-width="3"/>
+  <path d="M40 150 V118 H490" fill="none" stroke="#6ea8ff" stroke-width="3"/>
   <text x="48" y="36" fill="#f4f7f4" font-size="18" font-family="sans-serif">Two kinds of wrong</text>
   <text x="48" y="200" fill="#ffd24a" font-size="16" font-family="sans-serif">Yellow: white noise, a fresh error every sample.</text>
   <text x="48" y="224" fill="#6ea8ff" font-size="16" font-family="sans-serif">Blue: a bias, drawn once, then held.</text>

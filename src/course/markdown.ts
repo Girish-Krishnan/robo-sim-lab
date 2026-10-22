@@ -99,7 +99,8 @@ function renderProse(source: string): string {
     const raw = para.join(" ").trim();
     const simHint = /^(\*\*)?In the sim:/.test(raw);
     const note = /^(\*\*)?Note:/.test(raw);
-    const klass = simHint ? "sim-hint" : note ? "lesson-note" : "";
+    const further = /^(\*\*)?Going further:/.test(raw);
+    const klass = simHint ? "sim-hint" : note ? "lesson-note" : further ? "going-further" : "";
     out.push(`<p${klass ? ` class="${klass}"` : ""}>${inline(para.join(" "), restore)}</p>`);
   }
   return out.join("\n");

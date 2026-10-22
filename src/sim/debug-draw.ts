@@ -97,20 +97,47 @@ function pointCloud(
   return dots;
 }
 
+/** 2-sigma radius of the cloud, in metres. Under a metre the filter has pulled in. */
+function cloudSpread(points: { x: number; y: number }[]): number {
+  if (points.length < 2) return 0;
+  let mx = 0;
+  let my = 0;
+  for (const point of points) {
+    mx += point.x;
+    my += point.y;
+  }
+  mx /= points.length;
+  my /= points.length;
+  let variance = 0;
+  for (const point of points) variance += (point.x - mx) ** 2 + (point.y - my) ** 2;
+  return 2 * Math.sqrt(variance / points.length);
+}
+
+/** Even stride, so a tight cloud stays a sample of the filter rather than a disc. */
+function thinCloud<T>(points: T[], limit: number): T[] {
+  if (points.length <= limit) return points;
+  const out: T[] = [];
+  const step = points.length / limit;
+  for (let i = 0; i < limit; i += 1) out.push(points[Math.floor(i * step)]!);
+  return out;
+}
+
 function markers(spawn: SpawnPose, points: { x: number; y: number; yaw?: number; w?: number }[], color: string): THREE.Group {
   const group = new THREE.Group();
   group.frustumCulled = false;
-  const count = points.length;
+  const converged = cloudSpread(points) < 1;
+  const shown = converged ? thinCloud(points, 150) : points;
+  const count = shown.length;
   const positions = new Float32Array(count * 3);
   const colors = new Float32Array(count * 3);
   const base = new THREE.Color(color);
   const hot = new THREE.Color("#ff7ae8");
   let maxWeight = 0;
-  for (const point of points) if (point.w !== undefined) maxWeight = Math.max(maxWeight, point.w);
+  for (const point of shown) if (point.w !== undefined) maxWeight = Math.max(maxWeight, point.w);
   const weighted = maxWeight > 0;
   const scratch = new THREE.Color();
   for (let i = 0; i < count; i++) {
-    const point = points[i]!;
+    const point = shown[i]!;
     const at = place(spawn, point.x, point.y, DOT_Y);
     positions[i * 3] = at.x;
     positions[i * 3 + 1] = at.y;
@@ -121,33 +148,35 @@ function markers(spawn: SpawnPose, points: { x: number; y: number; yaw?: number;
     colors[i * 3 + 1] = scratch.g;
     colors[i * 3 + 2] = scratch.b;
   }
-  const halo = pointCloud(
-    positions,
-    new THREE.PointsMaterial({
-      size: count >= 24 ? 6 : 8,
-      sizeAttenuation: false,
-      color: "#140014",
-      transparent: true,
-      opacity: 0.18,
-      depthTest: false,
-      depthWrite: false,
-      toneMapped: false,
-      fog: false,
-    }),
-    4,
-  );
-  group.add(halo);
+  if (!converged) {
+    const halo = pointCloud(
+      positions,
+      new THREE.PointsMaterial({
+        size: count >= 24 ? 6 : 8,
+        sizeAttenuation: false,
+        color: "#140014",
+        transparent: true,
+        opacity: 0.18,
+        depthTest: false,
+        depthWrite: false,
+        toneMapped: false,
+        fog: false,
+      }),
+      4,
+    );
+    group.add(halo);
+  }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
   geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
   const dots = new THREE.Points(
     geometry,
     new THREE.PointsMaterial({
-      size: count >= 24 ? 3.5 : 5,
+      size: converged ? 2 : count >= 24 ? 3.5 : 5,
       sizeAttenuation: false,
       vertexColors: true,
       transparent: true,
-      opacity: 0.45,
+      opacity: converged ? 0.9 : 0.45,
       depthTest: false,
       depthWrite: false,
       toneMapped: false,
@@ -158,8 +187,10 @@ function markers(spawn: SpawnPose, points: { x: number; y: number; yaw?: number;
   dots.renderOrder = 6;
   group.add(dots);
 
-  const tick = headingTicks(spawn, points, base, hot, weighted, maxWeight);
-  if (tick) group.add(tick);
+  if (!converged) {
+    const tick = headingTicks(spawn, thinCloud(shown, 80), base, hot, weighted, maxWeight);
+    if (tick) group.add(tick);
+  }
   return group;
 }
 
@@ -244,8 +275,8 @@ function ellipseRing(
   const shade = ribbon(upper, "#1a1200", half + (minor > 4 ? 0.55 : 0.06));
   const ring = ribbon(upper, op.color, half);
   for (const [mesh, order] of [
-    [shade, 2],
-    [ring, 3],
+    [shade, 8],
+    [ring, 9],
   ] as const) {
     mesh.frustumCulled = false;
     mesh.renderOrder = order;

@@ -34,8 +34,8 @@ export function particleFilterSource(mode: "track" | "global"): string {
 # by a lidar likelihood field, and low-variance resamples. With a known
 # start the pose we steer with is the weighted mean.
 #
-# UNKNOWN_START is a kidnapped robot. Most particles are free cells with
-# random headings. A minority sit on the route at twelve headings, because
+# UNKNOWN_START is a kidnapped robot. Most particles start in empty space
+# with random headings. A minority sit on the route at twelve headings, because
 # a few hundred uniform poses do not cover x, y, and yaw. The car creeps
 # with the right-wall follower (same gains as the wall lesson, throttle
 # capped) until one particle holds about a tenth of the weight. The cloud
@@ -56,7 +56,7 @@ export function particleFilterSource(mode: "track" | "global"): string {
 # The warehouse bay is flatter, so the creep continues until a peak
 # appears. If the short-term likelihood average later falls below the
 # long-term one, resample mixes in random free-space particles. A pose
-# that has left the route hands the wheel back to the wall follower.
+# that has left the route backs away when the bumper is against a wall.
 
 import base64
 import math
@@ -212,15 +212,35 @@ def control(sensors):
         particles = resample(particles, weights, 0.0, field, m)
     # Creep on the right-hand wall until one particle owns the scan.
     # Wall gains are the wall lesson's; the cap is the creep. After that,
-    # pursuit. A pose that has left the route hands the wheel back.
+    # pursuit. Off the route, back away instead of grinding the wall ahead.
     off_route = UNKNOWN_START and path_distance(sensors.task.path, estimate[0], estimate[1]) > 4.0
-    if UNKNOWN_START and (explore.locked == 0 or off_route):
+    if UNKNOWN_START and explore.locked == 0:
         steer, throttle = follow_wall(sensors)
         speed = float(sensors.odometry.speed)
         if speed > 1.5:
             throttle = min(throttle, -0.05)
         else:
             throttle = min(throttle, 0.22)
+    elif off_route:
+        # The guess has left the loop, so the route wall is the wrong one
+        # to creep along. A return inside 2 m is the bumper on whatever
+        # is actually ahead (the lidar sits behind it). Back off that face.
+        steer, throttle = follow_wall(sensors)
+        ranges = np.asarray(sensors.lidar.ranges, dtype=float)
+        angles = np.asarray(sensors.lidar.angles, dtype=float)
+        ahead = np.abs(angles) < 0.8
+        front = float(np.min(ranges[ahead])) if np.any(ahead) else sensors.lidar.max_range
+        if front < 2.2:
+            left = float(np.mean(ranges[angles > 0.4])) if np.any(angles > 0.4) else 0.0
+            right = float(np.mean(ranges[angles < -0.4])) if np.any(angles < -0.4) else 0.0
+            steer = 0.45 if left >= right else -0.45
+            throttle = -0.35
+        else:
+            speed = float(sensors.odometry.speed)
+            if speed > 1.5:
+                throttle = min(throttle, -0.05)
+            else:
+                throttle = min(throttle, 0.22)
     else:
         steer, throttle = pursue(sensors, estimate)
     trail.append((float(estimate[0]), float(estimate[1])))

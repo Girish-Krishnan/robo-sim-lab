@@ -75,32 +75,33 @@ async function main(): Promise<void> {
   const fullMatrix = !only && rows.length === EVAL_WORLDS.length * EVAL_EXAMPLES.length && seed === 1;
   const extras: RunMetrics[] = [];
   if (ci && fullMatrix) {
-    const seen = new Set<string>();
+    const starters = new Set<EvalExample>();
     for (const lesson of LESSONS) {
-      if (lesson.status !== "ready" || !lesson.starter) continue;
-      const key = `${lesson.world}/${lesson.starter}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      for (const extraSeed of [2, 3]) {
-        const started = Date.now();
-        const source = EXAMPLES.find((item) => item.id === lesson.starter)?.source;
-        if (!source) throw new Error(`Missing example ${lesson.starter}`);
-        const policy = loadStudentPolicy(pyodide, source);
-        const solids = solidsFor(lesson.world as EvalWorld);
-        const spawn = spawnFor(lesson.world as EvalWorld, lesson.starter, "scenario");
-        const episode = runEpisode(RAPIER, solids, {
-          world: lesson.world as EvalWorld,
-          example: lesson.starter as EvalExample,
-          spawn,
-          seconds,
-          seed: extraSeed,
-          policy,
-        });
-        extras.push(episode.metrics);
-        const m = episode.metrics;
-        process.stdout.write(
-          `${lesson.world}/${lesson.starter} seed ${extraSeed}  dist ${m.distance.toFixed(1)}  real ${m.collisionCount}  stuck ${m.stuckTime.toFixed(1)}  ${(Date.now() - started) / 1000}s\n`,
-        );
+      if (lesson.status === "ready" && lesson.starter) starters.add(lesson.starter as EvalExample);
+    }
+    for (const example of starters) {
+      for (const world of EVAL_WORLDS) {
+        for (const extraSeed of [2, 3]) {
+          const started = Date.now();
+          const source = EXAMPLES.find((item) => item.id === example)?.source;
+          if (!source) throw new Error(`Missing example ${example}`);
+          const policy = loadStudentPolicy(pyodide, source);
+          const solids = solidsFor(world);
+          const spawn = spawnFor(world, example, "scenario");
+          const episode = runEpisode(RAPIER, solids, {
+            world,
+            example,
+            spawn,
+            seconds,
+            seed: extraSeed,
+            policy,
+          });
+          extras.push(episode.metrics);
+          const m = episode.metrics;
+          process.stdout.write(
+            `${world}/${example} seed ${extraSeed}  dist ${m.distance.toFixed(1)}  real ${m.collisionCount}  stuck ${m.stuckTime.toFixed(1)}  ${(Date.now() - started) / 1000}s\n`,
+          );
+        }
       }
     }
   }

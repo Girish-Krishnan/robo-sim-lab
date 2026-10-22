@@ -15,26 +15,28 @@ In the sim: a fixed steer on an open pad, with the coloured trail showing the ci
 
 <svg viewBox="0 0 560 340" role="img" aria-label="Top view: turn centre, radius R, wheelbase L perpendicular to R, and steer angle delta">
   <rect width="560" height="340" rx="12" fill="#0e1418"/>
-  <circle cx="90" cy="230" r="7" fill="#ffd24a"/>
-  <text x="104" y="218" fill="#ffd24a" font-size="18" font-family="sans-serif">turn centre</text>
-  <line x1="90" y1="230" x2="300" y2="230" stroke="#7ee0d0" stroke-width="3"/>
-  <text x="170" y="218" fill="#7ee0d0" font-size="20" font-family="sans-serif">R</text>
-  <path d="M300 230 A 210 210 0 0 1 300 70" fill="none" stroke="#2a4a44" stroke-width="10"/>
-  <rect x="262" y="78" width="76" height="168" rx="16" fill="none" stroke="#f4f7f4" stroke-width="3"/>
-  <rect x="258" y="214" width="22" height="10" rx="2" fill="#f4f7f4"/>
-  <rect x="320" y="214" width="22" height="10" rx="2" fill="#f4f7f4"/>
-  <line x1="300" y1="220" x2="300" y2="100" stroke="#f4f7f4" stroke-width="4"/>
-  <text x="308" y="168" fill="#f4f7f4" font-size="20" font-family="sans-serif">L</text>
-  <g transform="rotate(-28 300 100)">
-    <rect x="274" y="94" width="52" height="12" rx="2" fill="#ffd24a"/>
+  <circle cx="78" cy="214" r="7" fill="#ffd24a"/>
+  <text x="16" y="252" fill="#ffd24a" font-size="16" font-family="sans-serif">turn centre</text>
+  <line x1="78" y1="214" x2="300" y2="214" stroke="#7ee0d0" stroke-width="3"/>
+  <line x1="300" y1="94" x2="78" y2="214" stroke="#7ee0d0" stroke-width="2" stroke-dasharray="7 6"/>
+  <text x="168" y="202" fill="#7ee0d0" font-size="20" font-family="sans-serif">R</text>
+  <path d="M300 214 A 222 222 0 0 1 300 40" fill="none" stroke="#2a4a44" stroke-width="10"/>
+  <rect x="262" y="70" width="76" height="160" rx="16" fill="none" stroke="#f4f7f4" stroke-width="3"/>
+  <rect x="248" y="200" width="12" height="28" rx="2" fill="#f4f7f4"/>
+  <rect x="340" y="200" width="12" height="28" rx="2" fill="#f4f7f4"/>
+  <line x1="300" y1="214" x2="300" y2="94" stroke="#f4f7f4" stroke-width="4"/>
+  <text x="308" y="160" fill="#f4f7f4" font-size="20" font-family="sans-serif">L</text>
+  <g transform="rotate(-28 300 94)">
+    <rect x="274" y="80" width="12" height="28" rx="2" fill="#ffd24a"/>
+    <rect x="314" y="80" width="12" height="28" rx="2" fill="#ffd24a"/>
   </g>
-  <path d="M300 78 A 22 22 0 0 1 286 92" fill="none" stroke="#ffd24a" stroke-width="3"/>
-  <text x="248" y="70" fill="#ffd24a" font-size="20" font-family="sans-serif">δ</text>
-  <text x="214" y="248" fill="#c9d4ce" font-size="16" font-family="sans-serif">rear axle</text>
-  <text x="360" y="108" fill="#ffd24a" font-size="16" font-family="sans-serif">front wheels</text>
+  <path d="M300 70 A 24 24 0 0 1 284 86" fill="none" stroke="#ffd24a" stroke-width="3"/>
+  <text x="246" y="64" fill="#ffd24a" font-size="20" font-family="sans-serif">δ</text>
+  <text x="364" y="220" fill="#c9d4ce" font-size="16" font-family="sans-serif">rear axle</text>
+  <text x="392" y="88" fill="#ffd24a" font-size="16" font-family="sans-serif">front wheels</text>
   <text x="16" y="32" fill="#f4f7f4" font-size="18" font-family="sans-serif">L is perpendicular to R</text>
   <text x="16" y="300" fill="#d5ddd8" font-size="16" font-family="sans-serif">White bar: wheelbase L, rear axle up to the front axle.</text>
-  <text x="16" y="324" fill="#d5ddd8" font-size="16" font-family="sans-serif">Teal bar: turning radius R. Yellow: steered front axle, angle δ.</text>
+  <text x="16" y="324" fill="#d5ddd8" font-size="16" font-family="sans-serif">Teal bar: turning radius R. Dashed: front axle to the turn centre.</text>
 </svg>
 
 ## Why the rear axle is the reference point

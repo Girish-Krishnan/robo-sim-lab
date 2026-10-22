@@ -11,6 +11,7 @@ import {
   isCompleted,
   loadLessonCode,
   loadProgress,
+  markCompleted,
   markVisited,
   saveLessonCode,
   toggleCompleted,
@@ -167,14 +168,6 @@ export function mountCourse(host: CourseHost): void {
     }
   };
 
-  const showConsole = (open: boolean) => {
-    const app = document.getElementById("app");
-    const consoleBtn = document.getElementById("toggle-console");
-    app?.classList.toggle("console-open", open);
-    consoleBtn?.setAttribute("aria-expanded", String(open));
-    consoleBtn?.classList.toggle("is-on", open);
-  };
-
   const show = (route: Route) => {
     collapseLab();
     const lesson = route.mode === "lessons" && route.id ? lessonById(route.id) : undefined;
@@ -182,6 +175,7 @@ export function mountCourse(host: CourseHost): void {
       location.hash = `#/lesson/${lastLessonId()}`;
       return;
     }
+    document.getElementById("app")?.classList.toggle("soon-lesson", lesson?.status === "soon");
     const token = ++opening;
     labId = lesson?.starter ? lesson.id : null;
     document.getElementById("reset-starter")?.toggleAttribute("hidden", !lesson?.starter);
@@ -215,7 +209,6 @@ export function mountCourse(host: CourseHost): void {
     host.clearConsole();
     host.setLessonSpawn(resolveSpawn(lesson), lesson.world, lesson.spawn);
     host.applyScene(scene);
-    if (lesson.starter) showConsole(true);
     void openLesson(lesson, scene.run, token);
   };
 
@@ -228,7 +221,6 @@ export function mountCourse(host: CourseHost): void {
     host.setCode(loadLessonCode(lesson.id) ?? starterOf(lesson));
     applying = false;
     refillChunks();
-    showConsole(true);
     }
     host.resetWorld();
     if (run) host.runProgram();
@@ -243,7 +235,8 @@ export function mountCourse(host: CourseHost): void {
     const ready = LESSONS.filter((item) => item.status === "ready");
     const doneCount = ready.filter((item) => progress.completed.includes(item.id)).length;
     const index = lessonIndex(lesson.id);
-    const prev = index > 0 ? LESSONS[index - 1] : undefined;
+    const soon = lesson.status === "soon";
+    const prev = index > 0 ? [...LESSONS.slice(0, index)].reverse().find((item) => item.status === "ready") : undefined;
     const nextReady = index >= 0 ? LESSONS.slice(index + 1).find((item) => item.status === "ready") : undefined;
     const done = isCompleted(lesson.id);
 
@@ -254,9 +247,9 @@ export function mountCourse(host: CourseHost): void {
       </div>
       <div class="lesson-nav-row">
         <button type="button" id="lesson-prev" ${prev ? "" : "disabled"}>Prev</button>
-        <button type="button" id="lesson-next" ${nextReady ? "" : ""}>${nextReady ? "Next" : "Done"}</button>
+        <button type="button" id="lesson-next" ${soon ? "disabled" : ""}>${soon || nextReady ? "Next" : "Done"}</button>
         <button type="button" id="lesson-complete" class="${done ? "is-on" : ""}">${done ? "Completed" : "Mark complete"}</button>
-        <span class="lesson-progress" title="Completed lessons">${doneCount}/${ready.length}</span>
+        <span class="lesson-progress" title="Completed lessons you can run">${doneCount}/${ready.length} available</span>
       </div>
       <details id="lesson-index" ${indexOpen ? "open" : ""}>
         <summary>All lessons</summary>
@@ -271,7 +264,7 @@ export function mountCourse(host: CourseHost): void {
       const option = document.createElement("option");
       option.value = module.id;
       option.textContent = module.soon ? `${module.title} (soon)` : module.title;
-      option.disabled = Boolean(module.soon);
+      option.disabled = Boolean(module.soon) && module.id !== lesson.moduleId;
       moduleSelect.append(option);
     }
     moduleSelect.value = lesson.moduleId;
@@ -281,7 +274,7 @@ export function mountCourse(host: CourseHost): void {
         const option = document.createElement("option");
         option.value = item.id;
         option.textContent = item.status === "soon" ? `${item.title} (soon)` : item.title;
-        option.disabled = item.status === "soon";
+        option.disabled = item.status === "soon" && item.id !== lesson.id;
         lessonSelect.append(option);
       }
     };
@@ -299,8 +292,15 @@ export function mountCourse(host: CourseHost): void {
       if (prev) navigate({ mode: "lessons", id: prev.id });
     });
     nav.querySelector("#lesson-next")?.addEventListener("click", () => {
-      if (nextReady) navigate({ mode: "lessons", id: nextReady.id });
-      else article.querySelector(".course-complete")?.scrollIntoView({ block: "nearest" });
+      if (lesson.status === "soon") return;
+      if (lesson.status === "ready") markCompleted(lesson.id);
+      if (nextReady) {
+        navigate({ mode: "lessons", id: nextReady.id });
+        return;
+      }
+      nav.querySelector("#lesson-index")?.setAttribute("open", "");
+      renderNav(lesson);
+      article.querySelector(".course-complete")?.scrollIntoView({ block: "nearest" });
     });
     nav.querySelector("#lesson-complete")?.addEventListener("click", () => {
       toggleCompleted(lesson.id);

@@ -17,7 +17,7 @@ Cross-track here is the distance from the true position to the reference path, a
   <rect width="520" height="240" rx="12" fill="#0e1418"/>
   <path d="M30 160 H490" fill="none" stroke="#7dcea0" stroke-width="3"/>
   <path d="M30 160 C 140 158, 240 150, 360 120 S 470 70, 500 56" fill="none" stroke="#f4f7f4" stroke-width="3"/>
-  <path d="M30 160 H470" fill="none" stroke="#6ea8ff" stroke-width="3" stroke-dasharray="8 6"/>
+  <path d="M30 146 H470" fill="none" stroke="#6ea8ff" stroke-width="3" stroke-dasharray="8 6"/>
   <line x1="360" y1="120" x2="360" y2="160" stroke="#ffd24a" stroke-width="2"/>
   <text x="368" y="146" fill="#ffd24a" font-size="16" font-family="sans-serif">cross-track</text>
   <text x="30" y="36" fill="#f4f7f4" font-size="18" font-family="sans-serif">The ghost stays on the path. The car does not.</text>
