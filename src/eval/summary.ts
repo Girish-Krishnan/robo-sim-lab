@@ -207,6 +207,12 @@ export function regressionErrors(row: RunMetrics): string[] {
       errors.push(`${name} travelled ${row.distance.toFixed(1)} m`);
     }
     if (row.laps < 1) errors.push(`${name} laps ${row.laps}`);
+    if (row.world === "track" && row.seed === 1) {
+      const at4 = row.poseErrorAt4 ?? -1;
+      if (!(at4 >= 0 && at4 <= 1)) {
+        errors.push(`${name} pose at 4 s ${at4 < 0 ? "missing" : `${at4.toFixed(2)} m`}`);
+      }
+    }
   }
   if ((row.controlMsMax ?? 0) > 45) errors.push(`${name} control max ${row.controlMsMax.toFixed(1)} ms`);
   return errors;

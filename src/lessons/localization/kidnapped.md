@@ -46,11 +46,12 @@ In the sim, the camera stays overhead and the view holds that first cloud for 2 
 
 On seed 1 the car waits out the 2 s hold. The guesses close on the car during that hold, and when it ends the car drives. By about 4 s it is moving at a few metres per second.
 
-On a roundabout or in the forest, one particle takes almost all of the weight at once. On the oval the favourite straight holds about 10% of the weight. The warehouse shares its weight for longer, so the hold is the same 2 s but the cloud can stay broad after it.
+On a roundabout or in the forest, one guess matches the walls and the others fade. On the oval, the two long straights look the same to the lidar, so the best guess is only a modest favourite and a second clump can linger. The warehouse keeps several guesses alive until the car moves. The hold is the same 2 s either way, and the cloud can stay broad after it.
 
-Going further: when the scan stops fitting, sprinkle fresh guesses.
-
-Note: the filter compares a short-term average of the log mean beam likelihood with a long-term one, counted in nats. A drop of several nats adds random particles in empty space, at most a quarter of the cloud. A turn moves the fit by a nat or two and adds none. After the first scans the weights are cubed, and the cube goes away once a particle is adopted.
+<details class="going-further">
+<summary>Going further</summary>
+<p>When the scan stops fitting the map, the filter sprinkles fresh guesses into empty space, and never more than about a quarter of the cloud. It compares a short average of the beam fit with a longer average of the same score. A real mismatch drops that score hard. A turn only wobbles it, and adds no new guesses. Early on, the weights are cubed so one good guess can stand out. Once a guess is adopted, that cube goes away.</p>
+</details>
 
 The prior that spreads the first cloud, and the steer once a winner exists:
 

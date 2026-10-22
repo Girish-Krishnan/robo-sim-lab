@@ -191,6 +191,14 @@ export class LidarView {
     }
 
     if (overlay) drawStudentOverlay(ctx, overlay, cx, cy, radius);
+    const widePrior = overlay?.ops.some((op) => op.kind === "ellipse" && Math.max(op.rx, op.ry) > 6) ?? false;
+    if (widePrior) {
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = "rgba(215, 230, 224, 0.9)";
+      ctx.font = "12px IBM Plex Mono, ui-monospace, monospace";
+      ctx.textAlign = "center";
+      ctx.fillText("spread only", cx, h - 16);
+    }
 
     ctx.fillStyle = "#2fbfa8";
     ctx.beginPath();

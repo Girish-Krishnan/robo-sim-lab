@@ -4,6 +4,7 @@ import type { VehicleTelemetry } from "../robots/types";
 export type AppMode = "drive" | "code" | "lessons";
 
 export class Hud {
+  private readonly root: HTMLElement;
   private readonly speed: HTMLElement;
   private readonly odom: HTMLElement;
   private readonly steerCmd: HTMLElement;
@@ -13,6 +14,7 @@ export class Hud {
   private readonly mode: HTMLElement;
 
   constructor(root: HTMLElement) {
+    this.root = root;
     root.replaceChildren();
     this.speed = row(root, "Speed");
     this.odom = row(root, "Odom", true);
@@ -24,6 +26,7 @@ export class Hud {
   }
 
   update(telemetry: VehicleTelemetry, mode: AppMode, run: SandboxState, simTime = 0, paused = false): void {
+    this.root.classList.toggle("is-paused", paused);
     this.speed.textContent = `${telemetry.trueSpeed.toFixed(2)} m/s`;
     this.odom.textContent = `${telemetry.odomSpeed.toFixed(2)} m/s`;
     this.steerCmd.textContent = `${telemetry.commandedSteering.toFixed(2)} rad`;

@@ -9,7 +9,7 @@ prerequisites: localization/bayes
 status: ready
 ---
 
-Each dot is a guess. Guesses that match the lidar survive. On the oval the starter begins in a tight neighbourhood of the car, so the first frame already agrees. Press **Scatter guesses** to throw that cloud out a couple of metres and watch the matching guesses survive. Open the **Key** on the view for the colour names: pink dots, yellow ring, red trail, and blue odometry. The red trail is the filter's mean, drawn on top of the dots.
+Each dot is a guess. Guesses that match the lidar survive. On the oval the starter begins in a tight neighbourhood of the car, so the first frame already agrees. Press **Scatter guesses** to throw that cloud out about 7 m and watch the matching guesses survive. The red mean has a dark outline so it stays readable on the pink dots. Open the **Key** on the view for the colour names: pink dots, yellow ring, red trail, and blue odometry. The red trail is the filter's mean, drawn on top of the dots.
 
 In the sim, the tracking cloud runs on the oval. The Key uses those same names.
 

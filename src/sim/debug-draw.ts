@@ -45,7 +45,13 @@ export class DebugDraw {
     for (const op of ops) {
       if (op.kind === "path" && op.points.length >= 2) {
         const mean = op.color.toLowerCase() === "#ff5d73" || op.color.toLowerCase() === "#ffe08a";
-        this.group.add(ribbon(op.points.map((point) => place(spawn, point.x, point.y, mean ? 0.52 : 0.46)), op.color, mean ? 0.12 : 0.08, mean));
+        const placed = op.points.map((point) => place(spawn, point.x, point.y, mean ? 0.52 : 0.46));
+        if (op.color.toLowerCase() === "#ff5d73") {
+          const shade = ribbon(placed, "#14060a", 0.36, true);
+          shade.renderOrder = 12;
+          this.group.add(shade);
+        }
+        this.group.add(ribbon(placed, op.color, mean ? 0.12 : 0.08, mean));
       }
     }
   }

@@ -47,6 +47,19 @@ export async function mountCourse(host: CourseHost): Promise<void> {
   const article = document.getElementById("lesson");
   const lessonChrome = document.getElementById("lesson-chrome");
   if (!nav || !article || !lessonChrome) return;
+  const lessonToast = document.createElement("p");
+  lessonToast.id = "lesson-toast";
+  lessonToast.hidden = true;
+  lessonChrome.append(lessonToast);
+  let toastTimer = 0;
+  const flashLesson = (text: string) => {
+    lessonToast.textContent = text;
+    lessonToast.hidden = false;
+    window.clearTimeout(toastTimer);
+    toastTimer = window.setTimeout(() => {
+      lessonToast.hidden = true;
+    }, 2400);
+  };
 
   let applying = false;
   let labId: string | null = null;
@@ -307,6 +320,13 @@ export async function mountCourse(host: CourseHost): Promise<void> {
       toggleCompleted(lesson.id);
       renderNav(lesson);
       fillProgressCard(lesson);
+      const marked = isCompleted(lesson.id);
+      flashLesson(marked ? "Marked complete" : "Marked open");
+      const card = article.querySelector<HTMLElement>(".course-complete");
+      if (marked && card) {
+        const delta = card.getBoundingClientRect().top - article.getBoundingClientRect().top;
+        article.scrollTop += delta - 8;
+      }
     });
 
     const body = nav.querySelector(".lesson-index-body");

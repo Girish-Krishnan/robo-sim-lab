@@ -13,16 +13,16 @@ The IMU in this sandbox is a yaw gyro and a three-axis accelerometer. There is n
 
 In the sim: the circle program on an open pad, so the yaw rate has a steady value to compare.
 
-<svg viewBox="0 0 520 230" role="img" aria-label="A gyro bias adds a little yaw every second, so heading walks off in a fan.">
-  <rect width="520" height="230" rx="12" fill="#0e1418"/>
+<svg viewBox="0 0 520 252" role="img" aria-label="A gyro bias adds a little yaw every second, so heading walks off in a fan.">
+  <rect width="520" height="252" rx="12" fill="#0e1418"/>
   <line x1="64" y1="188" x2="300" y2="152" stroke="#f4f7f4" stroke-width="3"/>
   <line x1="64" y1="188" x2="380" y2="56" stroke="#6ea8ff" stroke-width="3"/>
   <path d="M150 176 Q 168 158 142 148" fill="none" stroke="#ffd24a" stroke-width="3"/>
   <text x="186" y="160" fill="#ffd24a" font-size="18" font-family="sans-serif">b·t</text>
-  <text x="168" y="206" fill="#f4f7f4" font-size="16" font-family="sans-serif">true heading</text>
-  <text x="250" y="78" fill="#6ea8ff" font-size="16" font-family="sans-serif">integrated gyro</text>
-  <text x="24" y="32" fill="#f4f7f4" font-size="18" font-family="sans-serif">The bias is a heading that grows with time</text>
-  <text x="24" y="214" fill="#d5ddd8" font-size="16" font-family="sans-serif">b is 0.0012 rad/s, one sigma. Over a minute that is a few degrees.</text>
+  <text x="176" y="185" fill="#f4f7f4" font-size="16" font-family="sans-serif">true heading</text>
+  <text x="348" y="48" text-anchor="middle" fill="#6ea8ff" font-size="16" font-family="sans-serif">integrated gyro</text>
+  <text x="24" y="22" fill="#f4f7f4" font-size="18" font-family="sans-serif">The bias is a heading that grows with time</text>
+  <text x="24" y="236" fill="#d5ddd8" font-size="16" font-family="sans-serif">b is 0.0012 rad/s, one sigma. Over a minute that is a few degrees.</text>
 </svg>
 
 `sensors.imu.yaw_rate` is radians per second about body +z. Positive is a left turn, the same sign as positive steering and as the odometry yaw. White noise is about 0.002 rad/s. A bias drawn once per reset has standard deviation 0.0012 rad/s. The odometry lesson integrates this rate. If you integrate it yourself, use the same sample the odometry used, and the two headings stay in step.

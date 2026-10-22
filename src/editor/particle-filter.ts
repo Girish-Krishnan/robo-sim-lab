@@ -172,8 +172,20 @@ def control(sensors):
         ellipse_w = np.full(N, 1.0 / N)
         ellipse_at = (float(np.mean(particles[:, 0])), float(np.mean(particles[:, 1])))
     else:
-        ellipse_w = weights
-        ellipse_at = (mean[0], mean[1])
+        raw_x = float(np.mean(particles[:, 0]))
+        raw_y = float(np.mean(particles[:, 1]))
+        raw_dx = particles[:, 0] - raw_x
+        raw_dy = particles[:, 1] - raw_y
+        raw_var = float(np.mean(raw_dx * raw_dx + raw_dy * raw_dy))
+        # Scatter guesses throws the cloud out several metres. While those
+        # dots are still spread, the ring is that scatter. A tight cloud
+        # keeps the weighted covariance, which is the agreement of the guesses.
+        if raw_var > 4.0:
+            ellipse_w = np.full(N, 1.0 / N)
+            ellipse_at = (raw_x, raw_y)
+        else:
+            ellipse_w = weights
+            ellipse_at = (mean[0], mean[1])
     dxp = particles[:, 0] - ellipse_at[0]
     dyp = particles[:, 1] - ellipse_at[1]
     var_x = max(0.0, float(np.dot(ellipse_w, dxp * dxp)))

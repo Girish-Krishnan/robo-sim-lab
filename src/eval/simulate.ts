@@ -89,6 +89,11 @@ export interface RunMetrics {
   convergeTime: number;
   /** Pose error on the last control sample. Zero when there is no estimate. */
   finalPoseError: number;
+  /**
+   * Pose error on the first control sample at or after 4 s.
+   * -1 when the run is shorter, or the policy publishes no estimate.
+   */
+  poseErrorAt4: number;
   /** 2-sigma radius of the drawn cloud on the last sample. -1 when there is no cloud. */
   finalCloudRadius: number;
   /** Heading sigma of the drawn cloud on the last sample, radians. -1 when there is no cloud. */
@@ -253,6 +258,7 @@ export function runEpisode(
   let headMax = 0;
   let poseCount = 0;
   let finalPoseError = 0;
+  let poseErrorAt4 = -1;
   let finalCloudRadius = -1;
   let finalHeadingSigma = -1;
   let convergeTime = -1;
@@ -348,6 +354,7 @@ export function runEpisode(
         headMax = Math.max(headMax, heading);
         poseCount += 1;
         finalPoseError = position;
+        if (poseErrorAt4 < 0 && simTime >= 4 - 1e-6) poseErrorAt4 = position;
         const spread = command.spread;
         const tight =
           spread !== undefined &&
@@ -448,6 +455,7 @@ export function runEpisode(
     controlMsMax: round(maxOf(options.policy.controlMs)),
     convergeTime: round(convergeTime),
     finalPoseError: round(finalPoseError),
+    poseErrorAt4: poseErrorAt4 < 0 ? -1 : round(poseErrorAt4),
     finalCloudRadius: round(finalCloudRadius),
     finalHeadingSigma: round(finalHeadingSigma),
     final: { x: round(end.x), z: round(end.z), yaw: round(end.yaw) },

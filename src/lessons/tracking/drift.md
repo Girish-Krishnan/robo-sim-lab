@@ -16,10 +16,10 @@ Cross-track here is the distance from the true position to the reference path, a
 <svg viewBox="0 0 520 240" role="img" aria-label="The reference path stays put. Odometry follows it. The car peels away. Cross-track is the gap.">
   <rect width="520" height="240" rx="12" fill="#0e1418"/>
   <path d="M30 160 H490" fill="none" stroke="#7dcea0" stroke-width="3"/>
-  <path d="M30 160 C 140 158, 240 150, 360 120 S 470 70, 500 56" fill="none" stroke="#f4f7f4" stroke-width="3"/>
+  <path d="M30 160 C 140 158, 240 152, 360 136 S 460 128, 500 120" fill="none" stroke="#f4f7f4" stroke-width="3"/>
   <path d="M30 168 H470" fill="none" stroke="#6ea8ff" stroke-width="3" stroke-dasharray="8 6"/>
-  <line x1="360" y1="120" x2="360" y2="160" stroke="#ffd24a" stroke-width="2"/>
-  <text x="372" y="108" fill="#ffd24a" font-size="16" font-family="sans-serif">cross-track</text>
+  <line x1="360" y1="136" x2="360" y2="160" stroke="#ffd24a" stroke-width="2"/>
+  <text x="372" y="100" fill="#ffd24a" font-size="16" font-family="sans-serif">cross-track</text>
   <text x="30" y="36" fill="#f4f7f4" font-size="18" font-family="sans-serif">The ghost stays on the path. The car does not.</text>
   <text x="30" y="196" fill="#7dcea0" font-size="15" font-family="sans-serif">Green: reference path.</text>
   <text x="30" y="218" fill="#d5ddd8" font-size="15" font-family="sans-serif">White: where the car went. Blue dashes: odometry, still on the plan.</text>

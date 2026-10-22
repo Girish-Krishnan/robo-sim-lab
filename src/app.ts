@@ -258,8 +258,9 @@ export async function mountApp(): Promise<void> {
       hint.classList.remove("is-faded");
       if (paused) {
         hint.hidden = true;
-        driveHint.hidden = false;
-        driveHint.textContent = "Paused, press Resume";
+        // The badge and the Time row already say paused. The toast is for the person at the wheel.
+        driveHint.hidden = !driveSelf;
+        if (driveSelf) driveHint.textContent = "Paused, press Resume";
         return;
       }
       if ((mode === "lessons" && !driveSelf) || driveSelf) {
@@ -269,9 +270,9 @@ export async function mountApp(): Promise<void> {
           driveHint.hidden = false;
           driveHint.textContent = simArmed
             ? mode === "lessons"
-              ? "You are driving. WASD or arrows, Space brakes. Speed stays near 3 m/s."
-              : "You are driving. WASD or arrows, Space brakes. The filter still scores the scan."
-            : "Press a drive key to take the wheel. WASD or arrows, Space brakes.";
+              ? "Driving · speed stays near 3 m/s"
+              : "Driving · the filter still scores"
+            : "Press a drive key to take the wheel";
         }
         return;
       }
@@ -293,7 +294,7 @@ export async function mountApp(): Promise<void> {
       segments: [],
       stamp: 0,
     });
-    void import("./eval/scenarios").then((mod) => {
+    const solidsPromise = import("./eval/scenarios").then((mod) => {
       solidsReady = mod.solidsFor;
       mapCache = null;
     });
@@ -401,7 +402,7 @@ export async function mountApp(): Promise<void> {
       code.run(source ?? codeEditor.getValue());
     };
     const scatterGuesses = () => {
-      const source = codeEditor.getValue().replace(/TRACK_SPREAD\s*=\s*[0-9.]+/, "TRACK_SPREAD = 2.2");
+      const source = codeEditor.getValue().replace(/TRACK_SPREAD\s*=\s*[0-9.]+/, "TRACK_SPREAD = 3.5");
       if (source === codeEditor.getValue()) return;
       // The wider cloud belongs at the start, on the car. Leave the editor at 0.25.
       resetWorld(true, source);
@@ -725,6 +726,7 @@ export async function mountApp(): Promise<void> {
     });
     window.addEventListener("blur", () => keys.clear());
 
+    await solidsPromise;
     await mountCourse({
       setWorld: async (id) => {
         await switchWorld(id);
@@ -846,15 +848,22 @@ export async function mountApp(): Promise<void> {
             world.step();
             // The kidnapped prior is a 2 s hold on the Time row. Python may
             // still be loading the program, so the clock stays at 0 until
-            // that first cloud is on screen. Physics still steps, or the
-            // program would never receive a scan. A stopped or failed run
-            // does not pin the clock.
+            // that first cloud is on screen. Physics still steps. A stopped
+            // or failed run does not pin the clock.
             const pinningPrior = trackCloud && priorHoldUntil < 0 && (code.current === "loading" || code.current === "running");
             if (!pinningPrior) simTime += PHYSICS_DT;
             sensorAccumulator += PHYSICS_DT;
             accumulator -= PHYSICS_DT;
             steps += 1;
             if (sensorAccumulator >= CONTROL_DT - 1e-4) {
+              // Sampling draws the seeded lidar. Doing that before the
+              // program can see the frame burns the spawn scan, and the
+              // first likelihood then locks onto another pose on the straight.
+              const feed = !codeControls() || (code.current === "running" && taskMap().width >= 2);
+              if (!feed) {
+                sensorAccumulator = CONTROL_DT - PHYSICS_DT;
+                continue;
+              }
               const sampleDt = sensorAccumulator;
               sensorAccumulator = 0;
               const sensors = robot.sampleSensors(sampleDt);
@@ -864,7 +873,9 @@ export async function mountApp(): Promise<void> {
                 map: taskMap(),
               };
               studentPose = sensors.odometry.pose;
-              if (codeControls()) code.offer(sensors);
+              // A 1×1 placeholder map is not the yard. The filter would lock
+              // a pose on it and then refuse to jump onto the real map.
+              if (codeControls() && sensors.task.map.width >= 2) code.offer(sensors);
               const widePrior = drawOps.some((op) => op.kind === "ellipse" && Math.max(op.rx, op.ry) > 6);
               const insetOps = widePrior ? drawOps.filter((op) => op.kind !== "points") : drawOps;
               lidar.update(

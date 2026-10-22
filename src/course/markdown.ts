@@ -46,6 +46,18 @@ function renderProse(source: string): string {
       i += 1;
       continue;
     }
+    if (trimmed.startsWith("<details")) {
+      const chunk = [line];
+      i += 1;
+      while (i < lines.length && !(lines[i] ?? "").includes("</details>")) {
+        chunk.push(lines[i] ?? "");
+        i += 1;
+      }
+      if (i < lines.length) chunk.push(lines[i] ?? "");
+      i += 1;
+      out.push(chunk.join("\n"));
+      continue;
+    }
     if (trimmed.startsWith("<svg") || trimmed.startsWith("<div")) {
       const tag = trimmed.startsWith("<svg") ? "svg" : "div";
       const chunk = [line];
@@ -114,7 +126,7 @@ function renderProse(source: string): string {
 function isBoundary(line: string): boolean {
   const trimmed = line.trim();
   if (trimmed === "") return true;
-  if (trimmed.startsWith("<svg") || trimmed.startsWith("<div")) return true;
+  if (trimmed.startsWith("<svg") || trimmed.startsWith("<div") || trimmed.startsWith("<details")) return true;
   if (/^#{1,3}\s/.test(trimmed)) return true;
   if (/^\d+\.\s/.test(trimmed) || /^[-*]\s/.test(trimmed)) return true;
   if (/^@@MATH\d+@@$/.test(trimmed)) return true;

@@ -53,6 +53,17 @@ describe("course catalog", () => {
     expect(progressCard(soon!, [])).toBe("");
   });
 
+  it("puts the kidnapped expert note behind a collapsed Going further", () => {
+    const lesson = lessonById("localization/kidnapped");
+    expect(lesson?.markdown).not.toContain("10% of the weight");
+    expect(lesson?.markdown).not.toContain("sprinkle fresh guesses.");
+    const html = renderMarkdown(lesson?.markdown ?? "");
+    expect(html).toContain("<details");
+    expect(html).toContain("Going further");
+    expect(html).toContain("modest favourite");
+    expect(html).not.toContain("&lt;details");
+  });
+
   it("renders KaTeX and leaves an inline diagram in the page", () => {
     const html = renderMarkdown("A curvature $$\\kappa = 2\\sin\\alpha / L_d$$ and a line.\n\n<svg><path d=\"M0 0 L1 1\"></path></svg>");
     expect(html).toContain("katex");
