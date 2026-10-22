@@ -168,10 +168,13 @@ export class LidarView {
     ctx.lineTo(cx, cy - radius);
     ctx.stroke();
 
-    ctx.fillStyle = "rgba(215, 230, 224, 0.7)";
-    ctx.font = "11px IBM Plex Mono, ui-monospace, monospace";
+    ctx.fillStyle = "rgba(215, 230, 224, 0.92)";
+    ctx.font = "12px IBM Plex Mono, ui-monospace, monospace";
     ctx.textAlign = "center";
-    ctx.fillText("lidar", cx, 24);
+    ctx.fillText("Lidar", cx, 16);
+    ctx.font = "10px IBM Plex Mono, ui-monospace, monospace";
+    ctx.fillStyle = "rgba(215, 230, 224, 0.72)";
+    ctx.fillText("top-down · amber is close", cx, 30);
 
     const maxRange = scan.maxRange > 0 ? scan.maxRange : 1;
     const count = Math.min(scan.ranges.length, scan.angles.length);

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { LESSONS, MODULES } from "../src/course/catalog";
+import { LESSONS, MODULES, lessonById, resolveSpawnIn } from "../src/course/catalog";
 import { renderMarkdown } from "../src/course/markdown";
+import { readChunks } from "../src/editor/chunks";
 import { EXAMPLES } from "../src/editor/examples";
 
 describe("course catalog", () => {
@@ -39,5 +40,30 @@ describe("course catalog", () => {
     const rendered = renderMarkdown(bicycle?.markdown ?? "");
     expect(rendered).toContain("katex-display");
     expect(rendered).toContain("<svg");
+    expect(rendered).toContain('class="code-slot"');
+    expect(rendered).toContain('data-chunk="drive"');
+  });
+
+  it("keeps a lesson's kind of start when the world changes", () => {
+    const bicycle = lessonById("models/bicycle");
+    expect(bicycle?.spawn).toBe("circle");
+    const onTrack = resolveSpawnIn(bicycle!, "track");
+    const onCity = resolveSpawnIn(bicycle!, "city");
+    expect(onCity.z).not.toBe(onTrack.z);
+    expect(Math.hypot(onCity.x - 5.5, onCity.z + 30)).toBeLessThan(8);
+  });
+
+  it("points every lesson code slot at a slice of that lesson's starter", () => {
+    for (const lesson of LESSONS) {
+      const ids = [...lesson.markdown.matchAll(/\{\{code:([A-Za-z0-9_-]+)\}\}/g)].map((match) => match[1] ?? "");
+      if (!lesson.starter) {
+        expect(ids, lesson.id).toEqual([]);
+        continue;
+      }
+      const source = EXAMPLES.find((example) => example.id === lesson.starter)?.source ?? "";
+      const chunks = readChunks(source);
+      expect(ids.length, lesson.id).toBeGreaterThan(0);
+      for (const id of ids) expect(chunks.has(id), `${lesson.id} missing ${id}`).toBe(true);
+    }
   });
 });

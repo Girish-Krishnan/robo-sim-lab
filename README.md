@@ -1,8 +1,12 @@
 # Robotics Sandbox
 
-An educational robotics simulator that runs entirely in the browser. Open the page, drive an Ackermann-steered buggy around a small proving ground, or write Python that sees only simulated sensors and watch it run in the same 3D world.
+A browser lab for learning how a wheeled robot steers, senses, and finds itself on a map. You drive a small car, or you write Python that sees only lidar, wheel odometry, and an IMU, and you watch that program run in the same 3D world.
 
-There is no backend. The site is a static Vite build.
+It is for students and engineers who want the bicycle model, obstacle avoidance, pure pursuit, and particle filters without installing a robotics stack. The page is a static site. There is no account and no backend.
+
+**Live site:** https://girish-krishnan.github.io/robo-sim-lab/
+
+![The sandbox lesson, with the car in the city and the key naming the trails](docs/sandbox.png)
 
 ## Quick start
 
@@ -159,7 +163,7 @@ The reading. Use `$inline$` and `$$display$$` math. SVG can sit inline. Headings
 | `title`, `order` | Lesson label and order within the module. Module order is the list in `src/course/catalog.ts`. |
 | `world` | `city`, `track`, `forest`, or `warehouse`. Opening the lesson switches to it. |
 | `spawn` | `default`, `circle`, `avoid`, `wall`, `pursuit`, `mcl`, or `mcl-global`. These are the scenario spawns. |
-| `starter` | An example id from `src/editor/examples.ts`, or `none`. A starter is loaded into the Try it editor and run. The editor starts collapsed; Edit code opens it. |
+| `starter` | An example id from `src/editor/examples.ts`, or `none`. A starter is loaded and run. `{{code:id}}` in the lesson shows a named slice of that program, editable in place. |
 | `action` | `lab` runs starter code, `drive` leaves the keyboard in control, `sandbox` is a reading with the sim configured and no program. |
 | `prerequisites` | Comma-separated lesson ids, `module/slug`. |
 | `status` | `ready` or `soon`. |

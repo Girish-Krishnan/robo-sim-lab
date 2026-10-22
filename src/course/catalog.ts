@@ -29,6 +29,12 @@ export type LessonCamera = "chase" | "wide" | "overhead";
 export interface LessonScene {
   lidar: boolean;
   paths: boolean;
+  /** Particle cloud, ellipse, and estimate trail are on screen. */
+  particles: boolean;
+  /** The program draws the reference route. */
+  route: boolean;
+  /** Localization lessons can hand the steering wheel to the keyboard. */
+  manual: boolean;
   camera: LessonCamera;
   seed: number;
   /** Load and run the starter (or the saved edit). */
@@ -74,8 +80,17 @@ export function lessonIndex(id: string): number {
 }
 
 export function resolveSpawn(lesson: Lesson): SpawnPose {
-  if (lesson.spawn === "default") return worldSpawn(lesson.world);
-  return spawnFor(lesson.world as EvalWorld, lesson.spawn, "scenario");
+  return resolveSpawnIn(lesson, lesson.world);
+}
+
+/**
+ * The lesson's start, in whichever world is on screen. Switching yards
+ * keeps the same kind of start (circle pad, wall, route, avoid) instead
+ * of dropping back to that yard's driving spawn.
+ */
+export function resolveSpawnIn(lesson: Lesson, world: WorldId): SpawnPose {
+  if (lesson.spawn === "default") return worldSpawn(world);
+  return spawnFor(world as EvalWorld, lesson.spawn, "scenario");
 }
 
 /**
@@ -85,7 +100,7 @@ export function resolveSpawn(lesson: Lesson): SpawnPose {
  */
 export function sceneFor(lesson: Lesson): LessonScene {
   if (lesson.status === "soon") {
-    return { lidar: true, paths: false, camera: "chase", seed: 1, run: false };
+    return { lidar: true, paths: false, particles: false, route: false, manual: false, camera: "chase", seed: 1, run: false };
   }
   const kidnapped = lesson.spawn === "mcl-global" || lesson.starter === "mcl-global";
   const particles =
@@ -103,12 +118,22 @@ export function sceneFor(lesson: Lesson): LessonScene {
     lesson.slug === "odometry" ||
     lesson.slug === "noise" ||
     lesson.slug === "wall" ||
-    lesson.slug === "driving";
+    lesson.slug === "driving" ||
+    lesson.slug === "sandbox";
   const lidarOff = lesson.slug === "bicycle" || lesson.slug === "circle" || lesson.slug === "odometry" || lesson.slug === "imu" || lesson.slug === "noise" || lesson.slug === "pursuit" || lesson.slug === "drift" || lesson.slug === "dead-reckoning";
+  const route =
+    lesson.starter === "pursuit" ||
+    lesson.starter === "mcl" ||
+    lesson.starter === "mcl-global" ||
+    lesson.moduleId === "tracking" ||
+    lesson.moduleId === "localization";
   const camera: LessonCamera = kidnapped ? "overhead" : particles || steering ? "wide" : "chase";
   return {
     lidar: !lidarOff,
     paths,
+    particles,
+    route,
+    manual: lesson.moduleId === "localization" && Boolean(lesson.starter),
     camera,
     seed: 1,
     run: Boolean(lesson.starter),

@@ -26,5 +26,8 @@ jobs:
       - name: Fetch Pyodide
         run: node scripts/fetch-pyodide.mjs
 
+      - name: Unit tests
+        run: npm test
+
       - name: 60s eval
         run: npm run eval:ci

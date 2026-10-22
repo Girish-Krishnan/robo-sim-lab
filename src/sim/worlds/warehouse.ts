@@ -13,19 +13,19 @@ type Rapier = typeof RAPIER;
 export const WAREHOUSE_SPAWN: SpawnPose = { x: 0, y: 0.84, z: -10, yaw: 0 };
 
 export const WAREHOUSE_ATMOSPHERE: Atmosphere = {
-  background: "#4c545c",
-  fog: "#6e767e",
-  fogNear: 22,
-  fogFar: 78,
-  hemiSky: 0xc5ccd2,
-  hemiGround: 0x3a4046,
-  hemiIntensity: 0.55,
-  sunColor: 0xf0f2f4,
-  sunIntensity: 1.7,
-  exposure: 1.02,
-  zenith: "#5c656e",
-  horizon: "#8b9298",
-  skyGround: "#3e444a",
+  background: "#8d98a3",
+  fog: "#c5ced6",
+  fogNear: 80,
+  fogFar: 220,
+  hemiSky: 0xd5dde6,
+  hemiGround: 0x5a5048,
+  hemiIntensity: 0.9,
+  sunColor: 0xfff4e0,
+  sunIntensity: 2.5,
+  exposure: 1.12,
+  zenith: "#7f93a8",
+  horizon: "#e7d7c0",
+  skyGround: "#6a6258",
   hdriBackground: false,
 };
 
@@ -86,12 +86,15 @@ export async function mountWarehouse(
   floor.receiveShadow = true;
   group.add(floor);
 
+  // Roof the north aisles only. The south bay stays open so the chase
+  // camera (about 6 m up, behind the driving spawn) is not inside a plane,
+  // and the bay reads as a building instead of a gray fog box.
   const ceiling = new THREE.Mesh(
-    new THREE.PlaneGeometry(40, 60),
-    new THREE.MeshStandardMaterial({ color: 0x3c434a, roughness: 0.9, side: THREE.DoubleSide }),
+    new THREE.PlaneGeometry(40, 26),
+    new THREE.MeshStandardMaterial({ color: 0x4a525a, roughness: 0.9, side: THREE.DoubleSide }),
   );
   ceiling.rotation.x = Math.PI / 2;
-  ceiling.position.set(0, 4.6, 12);
+  ceiling.position.set(0, 8.5, 31);
   group.add(ceiling);
 
   const lampMat = new THREE.MeshStandardMaterial({

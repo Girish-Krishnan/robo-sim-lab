@@ -98,9 +98,10 @@ export class ChaseCamera {
   }
 
   /** Pull the chase rig back. Used to see a cloud that is wider than the car. */
-  frame(distance: number, pitch: number): void {
+  frame(distance: number, pitch: number, yaw = CHASE_ORBIT_YAW): void {
     this.distance = clamp(distance, 4.5, 210);
     this.orbitPitch = clamp(pitch, 0.12, 1.45);
+    this.orbitYaw = yaw;
   }
 
   /** Nearly overhead, yaw loosened so a map-sized cloud is not behind the bumper. */

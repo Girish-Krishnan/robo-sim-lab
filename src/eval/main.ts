@@ -8,7 +8,7 @@ import { loadStudentPolicy, loadStudentRuntime } from "./python";
 import { referenceRoute } from "../sim/routes";
 import { EVAL_EXAMPLES, EVAL_WORLDS, solidsFor, spawnFor, type EvalExample, type EvalWorld } from "./scenarios";
 import { runEpisode, type RunMetrics } from "./simulate";
-import { regressionErrors, renderSummary, type Compared } from "./summary";
+import { lessonDemoReport, regressionErrors, renderSummary, type Compared } from "./summary";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -70,6 +70,17 @@ async function main(): Promise<void> {
     return { after, before };
   });
   writeFileSync(path.join(outDir, "summary.md"), renderSummary(compared));
+
+  const fullMatrix = !only && rows.length === EVAL_WORLDS.length * EVAL_EXAMPLES.length;
+  if (fullMatrix) {
+    const demos = lessonDemoReport(rows);
+    writeFileSync(path.join(outDir, "lesson-demos.md"), demos.markdown);
+    process.stdout.write(`\n${demos.markdown}\n`);
+    if (ci && demos.errors.length) {
+      process.stderr.write(demos.errors.join("\n") + "\n");
+      process.exitCode = 1;
+    }
+  }
 
   if (ci) {
     const errors = rows.flatMap(regressionErrors);

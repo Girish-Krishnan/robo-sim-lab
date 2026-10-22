@@ -6,7 +6,9 @@
 export const STUDENT_PRELUDE = `
 import base64
 import copy
+import io
 import json
+import sys
 import types
 from types import SimpleNamespace
 import numpy as np
@@ -170,12 +172,17 @@ def _robo_prepare(raw_json):
     if not getattr(_robo_prepare, "warm", False):
         _robo_prepare.warm = True
         # Compile control once, then put the globals back so the timed steps
-        # see the program as it was loaded. Map decode stays above this.
+        # see the program as it was loaded. Swallow prints from this warm
+        # call, or the first tick shows up twice.
         snap = _robo_snapshot()
+        stdout = sys.stdout
+        sys.stdout = io.StringIO()
         try:
             _robo_invoke()
         except Exception:
             pass
+        finally:
+            sys.stdout = stdout
         _robo_restore(snap)
         init = _robo_ns.get("init")
         if callable(init):

@@ -51,8 +51,8 @@
             Seed
             <input id="seed" type="number" min="0" step="1" value="1" aria-label="Noise seed" />
           </label>
-          <button id="reset-seed" type="button">Reset seed</button>
-          <button id="camera-reset" type="button">Reset camera</button>
+          <button id="reset-seed" type="button" title="Replay the same sensor noise">Reset seed</button>
+          <button id="camera-reset" type="button" title="Put the camera behind the car">Reset camera</button>
         </div>
       </header>
 
@@ -64,6 +64,11 @@
             <p id="loading-text">Starting physics…</p>
           </div>
           <div id="hint"></div>
+          <div id="drive-hint" hidden>Click this view, then WASD or the arrows. The filter keeps running on the sensors.</div>
+          <div id="legend" hidden>
+            <button id="legend-toggle" type="button" aria-expanded="true">Key</button>
+            <ul id="legend-list"></ul>
+          </div>
           <div id="hud" aria-live="off"></div>
         </div>
 
@@ -82,15 +87,22 @@
           <article id="lesson" hidden></article>
           <div id="code-chrome">
             <div class="panel-bar">
-              <label class="example-label">
-                Example
-                <select id="example"></select>
-              </label>
+              <button id="browse-examples" type="button">Browse examples</button>
+              <select id="example" hidden aria-label="Loaded example"></select>
+            </div>
+            <div id="example-browser" hidden>
+              <p class="example-intro">Suggestions you can load. Your current program stays until you confirm.</p>
+              <ul id="example-list"></ul>
+              <div id="example-confirm" hidden>
+                <p>Replace your code with <strong id="example-confirm-name"></strong>?</p>
+                <button id="example-confirm-yes" type="button" class="primary">Load it</button>
+                <button id="example-confirm-no" type="button">Keep mine</button>
+              </div>
             </div>
             <p class="api-hint">
               <code>control(sensors)</code> at 20&nbsp;Hz returns
               <code>(steering, throttle)</code>. Steering is radians, positive left.
-              Throttle is −1…1. Python sees sensors only, not the true pose.
+              Throttle is −1…1. Python sees sensors only.
             </p>
           </div>
           <div id="python-status" hidden>
@@ -107,10 +119,11 @@
           <div id="editor"></div>
           <div id="try-bar">
             <span id="try-label">Try it</span>
-            <button id="run" type="button" class="primary">Run</button>
-            <button id="stop" type="button">Stop</button>
-            <button id="reset" type="button">Reset</button>
-            <button id="reset-starter" type="button" hidden>Starter</button>
+            <button id="run" type="button" class="primary" title="Run the program">Run</button>
+            <button id="stop" type="button" title="Stop the program">Stop</button>
+            <button id="reset" type="button" title="Put the car back at the start and run again">Reset run</button>
+            <button id="reset-starter" type="button" hidden title="Restore this lesson's program">Starter</button>
+            <button id="drive-self" type="button" hidden aria-pressed="false">Drive it yourself</button>
             <span id="run-state" data-state="idle">Idle</span>
             <button id="edit-code" type="button" aria-expanded="false">Edit code</button>
             <button id="toggle-console" type="button" aria-expanded="false">Console</button>

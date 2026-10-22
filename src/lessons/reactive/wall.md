@@ -9,15 +9,33 @@ prerequisites: reactive/avoid
 status: ready
 ---
 
-Wall following steers to hold a distance from the wall on the driver's right. On the oval that wall is the inner wall of the east straight. The same program then has to survive the corner, where the wall ends for a moment and comes back on the next straight.
+Wall following steers to hold a distance from the wall on the driver's right. On the oval that wall is the inner wall of the east straight. The same program then has to survive the corner, where the wall ends for a moment and comes back on the next straight. It is the same habit as walking a corridor with your shoulder a constant distance from the wall: you feel the gap now, and you also feel whether you are aimed into the plaster.
 
 In the sim: the east straight, inner wall on the right, with the trails on so a lap is easy to see.
 
-Two beams do most of the work. The beam near $-90^\circ$ measures the side distance. The beam near $-45^\circ$ sees the wall ahead of the rear axle, so the car can start turning before the side beam falls off the end. The target distance is 3.2 m, which puts the car in the lane rather than scraping the wall or driving down the middle toward the cones.
+Two beams do most of the work. The beam near $-90^\circ$ measures the side distance. The beam near $-45^\circ$ sees the wall ahead of the rear axle, so the car can start turning before the side beam falls off the end. The target distance is 3.2 m, which puts the car in the lane.
 
-Outside a corner the car creeps, then turns, then picks the wall up again. If the bumper is in the wall, it reverses. The steering sign while reversing is the one that yaws the nose the way you want. Positive steer while going backward yaws the nose right. The starter's backup uses that.
+Outside a corner the car creeps, then turns, then picks the wall up again. If the bumper is in the wall, it reverses. Positive steer while going backward yaws the nose right, because yaw rate flips with the sign of speed. The starter's backup uses that.
 
-Speed is not constant. On a long straight with the wall parallel and nothing close in front, it runs. Into a bend, or when the forward range drops, it slows. A fast car cannot start braking at the same instant the side beam loses the wall.
+Speed follows the situation. On a long straight with the wall parallel and nothing close in front, the car runs. Into a bend, or when the forward range drops, it slows. A fast car that waits until the side beam loses the wall has already missed the turn.
+
+The side beam and the diagonal beam come from one small helper. Centre $-90^\circ$ is the right-hand wall.
+
+{{code:beams}}
+
+<svg viewBox="0 0 480 250" role="img" aria-label="Wall-follow error: side distance, target gap, and the angle alpha">
+  <rect width="480" height="250" rx="12" fill="#10161a"/>
+  <line x1="70" y1="36" x2="70" y2="210" stroke="#9aa7a0" stroke-width="8"/>
+  <text x="16" y="28" fill="#9aa7a0" font-size="13" font-family="sans-serif">wall</text>
+  <polygon points="210,150 250,168 190,168" fill="#2fbfa8"/>
+  <line x1="70" y1="158" x2="210" y2="158" stroke="#e3a23a" stroke-width="2"/>
+  <line x1="70" y1="90" x2="220" y2="140" stroke="#9fd8cf" stroke-width="2"/>
+  <line x1="130" y1="40" x2="130" y2="210" stroke="#355850" stroke-width="1" stroke-dasharray="4 3"/>
+  <text x="78" y="150" fill="#e3a23a" font-size="13" font-family="sans-serif">d</text>
+  <text x="96" y="36" fill="#8e9b94" font-size="12" font-family="sans-serif">target 3.2 m</text>
+  <text x="228" y="120" fill="#9fd8cf" font-size="13" font-family="sans-serif">alpha</text>
+  <text x="16" y="232" fill="#8e9b94" font-size="13" font-family="sans-serif">d is the -90 deg beam. alpha comes from comparing it with the -45 deg beam.</text>
+</svg>
 
 ## Distance now, and distance a step ahead
 
@@ -29,14 +47,20 @@ The steering law in the starter is
 
 $$\delta = K_p (d^\star - d_{\mathrm{future}}) - K_d \alpha$$
 
-with $K_p = 0.16$, $K_d = 0.55$, and $L_{\mathrm{look}} = 1.8$ m. The minus on the $\alpha$ term is the damping. $\alpha$ positive means the wall is opening in a way that needs a turn back toward it. Flipping that sign makes the car swing away and then lose the wall.
+with $K_p = 0.16$, $K_d = 0.55$, and $L_{\mathrm{look}} = 1.8$ m. The minus on the $\alpha$ term is the damping. $\alpha$ positive means the wall is opening, and the steer turns back toward it.
 
-This is a PD law on distance. The "D" is not a filtered $\dot d$ from the last tick, because a single noisy range difference at 20 Hz is a bad derivative. The angle between two beams is a geometric stand-in for the heading error, and it is available in one scan.
+These three lines are that error. `future` is the distance the car will have if it holds this heading for `LOOK` metres.
 
-The right-hand wall is negative lidar angle. If you index the $+90^\circ$ beam you are following the left wall and the gains will wind you into it. A corner is not a large distance error. The side range goes to max range because the wall ended, not because you drifted to 12 m. The starter treats "side beam lost, diagonal beam still there" as a corner, and it coasts straight for a few ticks so the rear axle reaches the turn before the steer comes in. If you react to max range as a huge error, you will steer hard at the wrong time.
+{{code:error}}
 
-The oval should complete a lap with no real contact. If you retune $K_p$ up to make the straight look tighter, check the corner before you trust it.
+This is a PD law on distance. The derivative is the angle between two beams, available in one scan, which is steadier than a noisy range difference at 20 Hz.
 
-## Take the damping out
+The right-hand wall is a negative lidar angle. The $+90^\circ$ beam is the left wall, and the same gains wind you into it. At a corner the side range jumps to max range because the wall ended. The starter treats "side beam lost, diagonal beam still there" as a corner, and it coasts for a few ticks so the rear axle reaches the turn before the steer comes in.
 
-Run the starter on the oval. It should stay off the wall and the cones and finish a lap. Set $K_d$ to 0 and run the same straight. The car should oscillate toward and away from the wall. Swap the sign of the $K_d \alpha$ term only. The corner should throw the car off the wall. Put the minus sign back.
+The oval should complete a lap with the car clear of the wall. If you raise $K_p$ to tighten the straight, check the corner before you trust the new gain.
+
+## Try it
+
+1. Run the starter on the oval. It should stay off the wall and the cones and finish a lap.
+2. Set $K_d$ to 0 and run the same straight. The car should wander toward and away from the wall.
+3. Swap the sign of the $K_d \alpha$ term only. The corner should throw the car off the wall. Put the minus sign back.

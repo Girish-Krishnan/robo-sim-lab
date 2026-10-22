@@ -1,4 +1,6 @@
+import { LESSONS, resolveSpawn } from "../course/catalog";
 import type { RunMetrics } from "./simulate";
+import { spawnFor, type EvalWorld } from "./scenarios";
 
 export interface Compared {
   after: RunMetrics;
@@ -206,4 +208,45 @@ export function regressionErrors(row: RunMetrics): string[] {
   }
   if ((row.controlMsMax ?? 0) > 45) errors.push(`${name} control max ${row.controlMsMax.toFixed(1)} ms`);
   return errors;
+}
+
+const DEMO_DISTANCE = 15;
+
+/**
+ * Scripted lessons share the 60 s seed-1 matrix. A ready lesson with a
+ * starter has to finish that minute with no real contact and no stuck time.
+ */
+export function lessonDemoReport(rows: RunMetrics[]): { errors: string[]; markdown: string } {
+  const errors: string[] = [];
+  const lines = [
+    "| Lesson | World | Program | Contacts | Stuck s | Distance m |",
+    "| --- | --- | --- | ---: | ---: | ---: |",
+  ];
+  for (const lesson of LESSONS) {
+    if (lesson.status !== "ready") continue;
+    if (!lesson.starter) {
+      lines.push(`| ${lesson.title} | ${lesson.world} | hand drive | — | — | — |`);
+      continue;
+    }
+    const wanted = resolveSpawn(lesson);
+    const scenario = spawnFor(lesson.world as EvalWorld, lesson.starter, "scenario");
+    const yawGap = Math.atan2(Math.sin(wanted.yaw - scenario.yaw), Math.cos(wanted.yaw - scenario.yaw));
+    const same = Math.hypot(wanted.x - scenario.x, wanted.z - scenario.z) < 0.05 && Math.abs(yawGap) < 0.05;
+    const row = rows.find((item) => item.world === lesson.world && item.example === lesson.starter);
+    if (!same || !row) {
+      errors.push(`${lesson.id} demo is not in the eval matrix`);
+      lines.push(`| ${lesson.title} | ${lesson.world} | ${lesson.starter} | missing | missing | missing |`);
+      continue;
+    }
+    if (row.collisionCount !== 0) errors.push(`${lesson.id} contacts ${row.collisionCount}`);
+    if (row.stuckTime !== 0) errors.push(`${lesson.id} stuck ${row.stuckTime.toFixed(2)} s`);
+    if (row.distance < DEMO_DISTANCE) errors.push(`${lesson.id} travelled ${row.distance.toFixed(1)} m`);
+    lines.push(
+      `| ${lesson.title} | ${row.world} | ${row.example} | ${row.collisionCount} | ${row.stuckTime.toFixed(2)} | ${row.distance.toFixed(1)} |`,
+    );
+  }
+  return {
+    errors,
+    markdown: ["# Lesson demos", "", "Each scripted lesson is the matching 60 s seed-1 eval run in that lesson's world.", "", ...lines, ""].join("\n"),
+  };
 }

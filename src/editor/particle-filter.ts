@@ -258,6 +258,7 @@ def initial_cloud(m, field, path):
     cloud[:, 2] = rng.normal(0.0, 0.06, N)
     return cloud
 
+# @@chunk prior
 def kidnapped_cloud(m, field, path):
     # Free cells first, so the drawn cloud (and a truncated draw) is a
     # scatter across the yard. A route lattice sits behind them: a few
@@ -281,7 +282,9 @@ def kidnapped_cloud(m, field, path):
             cloud[i, 2] = float(heading + rng.normal(0.0, 0.02))
             i += 1
     return cloud
+# @@end
 
+# @@chunk motion
 def apply_motion(cloud, before, after):
     x0, y0, th0 = before
     x1, y1, th1 = after
@@ -302,7 +305,9 @@ def apply_motion(cloud, before, after):
     cloud[:, 0] += s2 * np.cos(heading)
     cloud[:, 1] += s2 * np.sin(heading)
     cloud[:, 2] = wrap_array(heading + s3)
+# @@end
 
+# @@chunk sense
 def likelihood(cloud, sensors, field, m):
     ranges = sensors.lidar.ranges
     angles = sensors.lidar.angles
@@ -346,6 +351,7 @@ def likelihood(cloud, sensors, field, m):
     if total <= 0.0:
         return np.full(N, 1.0 / N), log_mean, log_best
     return w / total, log_mean, log_best
+# @@end
 
 def weighted_mean(cloud, weights):
     x = float(np.dot(weights, cloud[:, 0]))
@@ -353,6 +359,7 @@ def weighted_mean(cloud, weights):
     yaw = math.atan2(float(np.dot(weights, np.sin(cloud[:, 2]))), float(np.dot(weights, np.cos(cloud[:, 2]))))
     return (x, y, yaw)
 
+# @@chunk resample
 def resample(cloud, weights, inject=0.0, field=None, m=None):
     cumulative = np.cumsum(weights)
     cumulative[-1] = 1.0
@@ -367,6 +374,7 @@ def resample(cloud, weights, inject=0.0, field=None, m=None):
         return picked
     picked[:n_new] = free_cloud(n_new, field, m)
     return picked
+# @@end
 
 def covariance_ellipse(cxx, cyy, cxy):
     # Eigenvalues of the 2x2 covariance. Radii are 2-sigma.
@@ -665,6 +673,7 @@ def wall_beam(ranges, angles, center, width):
         return 12.0
     return float(np.median(ranges[mask]))
 
+# @@chunk pursue
 def pursue(sensors, estimate):
     path = sensors.task.path
     if len(path) < 2:
@@ -723,6 +732,7 @@ def pursue(sensors, estimate):
     draw.path([(point.x, point.y) for point in path], "#7dcea0")
     draw.points([(target.x, target.y)], "#f4d03f")
     return steer, throttle
+# @@end
 
 def wrap(angle):
     return (angle + math.pi) % (2.0 * math.pi) - math.pi

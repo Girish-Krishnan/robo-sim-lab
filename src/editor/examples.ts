@@ -4,6 +4,7 @@ import { particleFilterSource } from "./particle-filter";
 export interface CodeExample {
   id: string;
   label: string;
+  blurb: string;
   source: string;
 }
 
@@ -45,6 +46,7 @@ import numpy as np
 
 ticks = 0
 
+# @@chunk drive
 def control(sensors):
     global ticks
     ticks += 1
@@ -62,6 +64,7 @@ def control(sensors):
             f"nearest {nearest:.2f} m",
         )
     return 0.34, 0.5
+# @@end
 `;
 
 /**
@@ -110,6 +113,7 @@ anchor_y = 0.0
 anchor_t = 0.0
 saw_anchor = False
 
+# @@chunk inflate
 def inflate(ranges, angles):
     # A return at range r blocks beams within atan(HALF / r) of it.
     wide = np.array(ranges, dtype=float, copy=True)
@@ -118,6 +122,7 @@ def inflate(ranges, angles):
         near = np.abs(angles - angles[i]) <= span[i]
         wide[near] = np.minimum(wide[near], ranges[i])
     return wide
+# @@end
 
 def control(sensors):
     global aim, reverse, phase, phase_ticks, cooldown, held_sign
@@ -290,11 +295,13 @@ gap = TARGET
 locked = False
 saw_preview = False
 
+# @@chunk beams
 def beam(ranges, angles, center, width):
     mask = np.abs(angles - center) < width
     if not np.any(mask):
         return 12.0
     return float(np.median(ranges[mask]))
+# @@end
 
 def corner_steer():
     # Radius matches the standoff, so the arc is centred on the corner.
@@ -310,11 +317,13 @@ def control(sensors):
     preview = beam(ranges, angles, -0.35, 0.1)
     front = beam(ranges, angles, 0.0, 0.32)
 
+    # @@chunk error
     # alpha < 0 means the nose is aimed into the right-hand wall.
     delta = math.pi / 4
     alpha = math.atan2(diag * math.cos(delta) - side, diag * math.sin(delta))
     dist = max(0.3, side * math.cos(min(0.8, max(-0.8, alpha))))
     future = dist + LOOK * math.sin(alpha)
+    # @@end
     # Both beams on the same face: remember how far off the wall we are.
     # Only a steady straight updates the radius. Readings mid-corner are
     # the next face arriving at a slant, and chasing them widens the arc
@@ -493,6 +502,7 @@ def control(sensors):
     control.index = best
 
     target = path[best]
+    # @@chunk lookahead
     for step in range(1, n):
         point = path[(best + step) % n]
         if math.hypot(point.x - pose.x, point.y - pose.y) >= LOOKAHEAD:
@@ -509,6 +519,7 @@ def control(sensors):
     curvature = 2.0 * math.sin(alpha) / ld
     steer = math.atan(WHEELBASE * curvature)
     steer = max(-${maxSteer}, min(${maxSteer}, steer))
+    # @@end
 
     # Slower into a bend. The integral is clamped so a long straight
     # does not wind up and then overshoot the corner.
@@ -558,12 +569,10 @@ control.escape_steer = 0.0
 `;
 
 export const EXAMPLES: CodeExample[] = [
-  { id: "circle", label: "Circle drive", source: circle },
-  { id: "avoid", label: "Lidar avoid", source: avoid },
-  { id: "wall", label: "Wall follow", source: wall },
-  { id: "pursuit", label: "Pure pursuit", source: pursuit },
-  { id: "mcl", label: "PF pursuit", source: particleFilterSource("track") },
-  { id: "mcl-global", label: "PF kidnapped", source: particleFilterSource("global") },
+  { id: "circle", label: "Circle drive", blurb: "Hold a fixed steer and draw a circle on an open pad.", source: circle },
+  { id: "avoid", label: "Lidar avoid", blurb: "Steer toward the widest gap the car can fit through.", source: avoid },
+  { id: "wall", label: "Wall follow", blurb: "Hold a distance from the wall on the driver's right.", source: wall },
+  { id: "pursuit", label: "Pure pursuit", blurb: "Steer an arc toward a point a few metres along the path.", source: pursuit },
+  { id: "mcl", label: "PF pursuit", blurb: "Follow the path using a particle-filter pose instead of raw odometry.", source: particleFilterSource("track") },
+  { id: "mcl-global", label: "PF kidnapped", blurb: "Start with no idea where the car is, then drive once the cloud collapses.", source: particleFilterSource("global") },
 ];
-
-export const DEFAULT_EXAMPLE = EXAMPLES[0]!;

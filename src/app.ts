@@ -1,7 +1,8 @@
 import RAPIER from "@dimforge/rapier3d-compat";
 import { ACKERMANN_BUGGY, CONTROL_DT, PHYSICS_DT, clampCommand, odomToWorld, worldToOdom, type DrawOp } from "./api";
 import { solidsFor, spawnFor } from "./eval/scenarios";
-import { EXAMPLES, DEFAULT_EXAMPLE } from "./editor/examples";
+import { EXAMPLES } from "./editor/examples";
+import { BLANK_SOURCE, loadScratch, saveScratch } from "./editor/blank";
 import { createEditor, type CodeEditor } from "./editor/editor";
 import { ChaseCamera } from "./sim/camera";
 import { LidarView } from "./sim/lidar-view";
@@ -27,6 +28,7 @@ import { mountCourse } from "./course/shell";
 import { CodeSandbox, type SandboxState } from "./sandbox/controller";
 import { ConsolePanel } from "./ui/console-panel";
 import { Hud, type AppMode } from "./ui/hud";
+import { mountLegend } from "./ui/legend";
 import { mountLabSplitter, mountSplitter } from "./ui/splitter";
 
 export async function mountApp(): Promise<void> {
@@ -71,6 +73,26 @@ export async function mountApp(): Promise<void> {
     world.timestep = PHYSICS_DT;
 
     const view = new SimView(viewport);
+    view.renderer.domElement.tabIndex = 0;
+    const driveHint = mustGet<HTMLElement>("drive-hint");
+    const legend = mountLegend(mustGet("legend"));
+    let driveSelf = false;
+    let simArmed = false;
+    const armSim = () => {
+      simArmed = true;
+      view.renderer.domElement.focus({ preventScroll: true });
+      driveHint.classList.toggle("is-armed", true);
+    };
+    viewport.addEventListener("pointerdown", (event) => {
+      if (event.target instanceof HTMLElement && event.target.closest("#legend, #drive-hint")) return;
+      if (driveSelf) armSim();
+    });
+    let refreshDriveHint = () => {};
+    view.renderer.domElement.addEventListener("blur", () => {
+      simArmed = false;
+      driveHint.classList.remove("is-armed");
+      refreshDriveHint();
+    });
     bindTextureLoader(view.renderer);
     bindPropLoader(view.renderer);
     void view.loadHdri().catch((error: unknown) => console.warn("[robo-sim] HDRI unavailable", error));
@@ -107,6 +129,7 @@ export async function mountApp(): Promise<void> {
 
     sandbox = new CodeSandbox({
       onCommand: (command) => {
+        if (driveSelf) return;
         if (codeControls() && code.current === "running") robot.setCommand(command, 0);
       },
       onDraw: (ops) => {
@@ -114,7 +137,14 @@ export async function mountApp(): Promise<void> {
         drawings.set(ops, activeSpawn);
         frameKidnappedCloud();
       },
-      onLog: (line, level) => consolePanel.log(line, level),
+      onLog: (line, level) => {
+        consolePanel.log(line, level);
+        if (level === "error") {
+          document.getElementById("app")?.classList.add("console-open");
+          document.getElementById("toggle-console")?.setAttribute("aria-expanded", "true");
+          document.getElementById("toggle-console")?.classList.add("is-on");
+        }
+      },
       onState: (state) => {
         setRunState(state);
         pythonStatus.hidden = state !== "loading" || (sandbox?.runtimeIsReady ?? false);
@@ -125,18 +155,26 @@ export async function mountApp(): Promise<void> {
     });
     const code = sandbox;
 
-    let scratch = DEFAULT_EXAMPLE.source;
-    editor = createEditor(mustGet("editor"), DEFAULT_EXAMPLE.source, () => runProgram(), (source) => {
-      if (mode === "code") scratch = source;
+    let scratch = loadScratch();
+    editor = createEditor(mustGet("editor"), scratch, () => runProgram(), (source) => {
+      if (mode === "code") {
+        scratch = source;
+        saveScratch(source);
+      }
       onCodeChange(source);
     });
     const codeEditor = editor;
+    const scratchOption = document.createElement("option");
+    scratchOption.value = "";
+    scratchOption.textContent = "Scratch";
+    exampleSelect.append(scratchOption);
     for (const example of EXAMPLES) {
       const option = document.createElement("option");
       option.value = example.id;
       option.textContent = example.label;
       exampleSelect.append(option);
     }
+    exampleSelect.value = "";
 
     const applyDrive = () => {
       const forward = keys.has("KeyW") || keys.has("ArrowUp");
@@ -155,29 +193,40 @@ export async function mountApp(): Promise<void> {
 
     let lessonSpawn: SpawnPose | null = null;
     let lessonWorld: string | null = null;
+    let lessonSpawnKind: string | null = null;
     let lessonCodeActive = false;
     let lessonCamera: "chase" | "wide" | "overhead" | null = null;
     const codeControls = () => mode === "code" || (mode === "lessons" && lessonCodeActive);
     const handsOn = () => mode === "drive" || (mode === "lessons" && !lessonCodeActive);
     const applyLessonCamera = () => {
       if (lessonCamera === "overhead") camera.overhead(72);
-      else if (lessonCamera === "wide") camera.frame(16, 0.7);
+      else if (yard.id === "warehouse" && lessonCamera !== "wide" && robot.focus().z < 2) {
+        // Open bay: sit beside and behind the car, under no roof, with sky in frame.
+        camera.frame(14, 0.32, 1.05);
+      } else if (lessonCamera === "wide") camera.frame(16, 0.7);
       else camera.reset();
     };
     let hintTimer = 0;
     const setHint = () => {
       window.clearTimeout(hintTimer);
       hint.classList.remove("is-faded");
-      if (mode === "lessons") {
+      if ((mode === "lessons" && !driveSelf) || driveSelf) {
         hint.hidden = true;
+        if (driveSelf) {
+          driveHint.hidden = false;
+          driveHint.textContent = simArmed
+            ? "Driving · WASD or arrows · Space brakes · The filter keeps scoring the scan"
+            : "Click this view, then WASD or the arrows. The filter keeps running on the sensors.";
+        }
         return;
       }
       hint.hidden = false;
       hint.textContent = handsOn()
-        ? "WASD or arrows to drive · Space brakes · Drag to look · Scroll to zoom · R resets"
-        : "Ctrl/⌘ Enter runs Python · sensors only, at 20 Hz · Drag to look around";
-      hintTimer = window.setTimeout(() => hint.classList.add("is-faded"), 4000);
+          ? "WASD or arrows to drive · Space brakes · Drag to look · Scroll to zoom · R resets"
+          : "Ctrl/⌘ Enter runs Python · sensors only, at 20 Hz · Drag to look around";
+      if (!driveSelf) hintTimer = window.setTimeout(() => hint.classList.add("is-faded"), 4000);
     };
+    refreshDriveHint = setHint;
     let mapCache: { key: string; map: ReturnType<typeof buildKnownMap> } | null = null;
     const taskMap = () => {
       const key = `${yard.id}|${activeSpawn.x.toFixed(2)}|${activeSpawn.z.toFixed(2)}|${activeSpawn.yaw.toFixed(3)}`;
@@ -192,7 +241,11 @@ export async function mountApp(): Promise<void> {
     };
 
     const currentSpawn = (): SpawnPose => {
-      if (lessonSpawn && lessonWorld === yard.id) return lessonSpawn;
+      if (mode === "lessons" && lessonSpawnKind) {
+        if (lessonWorld === yard.id && lessonSpawn) return lessonSpawn;
+        if (lessonSpawnKind === "default") return yard.spawn;
+        return spawnFor(yard.id, lessonSpawnKind, "scenario");
+      }
       const example = exampleSelect.value;
       if (mode === "code" && EXAMPLES.some((item) => item.id === example)) return spawnFor(yard.id, example, "scenario");
       return yard.spawn;
@@ -247,8 +300,9 @@ export async function mountApp(): Promise<void> {
       resetWorld();
     };
 
+    const manualDrive = () => driveSelf && simArmed;
     const runProgram = () => {
-      if (!codeControls()) return;
+      if (!codeControls() && !driveSelf) return;
       consolePanel.log("— running —", "log");
       code.run(codeEditor.getValue());
     };
@@ -270,7 +324,11 @@ export async function mountApp(): Promise<void> {
       if (next !== "lessons") {
         lessonCodeActive = false;
         lessonCamera = null;
+        driveSelf = false;
+        simArmed = false;
+        driveHint.hidden = true;
         app?.classList.remove("lesson-has-code");
+        legend.show(null);
       }
       codePanel.hidden = next === "drive";
       mustGet<HTMLButtonElement>("mode-drive").setAttribute("aria-selected", String(next === "drive"));
@@ -383,14 +441,65 @@ export async function mountApp(): Promise<void> {
       toggleConsole.setAttribute("aria-expanded", String(open));
       toggleConsole.classList.toggle("is-on", open);
     });
-    exampleSelect.addEventListener("change", () => {
-      const example = EXAMPLES.find((item) => item.id === exampleSelect.value);
+    const browser = mustGet<HTMLElement>("example-browser");
+    const exampleList = mustGet<HTMLElement>("example-list");
+    const confirmBox = mustGet<HTMLElement>("example-confirm");
+    const confirmName = mustGet<HTMLElement>("example-confirm-name");
+    let pendingExample = "";
+    const loadExample = (id: string) => {
+      const example = EXAMPLES.find((item) => item.id === id);
       if (!example) return;
       if (code.current === "running") stopProgram();
+      exampleSelect.value = id;
       codeEditor.setValue(example.source);
       scratch = example.source;
+      saveScratch(scratch);
+      browser.hidden = true;
+      confirmBox.hidden = true;
       if (mode === "code") resetWorld();
+    };
+    for (const example of EXAMPLES) {
+      const item = document.createElement("li");
+      const button = document.createElement("button");
+      button.type = "button";
+      button.innerHTML = `<strong>${example.label}</strong><span>${example.blurb}</span>`;
+      button.addEventListener("click", () => {
+        const current = codeEditor.getValue().trim();
+        const same = current === example.source.trim() || current === BLANK_SOURCE.trim();
+        if (same) {
+          loadExample(example.id);
+          return;
+        }
+        pendingExample = example.id;
+        confirmName.textContent = example.label;
+        confirmBox.hidden = false;
+      });
+      item.append(button);
+      exampleList.append(item);
+    }
+    mustGet("browse-examples").addEventListener("click", () => {
+      browser.hidden = !browser.hidden;
+      confirmBox.hidden = true;
     });
+    mustGet("example-confirm-yes").addEventListener("click", () => {
+      if (pendingExample) loadExample(pendingExample);
+    });
+    mustGet("example-confirm-no").addEventListener("click", () => {
+      confirmBox.hidden = true;
+      pendingExample = "";
+    });
+    const driveButton = mustGet<HTMLButtonElement>("drive-self");
+    const setDriveSelf = (on: boolean) => {
+      driveSelf = on;
+      simArmed = false;
+      driveButton.setAttribute("aria-pressed", String(on));
+      driveButton.classList.toggle("is-on", on);
+      driveHint.hidden = !on;
+      driveHint.classList.remove("is-armed");
+      setHint();
+      if (on && code.current !== "running" && code.current !== "loading") runProgram();
+    };
+    driveButton.addEventListener("click", () => setDriveSelf(!driveSelf));
     const pathsButton = mustGet<HTMLButtonElement>("paths-toggle");
     const setPaths = (enabled: boolean) => {
       paths.setVisible(enabled);
@@ -418,8 +527,9 @@ export async function mountApp(): Promise<void> {
           return;
         }
         if (isTypingTarget(event.target)) return;
+        const driving = handsOn() || manualDrive();
         if (handsOn() && event.code === "KeyR" && !event.repeat) resetWorld();
-        if (!handsOn()) return;
+        if (!driving) return;
         if (event.code.startsWith("Arrow") || event.code === "Space") event.preventDefault();
         keys.add(event.code);
       },
@@ -443,9 +553,25 @@ export async function mountApp(): Promise<void> {
         lessonCamera = scene?.camera ?? null;
         document.getElementById("app")?.classList.toggle("lesson-has-code", lessonCodeActive);
         if (!scene) {
+          driveSelf = false;
+          driveButton.hidden = true;
+          driveHint.hidden = true;
+          legend.show(null);
           setHint();
           return;
         }
+        driveSelf = false;
+        simArmed = false;
+        driveButton.hidden = !scene.manual;
+        driveButton.classList.remove("is-on");
+        driveButton.setAttribute("aria-pressed", "false");
+        driveHint.hidden = true;
+        legend.show({
+          lidar: scene.lidar,
+          paths: scene.paths,
+          particles: scene.particles,
+          route: scene.route,
+        });
         setLidarButton(scene.lidar);
         setPaths(scene.paths);
         noiseSeed = scene.seed >>> 0;
@@ -455,16 +581,22 @@ export async function mountApp(): Promise<void> {
         if (scene.run) code.warmup();
         setHint();
       },
-      setLessonSpawn: (spawn, worldId) => {
+      setLessonSpawn: (spawn, worldId, kind) => {
         lessonSpawn = spawn;
         lessonWorld = worldId;
+        lessonSpawnKind = kind;
       },
+      clearConsole: () => consolePanel.clear(),
       resetWorld,
       setCode: (source) => {
         codeEditor.setValue(source);
         frameKidnappedCloud(true);
         camera.snap(robot.focus());
       },
+      replaceSource: (source) => {
+        codeEditor.setValue(source);
+      },
+      getCode: () => codeEditor.getValue(),
       onCodeChange: (listener) => {
         onCodeChange = listener;
       },
@@ -493,8 +625,7 @@ export async function mountApp(): Promise<void> {
       },
       setExample: (id) => {
         if (!EXAMPLES.some((item) => item.id === id)) return;
-        exampleSelect.value = id;
-        exampleSelect.dispatchEvent(new Event("change"));
+        loadExample(id);
       },
       setQuality: (next) => applyQuality(next === "low" ? "low" : "high"),
       focus: () => robot.focus(),
@@ -515,7 +646,7 @@ export async function mountApp(): Promise<void> {
           accumulator = Math.min(accumulator + frameDt, PHYSICS_DT * 5);
           let steps = 0;
           while (accumulator >= PHYSICS_DT && steps < 5) {
-            if (handsOn()) applyDrive();
+            if (handsOn() || driveSelf) applyDrive();
             robot.preStep(PHYSICS_DT);
             world.step();
             simTime += PHYSICS_DT;

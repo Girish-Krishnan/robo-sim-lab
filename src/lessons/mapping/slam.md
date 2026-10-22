@@ -8,6 +8,6 @@ starter: none
 action: sandbox
 ---
 
-Simultaneous localization and mapping drops the known floor plan. The aisles in front of the car would have to be discovered, not looked up.
+Simultaneous localization and mapping builds the floor plan while it drives. The aisles in front of the car would be discovered from the scan, scan by scan.
 
-A particle filter can carry a small map in each particle (FastSLAM), or a pose graph can tie scans together after the fact. Both need a map you can update inside the 20 Hz budget, which is why this is not a starter yet.
+A particle filter can carry a small map in each particle (FastSLAM), or a pose graph can tie scans together after the fact. Both need a map you can update inside the 20 Hz budget. The starter arrives once that update fits.

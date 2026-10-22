@@ -35,6 +35,12 @@ function renderProse(source: string): string {
   while (i < lines.length) {
     const line = lines[i] ?? "";
     const trimmed = line.trim();
+    if (/^\{\{code:([A-Za-z0-9_-]+)\}\}$/.test(trimmed)) {
+      const id = trimmed.slice(7, -2);
+      out.push(`<div class="code-slot" data-chunk="${id}"></div>`);
+      i += 1;
+      continue;
+    }
     if (trimmed.startsWith("<svg") || trimmed.startsWith("<div")) {
       const tag = trimmed.startsWith("<svg") ? "svg" : "div";
       const chunk = [line];
@@ -92,7 +98,9 @@ function renderProse(source: string): string {
     }
     const raw = para.join(" ").trim();
     const simHint = /^(\*\*)?In the sim:/.test(raw);
-    out.push(`<p${simHint ? ' class="sim-hint"' : ""}>${inline(para.join(" "), restore)}</p>`);
+    const note = /^(\*\*)?Note:/.test(raw);
+    const klass = simHint ? "sim-hint" : note ? "lesson-note" : "";
+    out.push(`<p${klass ? ` class="${klass}"` : ""}>${inline(para.join(" "), restore)}</p>`);
   }
   return out.join("\n");
 }
@@ -104,6 +112,7 @@ function isBoundary(line: string): boolean {
   if (/^#{1,3}\s/.test(trimmed)) return true;
   if (/^\d+\.\s/.test(trimmed) || /^[-*]\s/.test(trimmed)) return true;
   if (/^@@MATH\d+@@$/.test(trimmed)) return true;
+  if (/^\{\{code:[A-Za-z0-9_-]+\}\}$/.test(trimmed)) return true;
   return false;
 }
 

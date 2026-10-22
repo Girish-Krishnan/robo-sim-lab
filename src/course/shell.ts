@@ -1,3 +1,4 @@
+import { readChunks, writeChunk } from "../editor/chunks";
 import { EXAMPLES } from "../editor/examples";
 import type { WorldId } from "../sim/worlds";
 import type { SpawnPose } from "../sim/vehicle";
@@ -19,9 +20,12 @@ export interface CourseHost {
   getWorld: () => WorldId;
   setMode: (mode: AppMode) => void;
   applyScene: (scene: ReturnType<typeof sceneFor> | null) => void;
-  setLessonSpawn: (spawn: SpawnPose | null, world: string | null) => void;
+  setLessonSpawn: (spawn: SpawnPose | null, world: string | null, kind: string | null) => void;
+  clearConsole: () => void;
   resetWorld: () => void;
   setCode: (source: string) => void;
+  replaceSource: (source: string) => void;
+  getCode: () => string;
   onCodeChange: (listener: (source: string) => void) => void;
   relayout: () => void;
   runProgram: () => void;
@@ -51,12 +55,41 @@ export function mountCourse(host: CourseHost): void {
     saveTimer = window.setTimeout(() => saveLessonCode(labId as string, source), 250);
   });
 
+  const refillChunks = () => {
+    const chunks = readChunks(host.getCode());
+    for (const slot of article.querySelectorAll<HTMLElement>(".code-slot")) {
+      const id = slot.dataset.chunk ?? "";
+      const body = chunks.get(id);
+      const area = document.createElement("textarea");
+      area.spellcheck = false;
+      area.setAttribute("aria-label", id ? `Lesson code: ${id}` : "Lesson code");
+      if (body === undefined) {
+        area.readOnly = true;
+        area.value = "";
+        slot.hidden = true;
+        continue;
+      }
+      slot.hidden = false;
+      area.value = body;
+      area.rows = Math.min(24, Math.max(4, body.split("\n").length + 1));
+      area.addEventListener("input", () => {
+        if (applying) return;
+        const next = writeChunk(host.getCode(), id, area.value);
+        applying = true;
+        host.replaceSource(next);
+        applying = false;
+      });
+      slot.replaceChildren(area);
+    }
+  };
+
   document.getElementById("reset-starter")?.addEventListener("click", () => {
     const lesson = labId ? lessonById(labId) : undefined;
     if (!lesson?.starter) return;
     clearLessonCode(lesson.id);
     applying = true;
     host.setCode(starterOf(lesson));
+    refillChunks();
     applying = false;
     host.resetWorld();
     host.runProgram();
@@ -91,6 +124,14 @@ export function mountCourse(host: CourseHost): void {
     }
   };
 
+  const showConsole = (open: boolean) => {
+    const app = document.getElementById("app");
+    const consoleBtn = document.getElementById("toggle-console");
+    app?.classList.toggle("console-open", open);
+    consoleBtn?.setAttribute("aria-expanded", String(open));
+    consoleBtn?.classList.toggle("is-on", open);
+  };
+
   const show = (route: Route) => {
     collapseLab();
     const lesson = route.mode === "lessons" && route.id ? lessonById(route.id) : undefined;
@@ -106,7 +147,7 @@ export function mountCourse(host: CourseHost): void {
 
     if (!lesson) {
       article.innerHTML = "";
-      host.setLessonSpawn(null, null);
+      host.setLessonSpawn(null, null, null);
       host.applyScene(null);
       host.setMode(route.mode);
       host.relayout();
@@ -123,19 +164,23 @@ export function mountCourse(host: CourseHost): void {
     article.innerHTML = lessonHtml(lesson);
     const scene = sceneFor(lesson);
     host.setMode("lessons");
-    host.setLessonSpawn(resolveSpawn(lesson), lesson.world);
+    host.clearConsole();
+    host.setLessonSpawn(resolveSpawn(lesson), lesson.world, lesson.spawn);
     host.applyScene(scene);
+    if (lesson.starter) showConsole(true);
     void openLesson(lesson, scene.run, token);
   };
 
   const openLesson = async (lesson: Lesson, run: boolean, token: number) => {
     if (host.getWorld() !== lesson.world) await host.setWorld(lesson.world);
     if (token !== opening) return;
-    host.setLessonSpawn(resolveSpawn(lesson), lesson.world);
+    host.setLessonSpawn(resolveSpawn(lesson), lesson.world, lesson.spawn);
     if (lesson.starter) {
       applying = true;
-      host.setCode(loadLessonCode(lesson.id) ?? starterOf(lesson));
-      applying = false;
+    host.setCode(loadLessonCode(lesson.id) ?? starterOf(lesson));
+    applying = false;
+    refillChunks();
+    showConsole(true);
     }
     host.resetWorld();
     if (run) host.runProgram();
@@ -235,8 +280,8 @@ export function mountCourse(host: CourseHost): void {
   };
 
   window.addEventListener("hashchange", () => show(parseRoute(location.hash)));
-  if (!location.hash || location.hash === "#") {
-    history.replaceState(null, "", "#/drive");
+  if (!location.hash || location.hash === "#" || location.hash === "#/") {
+    history.replaceState(null, "", "#/lesson/getting-started/sandbox");
   }
   show(parseRoute(location.hash));
 }

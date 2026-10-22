@@ -8,6 +8,6 @@ starter: none
 action: sandbox
 ---
 
-MPC writes the next second of steering and speed as an optimization, with the bicycle model as the constraint and the path as the cost. On this oval that path is the centreline pure pursuit already tracks.
+Model predictive control writes the next second of steering and speed as one optimization. The bicycle model is the constraint. The path is the cost. On this oval that path is the centreline pure pursuit already tracks.
 
-It can respect the steering rate and the speed limit in one problem. It has to fit in the same 20 Hz tick, which is the reason it is not a copy-paste starter.
+The problem can respect the steering rate and the speed limit together. It also has to fit in the same 20 Hz tick. The starter arrives when that fit is honest.

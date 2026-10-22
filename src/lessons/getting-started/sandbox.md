@@ -8,18 +8,31 @@ action: sandbox
 status: ready
 ---
 
-The car in the middle of the window is the course. Drive, Code, and Lessons, in the header, are three ways to use that same view. The pane on the right is either closed, a Python editor, or the lesson you are reading.
+The car in the middle of the window is the whole course. This page is where a first visit lands. Drive, Code, and Lessons are three ways into that same view.
 
-## Three modes, one simulator
+## Three ways to use the same car
 
-**Drive** is the keyboard. The right pane stays out of the way. **Code** opens a free-form editor: pick an example, press Run, and read the console underneath. **Lessons** keeps the car on screen and loads this pane. Each lesson sets the world, the start pose, the seed, and the overlays that make its point. If it has a program, Try it at the bottom of the pane runs it. Edit code opens the editor, and the console is the same one Code mode uses.
+**Drive** is the keyboard. W forward, S back, A and D steer, Space brakes.
 
-A lesson does not lock the header. You can still change the world, the graphics quality, the lidar drawing, the path trails, and the noise seed. What you cannot do from Python is read the true pose. The program sees sensors only.
+**Code** opens on a short template. `control(sensors)` returns a gentle roll forward. **Browse examples** lists finished programs. If you have already typed something, the lab asks before it replaces your text. Your scratch program stays in this browser.
 
-## The view, the trails, and what is saved
+**Lessons** keeps the car on screen and the reading in this pane. A lesson picks the world, the start, and the drawings. When a lesson has a program, the explanation and the code share this scroll. **Run** sits on the bar at the bottom. The console opens just above it, and it opens by itself if the program throws.
 
-Drag to look around the car, scroll to zoom, and use **Reset camera** if the chase rig ends up in the sky. **Graphics** has High and Low. High is the one with the sky and the softer shadows.
+## The buttons that reset something
 
-**Paths** draws two trails for you, not for the program. The coloured trail is where the car went, tinted by speed. The amber trail is wheel odometry. They start together and then disagree. That gap is a later lesson.
+Four controls put something back, and they put back different things.
 
-Physics runs at 60 Hz. When a program is running, `control(sensors)` is called at 20 Hz and must return a steering angle and a throttle. Code you edit inside a lesson is stored in this browser, and so are visited and completed marks. **Starter** puts the lesson's program back. A refresh keeps your place.
+- **Reset run**, on the bar, puts the car back at the start.
+- **Starter** restores this lesson's program.
+- **Reset seed**, in the header, replays the same sensor noise.
+- **Reset camera** puts the view behind the car.
+
+Drag to look around, and scroll to zoom. The **Key** on the view names the colours: the speed-tinted trail is where the car went, amber is the wheel-and-gyro guess, and the lidar inset draws the scan with amber for close hits. You can fold the key up. It stays available on every lesson that draws those overlays.
+
+Switching the **World** menu keeps this lesson's kind of start. A circle lesson stays on an open pad. A wall lesson stays beside a wall.
+
+## Try it
+
+1. Drive up the street with W. Watch the lidar inset: amber dots are the close hits.
+2. Open Code. The editor should be the short template. Open Browse examples, load Circle drive, and press Run.
+3. Come back here and open The bicycle model. The circle program is already running, and a piece of it sits in the reading.
