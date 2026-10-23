@@ -12,7 +12,7 @@ export type SurfaceName =
   | "planks"
   | "metal";
 
-/** Tiles per metre. The Poly Haven sweeps are about two metres across. */
+/** Tiles per meter. The Poly Haven sweeps are about two meters across. */
 export const TILES_PER_METER = 0.5;
 
 const textures = new Map<string, THREE.Texture>();
@@ -111,7 +111,7 @@ async function surfaceMaterial(
   return material;
 }
 
-/** Stretch a geometry's 0–1 UVs so a shared repeat-wrapped map tiles in metres. */
+/** Stretch a geometry's 0–1 UVs so a shared repeat-wrapped map tiles in meters. */
 export function tileUvs(geo: THREE.BufferGeometry, uScale: number, vScale: number): void {
   const uv = geo.getAttribute("uv");
   if (!uv) return;

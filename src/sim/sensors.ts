@@ -18,7 +18,7 @@ type Vehicle = InstanceType<typeof RAPIER.DynamicRayCastVehicleController>;
 
 /**
  * Sensor-mast puck, chassis frame. Body center settles near y = 0.78, so the
- * scan plane is about a metre off the ground. The visible puck uses this
+ * scan plane is about a meter off the ground. The visible puck uses this
  * same offset.
  */
 export const LIDAR_LOCAL = { x: 0, y: 0.28, z: 0.46 };

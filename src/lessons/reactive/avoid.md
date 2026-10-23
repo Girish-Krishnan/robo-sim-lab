@@ -1,6 +1,7 @@
 ---
 title: Lidar obstacle avoidance
 order: 2
+worlds: forest, warehouse
 world: forest
 spawn: avoid
 starter: avoid
@@ -41,7 +42,7 @@ $$\alpha \in \big[\alpha - \arctan(w / r),\; \alpha + \arctan(w / r)\big]$$
 
 for a half-width $w$ a bit larger than the car, and then picks the opening with the best score. The starter writes that idea as a pass over the beams.
 
-The half-width of each wedge, in metres. `HALF` is how wide a hit is painted.
+The half-width of each wedge, in meters. `HALF` is how wide a hit is painted.
 
 {{code:tunables}}
 

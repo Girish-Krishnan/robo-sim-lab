@@ -21,7 +21,7 @@ The program sees the map, the scan, and the odometry delta. The true pose stays 
 
 The pursuit block below is still steering from the raw integral. The next lessons replace the pose it reads.
 
-{{code:lookahead}}
+{{code:pursuit_steer}}
 
 ## One pose, then a distribution
 

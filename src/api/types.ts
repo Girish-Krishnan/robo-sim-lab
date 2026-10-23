@@ -13,13 +13,13 @@
 export interface LidarScan {
   /** Beam angle in the robot frame. 0 is forward, positive is left, range (−π, π]. */
   angles: number[];
-  /** Metres. A value equal to `maxRange` means no return. */
+  /** Meters. A value equal to `maxRange` means no return. */
   ranges: number[];
   maxRange: number;
 }
 
 export interface OdometryPose {
-  /** Dead-reckoned metres. This is not the world position. */
+  /** Dead-reckoned meters. This is not the world position. */
   x: number;
   y: number;
   /** Dead-reckoned yaw, radians, counterclockwise from above. */
@@ -61,7 +61,7 @@ export interface MapPoint {
  * so it cannot be confused with a pose.
  */
 export interface KnownMap {
-  /** Metres per cell. */
+  /** Meters per cell. */
   resolution: number;
   /** Odometry-frame coordinates of the minimum corner of cell (0, 0). */
   corner: { x: number; y: number };
@@ -69,7 +69,7 @@ export interface KnownMap {
   height: number;
   /**
    * Base64 bytes, row-major, one byte per cell. The value is the chamfer
-   * distance to the nearest occupied cell, in centimetres, clipped at 255.
+   * distance to the nearest occupied cell, in centimeters, clipped at 255.
    * A 0 is an occupied cell. Row 0 is the minimum y.
    */
   field: string;
@@ -134,7 +134,7 @@ export interface LidarSpec {
   /** Total field of view, radians, centered on forward. */
   fov: number;
   maxRange: number;
-  /** One-sigma range noise, metres. */
+  /** One-sigma range noise, meters. */
   rangeStdDev: number;
 }
 
@@ -142,9 +142,9 @@ export interface RobotDescriptor {
   id: string;
   name: string;
   kinematics: "ackermann";
-  /** Metres between front and rear axles. */
+  /** Meters between front and rear axles. */
   wheelbase: number;
-  /** Metres between the left and right wheels. */
+  /** Meters between the left and right wheels. */
   trackWidth: number;
   limits: RobotLimits;
   sensors: {

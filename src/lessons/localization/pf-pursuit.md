@@ -13,9 +13,9 @@ This is the same pure pursuit law as the path-tracking lesson, with one input ch
 
 In the sim: the oval, with the path trails and the particle cloud drawn.
 
-On the oval, pursuit that trusts odometry lets cross-track grow from about 0.18 m in the first 15 seconds to about 2.23 m after 45 seconds. The same minute with this filter has late cross-track of about **0.34 m**. The estimate ends about **0.38 m** from the car. Those are different numbers: 0.34 m is how far the car sits from the centreline late in the minute, and 0.38 m is how far the red estimate sits from the car at the end. The car stays clear of the walls. The estimate is what the lidar and the map agree on, so a slow gyro bias stops steering the car off the centreline.
+On the oval, pursuit that trusts odometry lets cross-track grow from about 0.18 m in the first 15 seconds to about 2.23 m after 45 seconds. The same minute with this filter has late cross-track of about **0.34 m**. The estimate ends about **0.38 m** from the car. Those are different numbers: 0.34 m is how far the car sits from the centerline late in the minute, and 0.38 m is how far the red estimate sits from the car at the end. The car stays clear of the walls. The estimate is what the lidar and the map agree on, so a slow gyro bias stops steering the car off the centerline.
 
-The coloured trail is where the car went. The red trail is the filter's estimate. The blue trail is raw odometry. You want truth on the centreline, the red estimate on the car, and the blue trail leaving.
+The colored trail is where the car went. The red trail is the filter's estimate. The blue trail is raw odometry. You want truth on the centerline, the red estimate on the car, and the blue trail leaving.
 
 A tight roundabout still has some cross-track, because the body slides even with a good pose. A long aisle of parallel walls is a weak place to ask a lidar how far along the corridor you are, until a crate or a pillar breaks the pattern. A cone or a trunk changes the scan when the pose slides, which is the idea from the Bayes lesson.
 
@@ -35,7 +35,7 @@ $$\alpha = \operatorname{atan2}(y_b, x_b),\quad \kappa = \frac{2\sin\alpha}{L_d}
 
 That is the pursuit lesson with $\theta$ replaced by $\hat\theta$ and the position replaced by the mean. Speed still comes from `sensors.odometry.speed`. Wheel speed is a good sensor. The derivative of $\hat x$ would add the filter's jitter to the throttle.
 
-`LOOKAHEAD` is in metres. The other lines are the filter's own knobs. `N` is the particle count for a known start.
+`LOOKAHEAD` is in meters. The other lines are the filter's own knobs. `N` is the particle count for a known start.
 
 {{code:tunables}}
 
@@ -51,6 +51,6 @@ The motion model already used the odometry delta. Mixing `odometry.pose` back in
 
 ## Try it
 
-1. Run the starter on the oval for a full minute. The blue trail should still leave. The car and the red estimate should stay near the centreline. Late cross-track is about 0.34 m. The estimate finishes about 0.38 m from the car.
+1. Run the starter on the oval for a full minute. The blue trail should still leave. The car and the red estimate should stay near the centerline. Late cross-track is about 0.34 m. The estimate finishes about 0.38 m from the car.
 2. In the tunables block, increase `LOOKAHEAD` to `6`. The cloud should look the same. The path should cut corners more, which is pursuit.
 3. Turn on Drive it yourself and drive the straight. The particles should ride with the car, and the blue trail should keep its own opinion.

@@ -1,6 +1,7 @@
 ---
 title: The sandbox
 order: 1
+worlds: city, track, forest, warehouse
 world: city
 spawn: default
 starter: none
@@ -20,16 +21,17 @@ The car in the middle of the window is the whole course. This page is where a fi
 
 ## The buttons that reset something
 
-Four controls put something back, and they put back different things.
+Three controls put something back, and they put back different things.
 
-- **Reset run**, on the bar, puts the car back at the start.
-- **Starter** restores this lesson's program.
-- **Reset seed**, in the header, replays the same sensor noise.
+- **Reset run**, on the bar, puts the car back at the start and runs the program you have now.
+- **Reset code**, on a lesson that has a program, asks first, then throws away your edits and loads the original.
 - **Reset camera** puts the view behind the car.
 
-Drag to look around, and scroll to zoom. The **Key** on the view names the colours: the speed-tinted trail is where the car went, blue is the wheel-and-gyro guess, and the lidar inset draws the scan with amber for close hits. After the first visit the key starts folded. It stays available on every lesson that draws those overlays.
+Sensor noise is not a button anymore. `SEED` at the top of a program draws the bias once, and Reset run replays that same number.
 
-Switching the **World** menu keeps this lesson's kind of start. A circle lesson stays on an open pad. A wall lesson stays beside a wall.
+Drag to look around, and scroll to zoom. The **Key** on the view names the colors: the speed-tinted trail is where the car went, blue is the wheel-and-gyro guess, and the lidar inset draws the scan with amber for close hits. After the first visit the key starts folded. It stays available on every lesson that draws those overlays.
+
+This page is happy in every world. The lessons menu at the top of this column lists them all. A lesson written for one yard locks the others, and the World menu says why. A lesson that travels, like this one, invites you to switch.
 
 ## Try it
 

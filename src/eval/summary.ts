@@ -29,7 +29,7 @@ export function renderSummary(rows: Compared[]): string {
     "",
     ...lines,
     "",
-    "The path plot legend labels the speed colour bar in m/s, the true path, the odometry trail, and contacts. Pure pursuit also draws the planned path. A scale bar is in metres. Roads, curbs, the oval asphalt, and the forest trail are drawn under the path.",
+    "The path plot legend labels the speed color bar in m/s, the true path, the odometry trail, and contacts. Pure pursuit also draws the planned path. A scale bar is in meters. Roads, curbs, the oval asphalt, and the forest trail are drawn under the path.",
     "Pure pursuit cross-track is the distance from the true pose to the reference polyline. It grows when odometry heading drifts. That is the point of the lesson.",
     "PF pursuit (mcl) is the same law driven by a particle-filter mean. The path plot adds that estimate in red, beside truth and odometry. Pose error is the estimate against the true pose in the odometry frame. Control time is the Python tick in this runtime.",
     ...pursuitNotes(rows),

@@ -24,7 +24,7 @@ async function loadTemplate(file: string) {
   return bakeObject(gltf.scene);
 }
 
-/** Metres, after bake. Radius is half the longer horizontal side. */
+/** Meters, after bake. Radius is half the longer horizontal side. */
 const EXPECTED: Record<string, { height: [number, number]; radius: [number, number]; upright?: boolean }> = {
   broadleaf: { height: [2.6, 4.2], radius: [1.4, 2.5], upright: true },
   pine: { height: [1.0, 1.8], radius: [0.2, 0.75], upright: true },
@@ -43,7 +43,7 @@ const EXPECTED: Record<string, { height: [number, number]; radius: [number, numb
 };
 
 describe("scanned props", () => {
-  it("keeps a scaled normalized mesh in metres instead of wrapping it", () => {
+  it("keeps a scaled normalized mesh in meters instead of wrapping it", () => {
     const box = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2));
     const position = box.geometry.getAttribute("position");
     const ints = new Int16Array(position.count * 3);

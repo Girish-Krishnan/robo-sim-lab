@@ -86,7 +86,7 @@ function forestRoute(): RoutePoint[] {
     line(-0.5, 30.6, -0.4, 32, 0.6),
     arc(-4, 32, 3.6, 0, Math.PI / 2, 8),
     // The west pine row sits at x=-11.5. The return stays west of x=-16 so a
-    // corner cut still leaves a metre of body clearance, then rejoins the trail.
+    // corner cut still leaves a meter of body clearance, then rejoins the trail.
     line(-4, 35.6, -16.5, 35.65, 2),
     arc(-16.5, 32.05, 3.6, Math.PI / 2, Math.PI, 8),
     line(-20.1, 32.05, -20.1, -9.0, 2),

@@ -30,7 +30,7 @@ const ROWS: Record<string, LegendRow> = {
   truth: {
     swatch: "linear-gradient(90deg, #3f8cc0, #f0c747)",
     name: "True path",
-    text: "Where the car actually drove. The colour follows speed.",
+    text: "Where the car actually drove. The color follows speed.",
   },
   odom: {
     swatch: "#6ea8ff",
@@ -75,7 +75,7 @@ export function mountLegend(root: HTMLElement): { show: (spec: LegendSpec | null
     root.classList.toggle("is-open", open);
     toggle.setAttribute("aria-expanded", String(open));
     toggle.textContent = open ? "Key" : "Key";
-    toggle.title = open ? "Fold the colour key" : "Open the colour key";
+    toggle.title = open ? "Fold the color key" : "Open the color key";
   };
   toggle.addEventListener("click", () => {
     open = !open;

@@ -1,6 +1,7 @@
 ---
 title: Open-loop circle
 order: 1
+worlds: city, track, forest, warehouse
 world: track
 spawn: circle
 starter: circle
@@ -17,7 +18,7 @@ The starter turns left at 0.34 rad and asks for a medium throttle. The car is pl
 
 There is no goal pose. The lesson is the radius, and the fact that a fixed command repeats. Later controllers close the loop because a wall that curves, or a path that drifts, needs a command that can change.
 
-{{code:drive}}
+{{code:control}}
 
 ## Constant steer is constant curvature
 
@@ -25,7 +26,7 @@ From the bicycle model, constant $\delta$ and constant $v$ give constant curvatu
 
 $$\kappa = \frac{\tan\delta}{L},\quad R = \frac{L}{\tan\delta}.$$
 
-One lap takes time $T = 2\pi R / v$ when the car actually holds speed $v$ and radius $R$. Throttle is a request, and speed is what the wheels settle to. A throttle of 0.5 on flat ground settles near a few metres per second. Read `sensors.odometry.speed` for the number.
+One lap takes time $T = 2\pi R / v$ when the car actually holds speed $v$ and radius $R$. Throttle is a request, and speed is what the wheels settle to. A throttle of 0.5 on flat ground settles near a few meters per second. Read `sensors.odometry.speed` for the number.
 
 The discrete command is held for $\Delta t = 0.05$ s. Returning $(0.34,\ 0.5)$ is the whole controller.
 

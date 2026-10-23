@@ -1,5 +1,6 @@
 import { ACKERMANN_BUGGY } from "../api";
 import { particleFilterSource } from "./particle-filter";
+import { programPreamble } from "./program-header";
 
 export interface CodeExample {
   id: string;
@@ -17,12 +18,12 @@ const maxRange = ACKERMANN_BUGGY.sensors.lidar.maxRange;
  * Open-loop circle. Constant steer and throttle.
  * Turning radius is about wheelbase / tan(steering).
  */
-const circle = `# Circle drive
+const circle = `${programPreamble("circle")}# Circle drive
 #
 # control(sensors) runs at 20 Hz in a Python sandbox. The object you
 # receive has only simulated sensors. World pose and velocity are not included.
 #
-#   sensors.lidar.ranges           NumPy array, ${beams} beams, metres
+#   sensors.lidar.ranges           NumPy array, ${beams} beams, meters
 #   sensors.lidar.angles           NumPy array, radians. 0 is forward, positive is left
 #   sensors.lidar.max_range        ${maxRange} m means no return
 #   sensors.odometry.speed         noisy wheel speed, m/s
@@ -38,7 +39,7 @@ const circle = `# Circle drive
 #
 # Code above control() runs once per Run. Names there persist across ticks.
 # Wheelbase is ${wheelbase} m, so this steer is a circle of roughly
-# ${wheelbase} / tan(0.34) metres (about 5.4 m). The car is placed on an
+# ${wheelbase} / tan(0.34) meters (about 5.4 m). The car is placed on an
 # open pad for this example: the south lawn, the oval infield, the meadow
 # south of the trees, or the open bay in the warehouse.
 
@@ -46,7 +47,6 @@ import numpy as np
 
 ticks = 0
 
-# @@chunk drive
 def control(sensors):
     global ticks
     ticks += 1
@@ -64,14 +64,13 @@ def control(sensors):
             f"nearest {nearest:.2f} m",
         )
     return 0.34, 0.5
-# @@end
 `;
 
 /**
  * Gap follower. Positive angle and positive steering are the driver's left.
  * The TypeScript copy in tests/avoid.test.ts must stay in step with this.
  */
-const avoid = `# Lidar avoid
+const avoid = `${programPreamble("avoid")}# Lidar avoid
 #
 # angles: 0 is straight ahead, positive is the driver's left.
 # steering uses the same sign, so a positive number also turns left.
@@ -101,9 +100,11 @@ const avoid = `# Lidar avoid
 import math
 import numpy as np
 
-# @@chunk tunables
-HALF = 1.35
-# @@end
+def tunables():
+    global HALF
+    HALF = 1.35
+
+tunables()
 aim = 0.0
 reverse = 0
 phase = "run"
@@ -115,7 +116,6 @@ anchor_y = 0.0
 anchor_t = 0.0
 saw_anchor = False
 
-# @@chunk inflate
 def inflate(ranges, angles):
     # A return at range r blocks beams within atan(HALF / r) of it.
     wide = np.array(ranges, dtype=float, copy=True)
@@ -124,17 +124,17 @@ def inflate(ranges, angles):
         near = np.abs(angles - angles[i]) <= span[i]
         wide[near] = np.minimum(wide[near], ranges[i])
     return wide
-# @@end
+
+def keep_misses(ranges, max_range):
+    # A beam at max_range did not hit anything. Leave it there so it counts as far, not as a wall.
+    return np.where(ranges >= max_range - 1e-6, max_range, ranges)
 
 def control(sensors):
     global aim, reverse, phase, phase_ticks, cooldown, held_sign
     global anchor_x, anchor_y, anchor_t, saw_anchor
     ranges = np.asarray(sensors.lidar.ranges, dtype=float)
     angles = np.asarray(sensors.lidar.angles, dtype=float)
-    # @@chunk misses
-    # A beam at max_range did not hit anything. Leave it there so it counts as far, not as a wall.
-    ranges = np.where(ranges >= sensors.lidar.max_range - 1e-6, sensors.lidar.max_range, ranges)
-    # @@end
+    ranges = keep_misses(ranges, sensors.lidar.max_range)
     wide = inflate(ranges, angles)
 
     front = np.abs(angles) < 0.95
@@ -254,7 +254,7 @@ def control(sensors):
  * Right-wall follower. Negative lidar angles are the driver's right.
  * The TypeScript copy in tests/worlds.test.ts must stay in step with this.
  */
-const wall = `# Wall follow
+const wall = `${programPreamble("wall")}# Wall follow
 #
 # Hold a distance to whatever is on the driver's right. Negative angles
 # are that side. Positive steering turns left, which is away from the wall.
@@ -273,11 +273,11 @@ const wall = `# Wall follow
 #
 # Speed is scheduled on front clearance and curvature. A parallel wall
 # and a long forward beam is a straight, and the car runs. The same beams
-# going long, or a return a few metres ahead, is a corner: brake to a
+# going long, or a return a few meters ahead, is a corner: brake to a
 # creep, then take the arc. Creeping the straights as well does not
 # finish an oval lap.
 #
-# If the forward beam is inside about a metre, the bumper is already
+# If the forward beam is inside about a meter, the bumper is already
 # there (the lidar sits ~0.7 m behind it). Back up with the wheels
 # turned right. In reverse that yaws the nose left, off the wall.
 #
@@ -288,12 +288,14 @@ const wall = `# Wall follow
 import math
 import numpy as np
 
-# @@chunk tunables
-TARGET = 3.2
-LOOK = 1.8
-KP = 0.16
-KD = 0.55
-# @@end
+def tunables():
+    global TARGET, LOOK, KP, KD
+    TARGET = 3.2
+    LOOK = 1.8
+    KP = 0.16
+    KD = 0.55
+
+tunables()
 WHEELBASE = 1.9
 # follow the wall, coast past the corner, then arc onto the next face.
 phase = "follow"
@@ -303,16 +305,25 @@ gap = TARGET
 locked = False
 saw_preview = False
 
-# @@chunk beams
 def beam(ranges, angles, center, width):
     mask = np.abs(angles - center) < width
     if not np.any(mask):
         return 12.0
     return float(np.median(ranges[mask]))
-# @@end
+
+def wall_error(side, diag, look):
+    # alpha < 0 means the nose is aimed into the right-hand wall.
+    delta = math.pi / 4
+    alpha = math.atan2(diag * math.cos(delta) - side, diag * math.sin(delta))
+    dist = max(0.3, side * math.cos(min(0.8, max(-0.8, alpha))))
+    future = dist + look * math.sin(alpha)
+    return alpha, dist, future
+
+def wall_steer(target, future, alpha, kp, kd):
+    return kp * (target - future) - kd * alpha
 
 def corner_steer():
-    # Radius matches the standoff, so the arc is centred on the corner.
+    # Radius matches the standoff, so the arc is centered on the corner.
     return -min(0.52, math.atan(WHEELBASE / max(gap, 3.15)))
 
 def control(sensors):
@@ -324,14 +335,7 @@ def control(sensors):
     # Earlier than -45 deg, used only to shed speed before the corner.
     preview = beam(ranges, angles, -0.35, 0.1)
     front = beam(ranges, angles, 0.0, 0.32)
-
-    # @@chunk error
-    # alpha < 0 means the nose is aimed into the right-hand wall.
-    delta = math.pi / 4
-    alpha = math.atan2(diag * math.cos(delta) - side, diag * math.sin(delta))
-    dist = max(0.3, side * math.cos(min(0.8, max(-0.8, alpha))))
-    future = dist + LOOK * math.sin(alpha)
-    # @@end
+    alpha, dist, future = wall_error(side, diag, LOOK)
     # Both beams on the same face: remember how far off the wall we are.
     # Only a steady straight updates the radius. Readings mid-corner are
     # the next face arriving at a slant, and chasing them widens the arc
@@ -412,7 +416,7 @@ def control(sensors):
     corner_soon = locked and side < 5.5 and ending and (settled or speed > 3.0)
     if corner_soon:
         # The straight may be near 5 m/s. The shallow beam sees the wall end
-        # several metres early. Shed that before the arc. Holding the brake
+        # several meters early. Shed that before the arc. Holding the brake
         # once the car is already slow drives it in reverse.
         if speed > 3.6:
             throttle = -0.72
@@ -425,15 +429,13 @@ def control(sensors):
         return 0.0, throttle
 
     if side < 9.0 and diag < 11.0:
-        # @@chunk steer
-        steering = KP * (TARGET - future) - KD * alpha
-        # @@end
+        steering = wall_steer(TARGET, future, alpha, KP, KD)
     else:
         steering = 0.0
     if dist > TARGET + 1.0:
         steering = max(steering, -0.16)
     steering = float(np.clip(steering, -0.4, 0.4))
-    # Open straight: run. A bend, or a return inside a few metres: slow.
+    # Open straight: run. A bend, or a return inside a few meters: slow.
     curvature = abs(alpha) + 0.55 * abs(steering)
     if front > 8.0 and curvature < 0.14:
         target = 5.4
@@ -457,7 +459,7 @@ def control(sensors):
  * Steering is the curvature that reaches a lookahead point; speed is a
  * small PID. Drawings are the student's own estimate, not the true pose.
  */
-const pursuit = `# Pure pursuit
+const pursuit = `${programPreamble("pursuit")}# Pure pursuit
 #
 # The world hands you a route the way a planner would hand a real robot a
 # lane: sensors.task.path is a list of waypoints in the same frame as
@@ -473,9 +475,46 @@ const pursuit = `# Pure pursuit
 import math
 
 WHEELBASE = ${wheelbase}
-# @@chunk tunables
-LOOKAHEAD = 3.2
-# @@end
+MAX_STEER = ${maxSteer}
+
+def tunables():
+    global LOOKAHEAD
+    LOOKAHEAD = 3.2
+
+tunables()
+
+class Run:
+    def __init__(self):
+        self.index = 0
+        self.integral = 0.0
+        self.escape = 0
+        self.escape_steer = 0.0
+
+run = Run()
+
+def init(sensors):
+    global run
+    run = Run()
+
+def pursuit_steer(pose, path, best, lookahead):
+    n = len(path)
+    target = path[best]
+    for step in range(1, n):
+        point = path[(best + step) % n]
+        if math.hypot(point.x - pose.x, point.y - pose.y) >= lookahead:
+            target = point
+            break
+    dx = target.x - pose.x
+    dy = target.y - pose.y
+    # Body frame: +x forward, +y left. Yaw is the integral of the gyro.
+    forward = math.cos(pose.yaw) * dx + math.sin(pose.yaw) * dy
+    left = -math.sin(pose.yaw) * dx + math.cos(pose.yaw) * dy
+    ld = max(math.hypot(forward, left), 0.4)
+    alpha = math.atan2(left, forward)
+    curvature = 2.0 * math.sin(alpha) / ld
+    steer = math.atan(WHEELBASE * curvature)
+    steer = max(-MAX_STEER, min(MAX_STEER, steer))
+    return steer, target, curvature, ld
 
 def control(sensors):
     path = sensors.task.path
@@ -487,51 +526,32 @@ def control(sensors):
     # short reverse instead of driving the same point into it every tick.
     ahead = np.abs(sensors.lidar.angles) < 0.6
     front = float(np.min(sensors.lidar.ranges[ahead])) if np.any(ahead) else sensors.lidar.max_range
-    if control.escape > 0:
-        control.escape -= 1
+    if run.escape > 0:
+        run.escape -= 1
         draw.path([{"x": point.x, "y": point.y} for point in path], "#7dcea0")
-        return control.escape_steer, -0.28
+        return run.escape_steer, -0.28
     if front < 0.95 and abs(sensors.odometry.speed) < 0.35:
         left = float(np.mean(sensors.lidar.ranges[sensors.lidar.angles > 0.3]))
         right = float(np.mean(sensors.lidar.ranges[sensors.lidar.angles < -0.3]))
-        control.escape = 16
-        control.escape_steer = 0.4 if left >= right else -0.4
+        run.escape = 16
+        run.escape_steer = 0.4 if left >= right else -0.4
         draw.path([{"x": point.x, "y": point.y} for point in path], "#7dcea0")
-        return control.escape_steer, -0.28
+        return run.escape_steer, -0.28
 
     n = len(path)
     # Search forward from the last progress index so a loop that folds
     # back on itself is not jumped onto the return leg.
-    best = control.index % n
+    best = run.index % n
     best_d = 1e9
     for step in range(min(n, 50)):
-        i = (control.index + step) % n
+        i = (run.index + step) % n
         point = path[i]
         dist = math.hypot(point.x - pose.x, point.y - pose.y)
         if dist < best_d:
             best_d = dist
             best = i
-    control.index = best
-
-    target = path[best]
-    # @@chunk lookahead
-    for step in range(1, n):
-        point = path[(best + step) % n]
-        if math.hypot(point.x - pose.x, point.y - pose.y) >= LOOKAHEAD:
-            target = point
-            break
-
-    dx = target.x - pose.x
-    dy = target.y - pose.y
-    # Body frame: +x forward, +y left. Yaw is the integral of the gyro.
-    forward = math.cos(pose.yaw) * dx + math.sin(pose.yaw) * dy
-    left = -math.sin(pose.yaw) * dx + math.cos(pose.yaw) * dy
-    ld = max(math.hypot(forward, left), 0.4)
-    alpha = math.atan2(left, forward)
-    curvature = 2.0 * math.sin(alpha) / ld
-    steer = math.atan(WHEELBASE * curvature)
-    steer = max(-${maxSteer}, min(${maxSteer}, steer))
-    # @@end
+    run.index = best
+    steer, target, curvature, ld = pursuit_steer(pose, path, best, LOOKAHEAD)
 
     # Slower into a bend. The integral is clamped so a long straight
     # does not wind up and then overshoot the corner.
@@ -543,8 +563,8 @@ def control(sensors):
     else:
         target_speed = 4.4
     error = target_speed - speed
-    control.integral = max(-2.0, min(2.0, control.integral + error * sensors.dt))
-    throttle = 0.34 * error + 0.05 * control.integral
+    run.integral = max(-2.0, min(2.0, run.integral + error * sensors.dt))
+    throttle = 0.34 * error + 0.05 * run.integral
     throttle = max(-0.55, min(0.75, throttle))
 
     # The path, the lookahead, and the arc the steering command would drive.
@@ -573,18 +593,13 @@ def command_arc(pose, curvature, length):
             "y": pose.y + sy * fx + c * ly,
         })
     return points
-
-control.index = 0
-control.integral = 0.0
-control.escape = 0
-control.escape_steer = 0.0
 `;
 
 export const EXAMPLES: CodeExample[] = [
   { id: "circle", label: "Circle drive", blurb: "Hold a fixed steer and draw a circle on an open pad.", source: circle },
   { id: "avoid", label: "Lidar avoid", blurb: "Steer toward the widest gap the car can fit through.", source: avoid },
   { id: "wall", label: "Wall follow", blurb: "Hold a distance from the wall on the driver's right.", source: wall },
-  { id: "pursuit", label: "Pure pursuit", blurb: "Steer an arc toward a point a few metres along the path.", source: pursuit },
+  { id: "pursuit", label: "Pure pursuit", blurb: "Steer an arc toward a point a few meters along the path.", source: pursuit },
   { id: "mcl", label: "PF pursuit", blurb: "Follow the path using a particle-filter pose instead of raw odometry.", source: particleFilterSource("track") },
   { id: "mcl-global", label: "PF kidnapped", blurb: "Start with no idea where the car is, then drive once the cloud collapses.", source: particleFilterSource("global") },
 ];

@@ -23,7 +23,7 @@ export type EvalWorld = (typeof EVAL_WORLDS)[number];
 export type EvalExample = (typeof EVAL_EXAMPLES)[number];
 
 /**
- * How far the body reaches from the circle's centre.
+ * How far the body reaches from the circle's center.
  * Path radius plus half the track, with a little nose margin.
  */
 export const CIRCLE_ENVELOPE = circleRadius() + ACKERMANN_BUGGY.trackWidth / 2 + 0.35;

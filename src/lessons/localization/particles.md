@@ -9,7 +9,7 @@ prerequisites: localization/bayes
 status: ready
 ---
 
-Each dot is a guess. Guesses that match the lidar survive. On the oval the starter begins in a tight neighbourhood of the car, so the first frame already agrees. Press **Scatter guesses** to throw that cloud out about 7 m and watch the matching guesses survive. The red mean has a dark outline so it stays readable on the pink dots. Open the **Key** on the view for the colour names: pink dots, yellow ring, red trail, and blue odometry. The red trail is the filter's mean, drawn on top of the dots.
+Each dot is a guess. Guesses that match the lidar survive. On the oval the starter begins in a tight neighborhood of the car, so the first frame already agrees. Press **Scatter guesses** to throw that cloud out about 7 m and watch the matching guesses survive. The red mean has a dark outline so it stays readable on the pink dots. Open the **Key** on the view for the color names: pink dots, yellow ring, red trail, and blue odometry. The red trail is the filter's mean, drawn on top of the dots.
 
 In the sim, the tracking cloud runs on the oval. The Key uses those same names.
 
@@ -19,7 +19,7 @@ The starter keeps a few hundred particles and scores a few dozen lidar beams aga
 
 {{scatter}}
 
-On a straight every stretch of wall looks the same, so the red mean can sit a few metres ahead or behind with a small ring: confident and wrong. The first corner settles it, usually within 15 s.
+On a straight every stretch of wall looks the same, so the red mean can sit a few meters ahead or behind with a small ring: confident and wrong. The first corner settles it, usually within 15 s.
 
 The blocks below are one tick of that filter. They are slices of the same program that is driving the oval.
 
@@ -51,7 +51,7 @@ Start with particles $x^{[i]}$ and weights $w^{[i]}$, usually uniform after a re
 
 **Predict.** Apply the noisy motion model to every particle. In the starter this is a vector of $N$ samples.
 
-{{code:motion}}
+{{code:apply_motion}}
 
 **Weight.** For each particle, sum the log of the per-beam likelihoods:
 
@@ -59,7 +59,7 @@ $$\ell^{[i]} = \sum_k \log p(z_k \mid x^{[i]}),\quad w^{[i]} \propto \exp(\ell^{
 
 Subtracting the max keeps the exponential from underflowing to zero. Then divide by $\sum w$.
 
-{{code:sense}}
+{{code:likelihood}}
 
 **Effective sample size.**
 

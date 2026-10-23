@@ -1,6 +1,7 @@
 ---
 title: Why odometry drift hurts
 order: 2
+worlds: track, city
 world: track
 spawn: pursuit
 starter: pursuit
@@ -9,7 +10,7 @@ prerequisites: tracking/pursuit, models/noise
 status: ready
 ---
 
-Pure pursuit on the oval is a good controller attached to a drifting pose. The path plot is the picture: the plan stays on the centreline, the car follows it at first, and the odometry trail walks away. Cross-track of the true car grows because the controller is steering the ghost, the way a careful driver following a phone map still leaves the road when the blue dot is wrong.
+Pure pursuit on the oval is a good controller attached to a drifting pose. The path plot is the picture: the plan stays on the centerline, the car follows it at first, and the odometry trail walks away. Cross-track of the true car grows because the controller is steering the ghost, the way a careful driver following a phone map still leaves the road when the blue dot is wrong.
 
 Cross-track here is the distance from the true position to the reference path, a chain of short straight segments (a polyline). The odometry pose stays close to the path by construction, because pursuit is tracking that pose. The car is what leaves.
 
@@ -29,7 +30,7 @@ On seed 1, for a 60 second run, the oval numbers are:
 
 - about **0.18 m** mean cross-track in the first 15 seconds
 - about **2.23 m** mean cross-track after 45 seconds
-- one lap, the car clear of the walls, odometry drift of a few metres by the end
+- one lap, the car clear of the walls, odometry drift of a few meters by the end
 
 The city roundabout tells a different story. There the body slides sideways while the wheels still point along the turn. That slide is sideslip, also called crabbing. Cross-track sits near 0.6 m the whole minute, and the slide dominates the gyro. When you want to see drift, use the oval.
 
@@ -39,7 +40,7 @@ In the sim: that oval run, with the plan and both trails drawn.
 
 The steer itself is the pursuit block. The pose inside it is the one that walks away.
 
-{{code:lookahead}}
+{{code:pursuit_steer}}
 
 ## A heading error that grows, then a cross-track that bends
 
@@ -55,7 +56,7 @@ plus the ordinary tracking error from lookahead and slip. The $t^2$ is why the f
 
 Feedback on the true $e$ would hold it. This program sees the odometry $e$. The localization module builds an $e$ the lidar can see, by comparing the scan to a known map, and then hands pursuit that pose.
 
-Judge the controller by the coloured trail against the planned path. The blue trail is the input the controller believes. A contact on the second lap is often the drift: the car is 2 m off the centreline and in the cones. Shortening the lookahead makes the first ten seconds prettier and tracks the bad pose more tightly after that.
+Judge the controller by the colored trail against the planned path. The blue trail is the input the controller believes. A contact on the second lap is often the drift: the car is 2 m off the centerline and in the cones. Shortening the lookahead makes the first ten seconds prettier and tracks the bad pose more tightly after that.
 
 ## Try it
 

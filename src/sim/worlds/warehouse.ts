@@ -53,7 +53,7 @@ export function buildWarehouseSolids(): Solid[] {
   solids.push(cuboid(-17.8, 8, 0.4, 3.2, 56, "concrete"));
   solids.push(cuboid(17.8, 8, 0.4, 3.2, 56, "concrete"));
 
-  // A loose slalom in the centre aisle. Gaps stay wider than a reverse
+  // A loose slalom in the center aisle. Gaps stay wider than a reverse
   // arc, so a noisy scan can back out of the end shelf without planting
   // on the next pallet. The rack's outside lane stays empty for wall follow.
   solids.push(cuboid(5.0, 23.2, 1.2, 1.35, 1.05, "pallet", 0.08));

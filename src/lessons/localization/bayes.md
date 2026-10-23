@@ -47,7 +47,7 @@ $\eta$ makes the belief integrate to 1. $u_t$ is the motion. $z_t$ is the scan. 
 
 The motion model in the running program turns that delta into three noisy numbers and adds them to every guess.
 
-{{code:motion}}
+{{code:apply_motion}}
 
 ## A motion model in three numbers
 
@@ -63,7 +63,7 @@ A likelihood field asks a simple question of each beam. Take the endpoint, place
 
 $$p(z \mid x) \propto \exp\left(-\frac{d^2}{2\sigma^2}\right) + \lambda$$
 
-The $\lambda$ floor keeps one bad beam from zeroing the particle. $\sigma$ is a few tens of centimetres, larger than the lidar's 2 cm, because the grid is 0.5 m and the car slips. Beams at `max_range` are skipped. They missed the map.
+The $\lambda$ floor keeps one bad beam from zeroing the particle. $\sigma$ is a few tens of centimeters, larger than the lidar's 2 cm, because the grid is 0.5 m and the car slips. Beams at `max_range` are skipped. They missed the map.
 
 <svg viewBox="0 0 480 220" role="img" aria-label="Likelihood field: a beam endpoint scored by its distance to the wall">
   <rect width="480" height="220" rx="12" fill="#10161a"/>
@@ -78,13 +78,13 @@ The $\lambda$ floor keeps one bad beam from zeroing the particle. $\sigma$ is a 
   <text x="16" y="200" fill="#8e9b94" font-size="13" font-family="sans-serif">Bright band: cells on the wall. The score falls off with d, the gap from the endpoint to that band.</text>
 </svg>
 
-The starter's `map.field` is that lookup, precomputed, in centimetres, so the 20 Hz tick reads a table. A 0 is an occupied cell. `map.segments` is the wall list the grid came from: packed edges $x_0, y_0, x_1, y_1$. The true pose stays off the sample.
+The starter's `map.field` is that lookup, precomputed, in centimeters, so the 20 Hz tick reads a table. A 0 is an occupied cell. `map.segments` is the wall list the grid came from: packed edges $x_0, y_0, x_1, y_1$. The true pose stays off the sample.
 
 The field scores the endpoint. A beam that passed through one wall and hit a second one still contributes its endpoint. These yards have few thin false openings at scan height, so that shortcut holds. A beam model would raycast. It is the stricter question, and it is too slow here if you ask it for every particle and every beam.
 
 The scoring function in the program:
 
-{{code:sense}}
+{{code:likelihood}}
 
 ## A long wall, then a cone
 

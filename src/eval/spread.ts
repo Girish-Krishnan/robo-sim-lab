@@ -1,10 +1,10 @@
 import type { DrawPoint } from "../api/draw";
 
-/** 2-sigma position radius, metres. The cloud counts as tight below this. */
+/** 2-sigma position radius, meters. The cloud counts as tight below this. */
 export const CONVERGE_RADIUS = 0.5;
 /** Heading sigma, radians. 10 degrees. */
 export const CONVERGE_HEADING = (10 * Math.PI) / 180;
-/** Estimate versus true pose, metres. */
+/** Estimate versus true pose, meters. */
 export const CONVERGE_POSITION = 0.5;
 /** How long all three have to hold, seconds. */
 export const CONVERGE_HOLD = 1;

@@ -1,6 +1,7 @@
 ---
 title: The sensor contract
 order: 3
+worlds: city, track, forest, warehouse
 world: city
 spawn: circle
 starter: circle
@@ -15,13 +16,15 @@ You get lidar, wheel odometry, an IMU, the time, and a task. The task can carry 
 
 That split is the point of the lab. A controller that could read the true position would look brilliant and would have skipped the sensing. Localization means something once the estimate is built from the same sensors a real robot would have.
 
-The Python side is a sandbox. NumPy is there. `print` and tracebacks show up in the console. Names you create above `control` live for the whole run. A name you create inside `control` lives for that tick, unless you hang it on the function or declare it global.
+The Python side is a sandbox. NumPy is there. `print` and tracebacks show up in the console. Names you create above `control` live for the whole run. A name you create inside `control` lives for that tick, unless you declare it global or keep it on an object you built above `control`.
 
-In the sim: the circle program on the south lawn, so the sample is changing and the car has room.
+Open **Full program** once. The first lines are `SEED` and `START_POSE`. `SEED` draws the sensor bias once, and the same number replays the same noise. Use it for your own random numbers too: `np.random.default_rng(SEED)`. `START_POSE` is where the car is placed on Run and Reset. `x` and `y` are meters on the map (`y` runs north), and the third number is heading in degrees. 0 faces north. That chooses a start. It is not a sensor, and it is not the true pose. A dict with one pose per world lets the same program travel. A bare tuple is the one-world form. A pose inside a wall, or off the map, is refused in the console and the world's usual start is used instead.
 
-The block below is the program that is running. It prints one sample and then holds the wheel.
+In the sim: the circle program on the south lawn, so the sample is changing and the car has room. The same program is happy on the oval infield, the south meadow, and the warehouse bay. The World menu lists them.
 
-{{code:drive}}
+The block below is the part that runs every tick. It prints one sample and then holds the wheel.
+
+{{code:control}}
 
 ## What is on the sample
 
@@ -62,7 +65,7 @@ The odometry pose and the chase-camera heading grow in opposite directions. A le
 
 `draw.path`, `draw.points`, and `draw.text` post pictures back to the view. Coordinates are the odometry frame. The host places them with the spawn transform, the shift from that origin onto the map, so a path the world gave you stays on the map, and a point computed from a drifting pose walks away from the car.
 
-Note: the HUD and the coloured trail are for you. They are pictures, and the program keeps its own variables if it wants a number next tick.
+Note: the HUD and the colored trail are for you. They are pictures, and the program keeps its own variables if it wants a number next tick.
 
 ## Try it
 

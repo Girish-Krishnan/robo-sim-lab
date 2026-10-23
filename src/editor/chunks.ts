@@ -1,91 +1,67 @@
-/** Named slices of one Python program. Markers are comments, so they run as no-ops. */
+/** Named slices of one Python program. A slice is a top-level function or class. */
 
-const OPEN = /^\s*# @@chunk ([A-Za-z0-9_-]+)\s*$/;
-const CLOSE = /^\s*# @@end\s*$/;
-
-export function readChunks(source: string): Map<string, string> {
-  const chunks = new Map<string, string>();
-  const lines = source.split("\n");
-  let id: string | null = null;
-  let body: string[] = [];
-  for (const line of lines) {
-    const open = OPEN.exec(line);
-    if (open) {
-      id = open[1] ?? null;
-      body = [];
-      continue;
-    }
-    if (id && CLOSE.test(line)) {
-      chunks.set(id, body.join("\n"));
-      id = null;
-      body = [];
-      continue;
-    }
-    if (id) body.push(line);
-  }
-  return chunks;
+interface Block {
+  id: string;
+  start: number;
+  end: number;
 }
 
-/** Replace one marked slice. The markers stay put, so the rest of the program is unchanged. */
-export function writeChunk(source: string, id: string, body: string): string {
-  const lines = source.split("\n");
-  const out: string[] = [];
-  let skipping = false;
-  let found = false;
-  const next = body.replace(/\s+$/, "").split("\n");
-  for (const line of lines) {
-    const open = OPEN.exec(line);
-    if (open?.[1] === id) {
-      found = true;
-      skipping = true;
-      out.push(line, ...next);
-      continue;
-    }
-    if (skipping) {
-      if (CLOSE.test(line)) {
-        skipping = false;
-        out.push(line);
-      }
-      continue;
-    }
-    out.push(line);
-  }
-  return found ? out.join("\n") : source;
-}
+const OPEN = /^(?:async\s+def|def|class)\s+([A-Za-z_][A-Za-z0-9_]*)/;
 
-/** Map a 1-based line of the full program to the slice that contains it. */
-export function chunkAtLine(source: string, line1: number): { id: string; local: number } | null {
-  const lines = source.split("\n");
-  let id: string | null = null;
-  let local = 0;
+function blocks(lines: string[]): Block[] {
+  const found: Block[] = [];
+  let current: Block | null = null;
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index] ?? "";
     const open = OPEN.exec(line);
     if (open) {
-      id = open[1] ?? null;
-      local = 0;
+      if (current) current.end = index;
+      current = { id: open[1] ?? "", start: index, end: lines.length };
+      found.push(current);
       continue;
     }
-    if (id && CLOSE.test(line)) {
-      id = null;
-      local = 0;
-      continue;
+    if (!current) continue;
+    if (!line.trim() || line.startsWith("#") || /^\s/.test(line)) continue;
+    current.end = index;
+    current = null;
+  }
+  return found;
+}
+
+export function readChunks(source: string): Map<string, string> {
+  const lines = source.split("\n");
+  const chunks = new Map<string, string>();
+  for (const block of blocks(lines)) {
+    chunks.set(block.id, lines.slice(block.start, block.end).join("\n"));
+  }
+  return chunks;
+}
+
+/** Replace one top-level function or class. The rest of the program stays put. */
+export function writeChunk(source: string, id: string, body: string): string {
+  const lines = source.split("\n");
+  const block = blocks(lines).find((item) => item.id === id);
+  if (!block) return source;
+  const next = body.replace(/\s+$/, "").split("\n");
+  return [...lines.slice(0, block.start), ...next, ...lines.slice(block.end)].join("\n");
+}
+
+/** Map a 1-based line of the full program to the function or class that contains it. */
+export function chunkAtLine(source: string, line1: number): { id: string; local: number } | null {
+  const lines = source.split("\n");
+  for (const block of blocks(lines)) {
+    if (line1 >= block.start + 1 && line1 <= block.end) {
+      return { id: block.id, local: line1 - block.start };
     }
-    if (!id) continue;
-    local += 1;
-    if (index + 1 === line1) return { id, local };
   }
   return null;
 }
 
-/** 1-based line of a `# @@chunk id` marker, for scrolling the full program. */
+/** 1-based line where a top-level function or class begins. */
 export function chunkOpenLine(source: string, id: string): number | null {
   const lines = source.split("\n");
-  for (let index = 0; index < lines.length; index += 1) {
-    const open = OPEN.exec(lines[index] ?? "");
-    if (open?.[1] === id) return index + 1;
-  }
-  return null;
+  const block = blocks(lines).find((item) => item.id === id);
+  return block ? block.start + 1 : null;
 }
 
 /** Shared leading indent, so a slice can be shown flush with column 1. */

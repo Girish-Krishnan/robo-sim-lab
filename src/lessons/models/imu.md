@@ -1,6 +1,7 @@
 ---
 title: The IMU
 order: 4
+worlds: city, track, forest, warehouse
 world: city
 spawn: circle
 starter: circle
@@ -31,19 +32,19 @@ In the sim: the circle program on an open pad, so the yaw rate has a steady valu
 
 The circle program below holds $\delta$ and the throttle still, which is what makes the rate easy to predict.
 
-{{code:drive}}
+{{code:control}}
 
-## A bias becomes degrees, then metres
+## A bias becomes degrees, then meters
 
 A constant bias $b$ on the yaw gyro, integrated for $T$ seconds, is a heading error
 
 $$\Delta\theta = b\,T.$$
 
-With $b = 0.0012$ rad/s and $T = 60$ s, $\Delta\theta = 0.072$ rad, about 4.1°. After travelling a distance $s$, the cross-track contribution of a heading error is roughly $s\,\Delta\theta$ while the error is still small and growing. On an oval lap of about 200 m that is metres. The noise around the bias averages down. The bias stays.
+With $b = 0.0012$ rad/s and $T = 60$ s, $\Delta\theta = 0.072$ rad, about 4.1°. After travelling a distance $s$, the cross-track contribution of a heading error is roughly $s\,\Delta\theta$ while the error is still small and growing. On an oval lap of about 200 m that is meters. The noise around the bias averages down. The bias stays.
 
-Specific force $f$ and acceleration $a$ differ by gravity. In the world, $f = a - g$ with $g$ pointing down. On flat ground at rest, $a = 0$ and $f_z = +9.81$ in the body. A tilt $\phi$ leaks that into the horizontal axes. This course keeps the yards flat, so the accelerometer is here to make the sample look like a real IMU. Wheel speed remains the speed sensor. Integrating `accel.x` for a minute, with a bias of 0.02 m/s², invents tens of metres per second of fake speed.
+Specific force $f$ and acceleration $a$ differ by gravity. In the world, $f = a - g$ with $g$ pointing down. On flat ground at rest, $a = 0$ and $f_z = +9.81$ in the body. A tilt $\phi$ leaks that into the horizontal axes. This course keeps the yards flat, so the accelerometer is here to make the sample look like a real IMU. Wheel speed remains the speed sensor. Integrating `accel.x` for a minute, with a bias of 0.02 m/s², invents tens of meters per second of fake speed.
 
-The gyro bias and the speed bias are drawn in a fixed order from the seed. When the console numbers disagree with the lesson, check the seed before changing a gain. **Reset seed** replays the draw you already have.
+The gyro bias and the speed bias are drawn in a fixed order from `SEED` at the top of the program. When the console numbers disagree with the lesson, check that number before changing a gain. Reset run replays the draw you already have.
 
 Note: a free-body diagram draws weight as $(0, 0, -g)$. The accelerometer reports the opposite while you are standing on the floor, because it feels the floor's push.
 

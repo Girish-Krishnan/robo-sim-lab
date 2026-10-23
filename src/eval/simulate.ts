@@ -65,7 +65,7 @@ export interface RunMetrics {
   laps: number;
   lapTimes: number[];
   odomDrift: number;
-  /** Metres from the true pose to the reference polyline. Zero outside path trackers. */
+  /** Meters from the true pose to the reference polyline. Zero outside path trackers. */
   crossTrackMean: number;
   crossTrackMax: number;
   crossTrackEarly: number;

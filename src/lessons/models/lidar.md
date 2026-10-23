@@ -1,6 +1,7 @@
 ---
 title: Lidar
 order: 2
+worlds: track, forest, warehouse
 world: track
 spawn: avoid
 starter: avoid
@@ -9,7 +10,7 @@ prerequisites: getting-started/sensors
 status: ready
 ---
 
-The lidar is a spinning range finder in a plane about a metre off the ground. Each control tick you get one full scan: 270 beams across a 270° field of view, so the beams are about 1° apart. On the oval the inner wall and the cones give the fan something solid to hit.
+The lidar is a spinning range finder in a plane about a meter off the ground. Each control tick you get one full scan: 270 beams across a 270° field of view, so the beams are about 1° apart. On the oval the inner wall and the cones give the fan something solid to hit.
 
 In the sim: the oval, with the avoid program running and the scan drawn. The corner inset is the same scan from above. Amber dots are the close hits.
 
@@ -30,7 +31,7 @@ The ray starts at the roof puck. The nose of the body is about 0.7 m in front of
   <text x="16" y="58" fill="#9fd8cf" font-size="13" font-family="sans-serif">positive, left</text>
   <text x="318" y="58" fill="#e3a23a" font-size="13" font-family="sans-serif">negative, right</text>
   <path d="M196 196 A 70 70 0 0 0 284 196" fill="none" stroke="#5c6b66" stroke-width="8" stroke-linecap="round"/>
-  <text x="16" y="214" fill="#8e9b94" font-size="13" font-family="sans-serif">270 degree fan. The grey arc is the rear wedge with no beams.</text>
+  <text x="16" y="214" fill="#8e9b94" font-size="13" font-family="sans-serif">270 degree fan. The gray arc is the rear wedge with no beams.</text>
   <text x="16" y="234" fill="#8e9b94" font-size="13" font-family="sans-serif">A hit at max range is empty air, kept at 12 m.</text>
 </svg>
 
@@ -58,7 +59,7 @@ Here is that helper. `wide` is the scan after each return has blocked its neighb
 
 A beam at `max_range` missed. This line keeps that value, so empty air stays far. The right-hand side is the place to experiment.
 
-{{code:misses}}
+{{code:keep_misses}}
 
 Curbs, floor paint, and the start chevron sit below the scan plane. A map or a controller that expects them will drive over the paint and meet the wall behind it.
 
@@ -66,4 +67,4 @@ Curbs, floor paint, and the start chevron sit below the scan plane. A map or a c
 
 1. Run the avoid starter and watch the inset. Find a beam at the edge of the fan and confirm the rear is empty of rays.
 2. Print the angle and range of the shortest beam once a second. The range should fall as you approach a wall, then sit at a small number when you are close.
-3. In the misses block, change the right-hand side from `sensors.lidar.max_range` to `1.0`, so an empty beam looks like a wall a metre away. The car should brake in open space. Put `sensors.lidar.max_range` back.
+3. In the misses block, change the right-hand side from `sensors.lidar.max_range` to `1.0`, so an empty beam looks like a wall a meter away. The car should brake in open space. Put `sensors.lidar.max_range` back.

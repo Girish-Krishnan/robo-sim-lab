@@ -1,6 +1,7 @@
 ---
 title: Pure pursuit
 order: 1
+worlds: city, track, forest, warehouse
 world: track
 spawn: pursuit
 starter: pursuit
@@ -9,11 +10,11 @@ prerequisites: reactive/wall
 status: ready
 ---
 
-Pure pursuit picks a point on the path a fixed distance ahead of the pose it believes, and steers the circular arc that reaches that point. It is how you ride a bike toward a tree you picked out ahead of you: the tree is the lookahead, and the lean is the arc that would arrive there. The world publishes the path on `sensors.task.path` in the odometry frame. On the oval that path is the centreline.
+Pure pursuit picks a point on the path a fixed distance ahead of the pose it believes, and steers the circular arc that reaches that point. It is how you ride a bike toward a tree you picked out ahead of you: the tree is the lookahead, and the lean is the arc that would arrive there. The world publishes the path on `sensors.task.path` in the odometry frame. On the oval that path is the centerline.
 
 In the sim: the plan, the car, and the odometry trail are all drawn. The green line is the reference path.
 
-Each tick the starter finds the nearest point along the route, then walks forward until the point is at least `LOOKAHEAD` metres away. It transforms that point into the body frame of the odometry pose, computes a curvature, and converts curvature to a steering angle with the bicycle model. A small speed controller slows down when the steer is large: throttle follows the speed error (the P), and a little memory of that error (the I) keeps a long straight from winding the command up. That is the PI in PID. The corner is slower than the straight.
+Each tick the starter finds the nearest point along the route, then walks forward until the point is at least `LOOKAHEAD` meters away. It transforms that point into the body frame of the odometry pose, computes a curvature, and converts curvature to a steering angle with the bicycle model. A small speed controller slows down when the steer is large: throttle follows the speed error (the P), and a little memory of that error (the I) keeps a long straight from winding the command up. That is the PI in PID. The corner is slower than the straight.
 
 The starter draws the path, the lookahead point, and the arc implied by the command. All three are in the odometry frame. While the pose is still good, the arc sits on the real car. As the gyro bias accumulates, the drawn lookahead walks off the car even though the math is the same.
 
@@ -48,13 +49,13 @@ $$\delta = \arctan\left(L \cdot \frac{2\sin\alpha}{L_d}\right).$$
 
 $L$ is the wheelbase, 1.9 m. The starter clamps $\delta$ to the vehicle limit. In code, $\alpha = \operatorname{atan2}(y_{\mathrm{left}}, x_{\mathrm{forward}})$ after rotating the lookahead offset by the odometry yaw.
 
-`LOOKAHEAD` is the distance, in metres, from the car to the point it steers toward.
+`LOOKAHEAD` is the distance, in meters, from the car to the point it steers toward.
 
 {{code:tunables}}
 
 The loop that walks out to `LOOKAHEAD` and turns it into a steer command:
 
-{{code:lookahead}}
+{{code:pursuit_steer}}
 
 A longer $L_d$ cuts the corner and oscillates less. A shorter $L_d$ tracks tighter and oscillates more, and it amplifies yaw noise because a fixed lateral miss makes a larger $\alpha$ when the lookahead is short.
 

@@ -49,7 +49,7 @@ export const ACKERMANN_BUGGY: RobotDescriptor = {
       // MEMS gyro at the control rate, after a startup calibration.
       // 0.0012 rad/s is about 0.07 deg/s. Seed 1 draws nearly one sigma,
       // so the integrated heading walks about 4 deg in 60 s. On a straight
-      // that is a few metres of cross-track, under 5% of distance. White
+      // that is a few meters of cross-track, under 5% of distance. White
       // noise is small next to that bias. A larger residual (a few tenths
       // of a deg/s) is what previously turned one oval lap into a 50 m miss;
       // that was the bicycle-model steering bias, and it is not used here.

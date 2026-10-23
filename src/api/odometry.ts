@@ -44,7 +44,7 @@ export function worldToOdom(
  * Dead reckoning from wheel speed and gyro yaw rate.
  * Heading used to come from the bicycle model, `(speed / wheelbase) * tan(steer)`.
  * A constant steering bias then became a curvature bias, and one oval lap
- * walked the amber trail tens of metres off the car. A gyro bias integrates
+ * walked the amber trail tens of meters off the car. A gyro bias integrates
  * to a few degrees over a minute instead, which is what a calibrated MEMS
  * unit actually does. Wheel-speed bias only scales the distance.
  * There is no pose input: the integral cannot be seeded from ground truth.

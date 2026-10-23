@@ -1,6 +1,7 @@
 ---
 title: Wall following
 order: 3
+worlds: city, track, forest, warehouse
 world: track
 spawn: wall
 starter: wall
@@ -19,9 +20,9 @@ Outside a corner the car creeps, then turns, then picks the wall up again. If th
 
 Speed follows the situation. On a long straight with the wall parallel and nothing close in front, the car runs. Into a bend, or when the forward range drops, it slows. A fast car that waits until the side beam loses the wall has already missed the turn.
 
-The side beam and the diagonal beam come from one small helper. Centre $-90^\circ$ is the right-hand wall.
+The side beam and the diagonal beam come from one small helper. Center $-90^\circ$ is the right-hand wall.
 
-{{code:beams}}
+{{code:beam}}
 
 <svg viewBox="0 0 480 250" role="img" aria-label="Wall-follow error: side distance, target gap, and the angle alpha">
   <rect width="480" height="250" rx="12" fill="#10161a"/>
@@ -49,9 +50,9 @@ $$\delta = K_p (d^\star - d_{\mathrm{future}}) - K_d \alpha$$
 
 with $K_p = 0.16$, $K_d = 0.55$, and $L_{\mathrm{look}} = 1.8$ m. The minus on the $\alpha$ term is the damping. $\alpha$ positive means the wall is opening, and the steer turns back toward it.
 
-These three lines are that error. `future` is the distance the car will have if it holds this heading for `LOOK` metres.
+These three lines are that error. `future` is the distance the car will have if it holds this heading for `LOOK` meters.
 
-{{code:error}}
+{{code:wall_error}}
 
 The numbers in that law:
 
@@ -59,7 +60,7 @@ The numbers in that law:
 
 And the line that turns them into a steering command. $K_d$ is the damping gain on $\alpha$. $K_p$ is the gain on the distance error.
 
-{{code:steer}}
+{{code:wall_steer}}
 
 This is a PD law on distance. The derivative is the angle between two beams, available in one scan, which is steadier than a noisy range difference at 20 Hz.
 

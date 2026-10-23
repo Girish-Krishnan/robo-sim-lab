@@ -76,7 +76,7 @@ export function solidQuaternion(yaw: number, pitch: number): { x: number; y: num
 }
 
 /**
- * Props for the yard. The scan plane sits about a metre up, so anything the
+ * Props for the yard. The scan plane sits about a meter up, so anything the
  * lidar should notice is at least 1.25 m tall. Spawn (5.4, 0) is left open;
  * the drive north from there is a road with a weave, a cross street, and a
  * roundabout.

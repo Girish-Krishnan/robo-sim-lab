@@ -6,6 +6,8 @@ import { displayedOdom } from "../src/ui/hud";
 import { chunkAtLine, readChunks } from "../src/editor/chunks";
 import { formatStudentError } from "../src/editor/errors";
 import { EXAMPLES } from "../src/editor/examples";
+import { readProgramSeed, readStartPose, poseProblem } from "../src/editor/program-header";
+import { solidsFor } from "../src/eval/scenarios";
 import { spawnFor, worldSpawn } from "../src/sim/spawns";
 import type { WorldId } from "../src/sim/worlds";
 
@@ -79,7 +81,7 @@ describe("course catalog", () => {
     const html = renderMarkdown(lesson?.markdown ?? "");
     expect(html).toContain("<details");
     expect(html).toContain("Going further");
-    expect(html).toContain("modest favourite");
+    expect(html).toContain("modest favorite");
     expect(html).not.toContain("&lt;details");
   });
 
@@ -94,7 +96,7 @@ describe("course catalog", () => {
     expect(rendered).toContain("katex-display");
     expect(rendered).toContain("<svg");
     expect(rendered).toContain('class="code-slot"');
-    expect(rendered).toContain('data-chunk="drive"');
+    expect(rendered).toContain('data-chunk="control"');
   });
 
   it("keeps every ready lesson's kind of start in every world", () => {
@@ -132,23 +134,47 @@ describe("course catalog", () => {
     }
   });
 
-  it("maps a student traceback onto the slice that contains the line", () => {
-    const source = ["# @@chunk tunables", "N = 40", "# @@end", "def control(sensors):", "    return sensors.missing", "# @@chunk drive", "    return 0.34, 0.5", "# @@end"].join("\n");
-    expect(chunkAtLine(source, 2)).toEqual({ id: "tunables", local: 1 });
-    expect(chunkAtLine(source, 7)).toEqual({ id: "drive", local: 1 });
+  it("maps a student traceback onto the function that contains the line", () => {
+    const source = ["def tunables():", "    N = 40", "", "def control(sensors):", "    return sensors.missing"].join("\n");
+    expect(chunkAtLine(source, 2)).toEqual({ id: "tunables", local: 2 });
+    expect(chunkAtLine(source, 5)).toEqual({ id: "control", local: 2 });
     const formatted = formatStudentError(
       'Traceback (most recent call last):\n  File "/lib/python3.13/_pyodide/_base.py", line 1, in eval\n  File "student.py", line 5, in _robo_step\nAttributeError: missing',
       source,
     );
     expect(formatted.text.startsWith("AttributeError: missing")).toBe(true);
-    expect(formatted.text).toContain("line 5 of the program");
+    expect(formatted.text).toContain("line 2 of control");
     expect(formatted.text).toContain("sensors has time");
     expect(formatted.text).not.toContain("_pyodide");
     expect(formatted.text).not.toContain("_robo_step");
     const inSlice = formatStudentError('File "student.py", line 2\nSyntaxError: bad', source);
     expect(inSlice.chunk).toBe("tunables");
-    expect(inSlice.local).toBe(1);
+    expect(inSlice.local).toBe(2);
     expect(inSlice.text.startsWith("SyntaxError: bad")).toBe(true);
-    expect(inSlice.text).toContain("line 1 of tunables");
+    expect(inSlice.text).toContain("line 2 of tunables");
+  });
+
+  it("reads SEED and a per-world start from the program", () => {
+    const source = 'SEED = 4\nSTART_POSE = {\n    "track": (16, -20, 0),\n    "city": (1, 2, 90),\n}\n';
+    expect(readProgramSeed(source)).toBe(4);
+    expect(readProgramSeed("def control(sensors):\n    return 0, 0\n")).toBe(1);
+    expect(readStartPose(source, "track")).toEqual({ x: 16, y: -20, heading: 0 });
+    expect(readStartPose(source, "forest")).toBeNull();
+    expect(readStartPose("START_POSE = (3, 4, 180)\n", "city")).toEqual({ x: 3, y: 4, heading: 180 });
+    expect(poseProblem([], 200, 0)).toBe("off the map");
+  });
+
+  it("accepts every example start, and keeps the filter free of placeholder functions", () => {
+    for (const example of EXAMPLES) {
+      expect(example.source).toContain("SEED = 1");
+      expect(example.source).not.toContain("@@chunk");
+      expect(example.source).not.toContain("def augment(");
+      expect(example.source).not.toContain("def explore(");
+      for (const world of ["city", "track", "forest", "warehouse"] as const) {
+        const pose = readStartPose(example.source, world);
+        expect(pose, `${example.id} ${world}`).toBeTruthy();
+        expect(poseProblem(solidsFor(world), pose!.x, pose!.y), `${example.id} ${world}`).toBeNull();
+      }
+    }
   });
 });

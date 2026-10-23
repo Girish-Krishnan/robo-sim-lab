@@ -96,7 +96,7 @@ function ribbon(points: THREE.Vector3[], color: string, half = 0.08, onTop = fal
   return mesh;
 }
 
-/** A few centimetres off the floor. Pixel size, so a cloud stays a cloud. */
+/** A few centimeters off the floor. Pixel size, so a cloud stays a cloud. */
 const DOT_Y = 0.04;
 const TICK_Y = 0.06;
 const TICK_LENGTH = 0.28;
@@ -120,7 +120,7 @@ function pointCloud(
   return dots;
 }
 
-/** 2-sigma radius of the cloud, in metres. Under a metre the filter has pulled in. */
+/** 2-sigma radius of the cloud, in meters. Under a meter the filter has pulled in. */
 function cloudSpread(points: { x: number; y: number }[]): number {
   if (points.length < 2) return 0;
   let mx = 0;
@@ -217,7 +217,7 @@ function markers(spawn: SpawnPose, points: { x: number; y: number; yaw?: number;
   return group;
 }
 
-/** 28 cm heading marks. A few centimetres wide so the tick survives a far camera. */
+/** 28 cm heading marks. A few centimeters wide so the tick survives a far camera. */
 function headingTicks(
   spawn: SpawnPose,
   points: { x: number; y: number; yaw?: number; w?: number }[],

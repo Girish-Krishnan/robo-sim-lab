@@ -6,14 +6,14 @@ import type { Solid } from "./course";
 const RESOLUTION = 0.5;
 /** Cap so a yard cannot turn the 20 Hz message into a huge grid. */
 const MAX_CELLS = 240;
-/** Metres of map kept around the route, enough for a 12 m scan plus the car. */
+/** Meters of map kept around the route, enough for a 12 m scan plus the car. */
 const FOCUS_PAD = 14;
 const SCAN = 1.06;
 
 /**
  * A prebuilt map in the odometry frame at this spawn.
  * Occupied cells are where a lidar at scan height would see a solid.
- * `field` is a chamfer distance to those cells, in centimetres, so a
+ * `field` is a chamfer distance to those cells, in centimeters, so a
  * particle filter can look weights up instead of raycasting.
  * Ground-truth pose is not an input and is not an output.
  */
@@ -186,7 +186,7 @@ function inWindow(
   );
 }
 
-/** Chamfer distance in centimetres, clipped at 2.55 m. 0 is an occupied cell. */
+/** Chamfer distance in centimeters, clipped at 2.55 m. 0 is an occupied cell. */
 function distanceCentimetres(occupied: Uint8Array, width: number, height: number, resolution: number): Uint8Array {
   const diag = 1.41421356237;
   const inf = 1e6;
@@ -218,8 +218,8 @@ function distanceCentimetres(occupied: Uint8Array, width: number, height: number
   }
   const out = new Uint8Array(width * height);
   for (let i = 0; i < d.length; i++) {
-    const metres = d[i]! * resolution;
-    out[i] = metres >= 2.55 ? 255 : Math.max(0, Math.round(metres * 100));
+    const meters = d[i]! * resolution;
+    out[i] = meters >= 2.55 ? 255 : Math.max(0, Math.round(meters * 100));
   }
   return out;
 }

@@ -3,15 +3,16 @@ title: Noise and bias
 order: 5
 world: track
 spawn: pursuit
-starter: pursuit
-action: lab
+worlds: city, track, forest, warehouse
+starter: none
+action: drive
 prerequisites: models/imu
 status: ready
 ---
 
 The plots look jittery, and they also look slowly wrong. Those are two different animals. White noise is a fresh coin flip every sample. Bias is one coin flip at the start of the run, then held, so the late error is that single draw, grown up.
 
-In the sim: pure pursuit on the oval, seed 1. The late blue trail is that held bias. The Time row under the view is the clock these sentences use. Pause stops the car and the clock together.
+In the sim: you drive the oval, seed 1. The colored trail is the car and the blue trail is the guess. The graph is the distance between them as the clock runs. Pause stops the car, the clock, and the graph together. The same drive works in the other worlds.
 
 <svg viewBox="0 0 520 240" role="img" aria-label="White noise jitters around the truth. A bias walks away and stays walked away.">
   <rect width="520" height="240" rx="12" fill="#0e1418"/>
@@ -26,9 +27,9 @@ In the sim: pure pursuit on the oval, seed 1. The late blue trail is that held b
 
 **White noise** is a fresh random number every sample. On the lidar it is about 2 cm. On wheel speed it is about 2 cm/s. On the gyro it is about 0.002 rad/s. Averaged over a second of 20 Hz control, a lot of it shrinks.
 
-**Bias** is drawn once from the seed and then held. Reset run replays that same draw. Speed bias scales every metre you travel. Gyro bias turns every second into a little extra yaw. Steering bias shows up on `steering_angle` and stays out of the pose. A heading you build from $\tan(\delta)$ puts that bias back into the curvature, and the blue trail leaves the oval.
+**Bias** is drawn once from the seed and then held. Reset run replays that same draw. Speed bias scales every meter you travel. Gyro bias turns every second into a little extra yaw. Steering bias shows up on `steering_angle` and stays out of the pose. A heading you build from $\tan(\delta)$ puts that bias back into the curvature, and the blue trail leaves the road.
 
-Type a new number in the Seed box and press Enter to draw a different bias. Reset run, with the box left alone, replays the one you have.
+This page has no program, so the draw is seed 1. Reset run replays it. Open Code and change `SEED` at the top of the file when you want a different coin flip.
 
 ## Each sensor, written as an equation
 
@@ -44,7 +45,7 @@ That is a 2 cm Gaussian. Beams that miss stay at $r_{\max} = 12$ m. The noise st
 
 $$v_{\mathrm{odom}} = v(1 + b_v) + \mathcal{N}(0, \sigma_v^2)$$
 
-with $\sigma_v = 0.02$ m/s and $b_v \sim \mathcal{N}(0, 0.012^2)$. The 0.012 is a 1.2% scale bias, drawn once and then held, so it stretches every metre by the same fraction.
+with $\sigma_v = 0.02$ m/s and $b_v \sim \mathcal{N}(0, 0.012^2)$. The 0.012 is a 1.2% scale bias, drawn once and then held, so it stretches every meter by the same fraction.
 
 **Gyro.** The true yaw rate $\omega$ is published as
 
@@ -66,20 +67,16 @@ A gyro bias $b_\omega$ shifts every sample by the same amount. Integrated, that 
 
 $$\theta(t) = \theta_{\mathrm{true}}(t) + b_\omega t + \text{averaged noise}.$$
 
-Cross-track on a path tracker that trusts $\theta$ then grows with time even when the feedback law is steady. On the oval, pure pursuit's cross-track against the true centreline is about **0.18 m in the first 15 seconds** and about **2.23 m after 45 seconds**. Same gains. The late number is the bias, integrated.
+A heading error then grows with time even when your hands are steady. Drive a long straight and watch the graph: the early gap is small, and the late gap is the bias, integrated. The drift lesson puts a path tracker on this same guess and measures what that costs. On the oval that controller's cross-track against the true centerline is about 0.18 m in the first 15 seconds and about 2.23 m after 45 seconds. Same gains. The late number is this bias.
 
 Lidar noise stays local. A wall that was 3.20 m away is still about 3.20 m away a minute later, plus or minus 2 cm. A map plus a lidar can therefore correct a pose that odometry has walked away.
 
-The program below is the pursuit law riding that drifting pose. The gains stay put. The blue trail leaves because the pose they steer from is biased.
-
-{{code:lookahead}}
-
-On the view, the coloured line is where the car went and the blue line is odometry. The key on the view uses the same colours.
+On the view, the colored line is where the car went and the blue line is odometry. The key on the view uses the same colors. The graph is that gap, live, in meters.
 
 Note: smoothing the gyro to "take the bias out" also takes the turn out, until another sensor says which part was the turn. The particle filter later in the course is that other sensor.
 
 ## Try it
 
-1. Run pure pursuit on the oval. At about 10 s on the Time row the blue trail should still be subtle. Late in the minute it should be obvious. Pause if you want to look.
-2. Type `2` in the Seed box and press Enter. The direction of the drift should change, or its size should. The controller source stayed put. Reset run with seed 2 replays that new bias.
-3. Print the forward lidar range once a second on a straight. The number should jitter by centimetres. That is the contrast with yaw.
+1. Drive the east straight, then keep going. At about 10 s the blue trail is still subtle. Late in the minute it should be obvious, and the graph should say so. Pause if you want to look.
+2. Press Reset run and drive the same way. The peel should come back on the same side. That is seed 1 again.
+3. Creep toward a wall and watch the lidar inset. The ranges jitter by centimeters. The heading does not jitter itself back onto the truth. That is the contrast.

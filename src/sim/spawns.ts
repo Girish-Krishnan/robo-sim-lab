@@ -19,8 +19,8 @@ export function circleRadius(): number {
 
 /**
  * Open pads where a constant left circle stays clear of walls.
- * The car starts on the circle, west of the centre, nose along +Z,
- * so the centre sits on the driver's left.
+ * The car starts on the circle, west of the center, nose along +Z,
+ * so the center sits on the driver's left.
  */
 const CIRCLE_CENTER: Record<SpawnWorld, { x: number; z: number }> = {
   city: { x: 5.5, z: -30 },

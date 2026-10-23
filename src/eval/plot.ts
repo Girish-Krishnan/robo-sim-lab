@@ -10,7 +10,7 @@ export interface PathRaster {
 }
 
 /**
- * Top-down path plot. Truth is coloured by speed, odometry is amber,
+ * Top-down path plot. Truth is colored by speed, odometry is amber,
  * and a new contact is a red mark. This file is evaluation-only.
  */
 export function renderPathPlot(
@@ -50,7 +50,7 @@ export function paintPathPlot(
     maxZ = Math.max(maxZ, z + pad);
   };
   // Frame on the path. Taking in every solid shrinks a lap to a speck
-  // on the whole yard, and a few metres of drift disappears.
+  // on the whole yard, and a few meters of drift disappears.
   for (const sample of trail) {
     grow(sample.x, sample.z, 8);
     grow(sample.odomX, sample.odomZ, 8);
@@ -333,18 +333,18 @@ function drawLegend(
 function drawScaleBar(rgba: Uint8Array, width: number, height: number, span: number): void {
   const plotPx = width - 72;
   const metresPerPx = span / plotPx;
-  let metres = 5;
+  let meters = 5;
   for (const choice of [5, 10, 20, 50, 100]) {
-    if (choice / metresPerPx <= 160) metres = choice;
+    if (choice / metresPerPx <= 160) meters = choice;
   }
-  const px = metres / metresPerPx;
+  const px = meters / metresPerPx;
   const x1 = width - 28;
   const x0 = x1 - px;
   const y = height - 28;
   line(rgba, width, height, x0, y, x1, y, 230, 236, 230, 255, 2);
   line(rgba, width, height, x0, y - 5, x0, y + 5, 230, 236, 230, 255, 2);
   line(rgba, width, height, x1, y - 5, x1, y + 5, 230, 236, 230, 255, 2);
-  const label = `${metres} m`;
+  const label = `${meters} m`;
   text(rgba, width, height, x0 + px / 2 - label.length * 6, y - 18, label, 2);
 }
 
