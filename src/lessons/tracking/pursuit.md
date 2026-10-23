@@ -10,11 +10,11 @@ prerequisites: reactive/wall
 status: ready
 ---
 
-Pick a point ahead of you and steer the arc that would land on it. That is pure pursuit, the way you ride a bike toward a tree you picked out: the tree is the lookahead, and the lean is the arc that would arrive there. The point sits a fixed distance ahead of the pose the car believes. The world publishes the path on `sensors.task.path` in the odometry frame. On the oval that path is the centerline.
+Pick a point ahead of you and steer the arc that would land on it. That is pure pursuit. The point sits a fixed distance ahead of the pose the car believes. The world publishes the path on `sensors.task.path` in the odometry frame. On the oval that path is the centerline.
 
 In the sim: the plan, the car, and the odometry trail are all drawn. The green line is the reference path.
 
-Each tick the starter finds the nearest point along the route, then walks forward until the point is at least `LOOKAHEAD` meters away. It transforms that point into the body frame of the odometry pose, computes a curvature, and converts curvature to a steering angle with the bicycle model. A small speed controller slows down when the steer is large: throttle follows the speed error (the P), and a little memory of that error (the I) keeps a long straight from winding the command up. That is the PI in PID. The corner is slower than the straight.
+Every tick, the car picks a spot `LOOKAHEAD` meters down the route and steers for it, like a dog chasing a ball you keep throwing. It transforms that point into the body frame of the odometry pose, computes a curvature, and converts curvature to a steering angle with the bicycle model. A small speed controller slows down when the steer is large: throttle follows the speed error (the P), and a little memory of that error (the I) keeps a long straight from winding the command up. That is the PI in PID. The corner is slower than the straight.
 
 The starter draws the path, the lookahead point, and the arc implied by the command. All three are in the odometry frame. While the pose is still good, the arc sits on the real car. As the gyro bias accumulates, the drawn lookahead walks off the car even though the math is the same.
 
@@ -49,9 +49,9 @@ $$\delta = \arctan\left(L \cdot \frac{2\sin\alpha}{L_d}\right).$$
 
 $L$ is the wheelbase, 1.9 m. The starter clamps $\delta$ to the vehicle limit. In code, $\alpha = \operatorname{atan2}(y_{\mathrm{left}}, x_{\mathrm{forward}})$ after rotating the lookahead offset by the odometry yaw.
 
-`LOOKAHEAD` is the distance, in meters, from the car to the point it steers toward.
+`LOOKAHEAD` is the distance, in meters, from the car to the point it steers toward. It sits at the top of the program with the wheelbase.
 
-{{code:tunables}}
+{{code:settings}}
 
 The loop that walks out to `LOOKAHEAD` and turns it into a steer command:
 
@@ -68,5 +68,5 @@ Speed is a second loop. Wide-open throttle lets the corner radius grow from slip
 ## Try it
 
 1. Run the starter on the oval. You should complete a lap. The yellow lookahead point should stay ahead of the car at the start.
-2. Set `LOOKAHEAD` to `1.4` and run again. The steering should twitch more, and the path should look tighter.
+2. In the settings above, set `LOOKAHEAD` to `1.4` and run again. The steering should twitch more, and the path should look tighter.
 3. Set `LOOKAHEAD` to `6` and run again. The car should cut the corners and look steady. Put `3.2` back before you leave.

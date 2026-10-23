@@ -7,6 +7,7 @@ interface Block {
 }
 
 const OPEN = /^(?:async\s+def|def|class)\s+([A-Za-z_][A-Za-z0-9_]*)/;
+const CONSTANT = /^(?:[A-Z][A-Z0-9_]*\s*,\s*)*[A-Z][A-Z0-9_]*\s*=/;
 
 function blocks(lines: string[]): Block[] {
   const found: Block[] = [];
@@ -28,10 +29,46 @@ function blocks(lines: string[]): Block[] {
   return found;
 }
 
+/** Plain constant assignments between the imports and the first function. */
+function settingsBlock(lines: string[]): Block | null {
+  let lastImport = -1;
+  let firstCode = lines.length;
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index] ?? "";
+    if (/^(?:import |from )/.test(line)) lastImport = index;
+    if (/^(?:async\s+def|def|class)\s+/.test(line)) {
+      firstCode = index;
+      break;
+    }
+  }
+  let start = -1;
+  let end = -1;
+  for (let index = lastImport + 1; index < firstCode; index += 1) {
+    const line = lines[index] ?? "";
+    if (!line.trim() || line.startsWith("#")) continue;
+    if (!CONSTANT.test(line)) {
+      if (start >= 0) break;
+      continue;
+    }
+    if (start < 0) start = index;
+    end = index + 1;
+  }
+  if (start < 0 || end < 0) return null;
+  return { id: "settings", start, end };
+}
+
+function allBlocks(lines: string[]): Block[] {
+  const found = blocks(lines);
+  const settings = settingsBlock(lines);
+  if (settings) found.push(settings);
+  found.sort((a, b) => a.start - b.start || a.end - b.end);
+  return found;
+}
+
 export function readChunks(source: string): Map<string, string> {
   const lines = source.split("\n");
   const chunks = new Map<string, string>();
-  for (const block of blocks(lines)) {
+  for (const block of allBlocks(lines)) {
     chunks.set(block.id, lines.slice(block.start, block.end).join("\n"));
   }
   return chunks;
@@ -40,7 +77,7 @@ export function readChunks(source: string): Map<string, string> {
 /** Replace one top-level function or class. The rest of the program stays put. */
 export function writeChunk(source: string, id: string, body: string): string {
   const lines = source.split("\n");
-  const block = blocks(lines).find((item) => item.id === id);
+  const block = allBlocks(lines).find((item) => item.id === id);
   if (!block) return source;
   const next = body.replace(/\s+$/, "").split("\n");
   return [...lines.slice(0, block.start), ...next, ...lines.slice(block.end)].join("\n");
@@ -49,7 +86,7 @@ export function writeChunk(source: string, id: string, body: string): string {
 /** Map a 1-based line of the full program to the function or class that contains it. */
 export function chunkAtLine(source: string, line1: number): { id: string; local: number } | null {
   const lines = source.split("\n");
-  for (const block of blocks(lines)) {
+  for (const block of allBlocks(lines)) {
     if (line1 >= block.start + 1 && line1 <= block.end) {
       return { id: block.id, local: line1 - block.start };
     }
@@ -60,7 +97,7 @@ export function chunkAtLine(source: string, line1: number): { id: string; local:
 /** 1-based line where a top-level function or class begins. */
 export function chunkOpenLine(source: string, id: string): number | null {
   const lines = source.split("\n");
-  const block = blocks(lines).find((item) => item.id === id);
+  const block = allBlocks(lines).find((item) => item.id === id);
   return block ? block.start + 1 : null;
 }
 

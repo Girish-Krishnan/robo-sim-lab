@@ -10,7 +10,7 @@ prerequisites: getting-started/sensors
 status: ready
 ---
 
-Take the wheel. Before any controller exists, you should feel what this car can do. The keys send the same pair a Python program returns: a steering angle and a throttle. The simulator slews the steering, so full lock arrives over a few frames, the way a steering rack does.
+Take the wheel. Before any controller exists, feel what this car can do. The keys send the same pair a Python program returns: a steering angle and a throttle. Tap D and watch the wheels swing over a beat later. Real steering takes time to turn too.
 
 W or the up arrow drives forward. S or down reverses, more gently than full forward. A or left steers left. D or right steers right. Space brakes. R resets the world while you are driving by hand.
 

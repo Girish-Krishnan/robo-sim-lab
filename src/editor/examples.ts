@@ -108,11 +108,7 @@ const avoid = `${programPreamble("avoid")}# Lidar avoid
 import math
 import numpy as np
 
-def tunables():
-    global HALF
-    HALF = 1.35
-
-tunables()
+HALF = 1.35
 
 class Run:
     def __init__(self):
@@ -303,14 +299,10 @@ const wall = `${programPreamble("wall")}# Wall follow
 import math
 import numpy as np
 
-def tunables():
-    global TARGET, LOOK, KP, KD
-    TARGET = 3.2
-    LOOK = 1.8
-    KP = 0.16
-    KD = 0.55
-
-tunables()
+TARGET = 3.2
+LOOK = 1.8
+KP = 0.16
+KD = 0.55
 WHEELBASE = 1.9
 
 class Run:
@@ -499,12 +491,7 @@ import math
 
 WHEELBASE = ${wheelbase}
 MAX_STEER = ${maxSteer}
-
-def tunables():
-    global LOOKAHEAD
-    LOOKAHEAD = 3.2
-
-tunables()
+LOOKAHEAD = 3.2
 
 class Run:
     def __init__(self):

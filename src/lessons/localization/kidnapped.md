@@ -40,9 +40,9 @@ In the sim, the camera stays overhead and the view holds that first cloud for 2 
   <text x="24" y="244" fill="#d5ddd8" font-size="15" font-family="sans-serif">After the hold the guesses sit on the car, and the car drives.</text>
 </svg>
 
-`UNKNOWN_START` is true here. Most of the 720 particles start in empty space, each with a random heading. A few sit on the route at twelve headings, so one of them can land on the car. The camera stays overhead while that cloud fills the yard.
+`UNKNOWN_START` is true here. Most of the 720 particles start in empty space, each with a random heading. A few sit on the route at twelve headings, so one of them can land on the car. The camera stays overhead while that cloud fills the world.
 
-{{code:tunables}}
+{{code:settings}}
 
 On seed 1 the car waits out the 2 s hold. The guesses close on the car during that hold, and when it ends the car drives. By about 4 s it is cruising at about 4 m/s.
 
@@ -65,6 +65,6 @@ The oval's two straights share wall distances, so a second clump can survive on 
 
 ## Try it
 
-1. Run the kidnapped starter and watch the Time row. For 2 s the speed stays 0, the camera stays overhead, and the pink dots cover the yard. That hold is the prior, shown for 2 s.
+1. Run the kidnapped starter and watch the Time row. For 2 s the speed stays 0, the camera stays overhead, and the pink dots cover the world. That hold is the prior, shown for 2 s.
 2. At 2 s the dots sit on the car and the ring tightens. By about 4 s the car is cruising.
 3. Turn on Drive it yourself. Lesson speed stays near 3 m/s. The cloud keeps scoring the scan. In the warehouse the weight can stay shared for longer after the same 2 s hold.

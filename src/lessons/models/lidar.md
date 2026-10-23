@@ -1,7 +1,7 @@
 ---
 title: Lidar
 order: 2
-worlds: track, forest, warehouse
+worlds: track, forest
 world: track
 spawn: avoid
 starter: avoid
@@ -16,7 +16,7 @@ In the sim: the oval, with the avoid program running and the scan drawn. The cor
 
 Angle 0 points forward. Positive angles point to the driver's left. The rear 90° is a blank wedge, so something directly behind the car stays invisible until you yaw.
 
-A beam that hits nothing is reported as `max_range`, 12 m. Treat "equal to max range" as empty air. Every real controller in this course does. Range noise is about 2 cm, one sigma, in the band of a small outdoor lidar such as a Hokuyo UST-10LX. We publish every fourth hardware angle so the browser can keep up. The field of view and the 12 m range stay.
+A beam that hits nothing is reported as `max_range`, 12 m. Treat "equal to max range" as empty air. Every real controller in this course does. Range noise is about 2 cm, one sigma, in the band of a small outdoor lidar such as a Hokuyo UST-10LX. 270 beams: enough to spot every cone on the track.
 
 The ray starts at the roof puck. The nose of the body is about 0.7 m in front of that puck, so a program that drives until the forward range is 0.2 m has already arrived.
 
@@ -51,7 +51,7 @@ The 0.46 m is the puck's forward offset from the body origin. The localization l
 
 The right-hand wall in the wall-follow lesson is the beam near $-\pi/2$. Positive is left. A controller that flips that sign orbits the other way.
 
-Trees and shelf uprights are thinner than the gap the car needs. One long beam between two trunks can be a crack the bumper will never fit. The avoid program paints a wedge about as wide as the car around each hit, then looks for an opening in what remains.
+Trees are thinner than the gap the car needs. One long beam between two trunks can be a crack the bumper will never fit. The avoid program paints a wedge about as wide as the car around each hit, then looks for an opening in what remains. The warehouse stays off this page: those aisles are tighter than this starter, and the oval and the forest are where it stays clean.
 
 Here is that helper. `wide` is the scan after each return has blocked its neighbors.
 

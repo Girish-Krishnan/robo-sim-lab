@@ -18,7 +18,7 @@ In the sim: both the command and the wheel angle are on the readout under the vi
 
 The lidar sits on the roof, about 0.46 m ahead of the body center and a bit over a meter off the ground. Walls, trunks, shelves, and cones reach it. A curb is below the scan.
 
-The bicycle lesson writes the turn as one equation and names the coordinate frames. Here: just the car. The math comes in the bicycle lesson. Throttle near 0 applies a small hold brake, so letting go of the key is a gentle stop.
+For now, just meet the car. The math gets its own lesson. Throttle near 0 applies a small hold brake, so letting go of the key is a gentle stop.
 
 ## Try it
 

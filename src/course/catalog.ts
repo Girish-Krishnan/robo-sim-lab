@@ -88,9 +88,9 @@ export function resolveSpawn(lesson: Lesson): SpawnPose {
 }
 
 /**
- * The lesson's start, in whichever world is on screen. Switching yards
+ * The lesson's start, in whichever world is on screen. Switching worlds
  * keeps the same kind of start (circle pad, wall, route, avoid) instead
- * of dropping back to that yard's driving spawn.
+ * of dropping back to that world's driving spawn.
  */
 export function resolveSpawnIn(lesson: Lesson, world: WorldId): SpawnPose {
   if (lesson.spawn === "default") return worldSpawn(world);

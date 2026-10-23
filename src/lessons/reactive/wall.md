@@ -18,7 +18,7 @@ Two beams do most of the work. The beam near $-90^\circ$ measures the side dista
 
 Outside a corner the car creeps, then turns, then picks the wall up again. If the bumper is in the wall, it reverses. Positive steer while going backward yaws the nose right, because yaw rate flips with the sign of speed. The starter's backup uses that.
 
-Speed follows the situation. On a long straight with the wall parallel and nothing close in front, the car runs. Into a bend, or when the forward range drops, it slows. A fast car that waits until the side beam loses the wall has already missed the turn.
+Open road? Go. Wall closing in? Ease off. On a long straight with the wall parallel and nothing close in front, the car runs. Into a bend, or when the forward range drops, it slows. A fast car that waits until the side beam loses the wall has already missed the turn.
 
 The side beam and the diagonal beam come from one small helper. Center $-90^\circ$ is the right-hand wall.
 
@@ -54,9 +54,9 @@ These three lines are that error. `future` is the distance the car will have if 
 
 {{code:wall_error}}
 
-The numbers in that law:
+The numbers in that law live at the top of the program:
 
-{{code:tunables}}
+{{code:settings}}
 
 And the line that turns them into a steering command. $K_d$ is the damping gain on $\alpha$. $K_p$ is the gain on the distance error.
 
@@ -71,5 +71,5 @@ The oval should complete a lap with the car clear of the wall. If you raise $K_p
 ## Try it
 
 1. Run the starter on the oval. It should stay off the wall and the cones and finish a lap.
-2. In the tunables block, set `KD` to `0` and run the same straight. The car should wander toward and away from the wall.
+2. In the settings above, set `KD` to `0` and run the same straight. The car should wander toward and away from the wall.
 3. In the steer block, change `- KD * alpha` to `+ KD * alpha`. The corner should throw the car off the wall. Put the minus sign back.

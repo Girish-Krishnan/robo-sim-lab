@@ -435,7 +435,7 @@ function worldNote(lesson: Lesson): string {
   const home = label(lesson.world);
   const others = lesson.worlds.filter((id) => id !== lesson.world).map(label);
   if (others.length === 0) {
-    return `This lesson is written for ${home}. The World menu stays on that yard.`;
+    return `This lesson is written for ${home}. The World menu stays on that world.`;
   }
   return `This lesson also runs in ${others.join(", ")}. Pick one from World. The numbers in the text are for ${home}.`;
 }

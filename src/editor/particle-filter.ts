@@ -63,18 +63,14 @@ import base64
 import math
 import numpy as np
 
-def tunables():
-    global UNKNOWN_START, N, TRACK_SPREAD, BEAMS, SIGMA, LAND_SIGMA, WHEELBASE, LOOKAHEAD
-    UNKNOWN_START = ${unknown}
-    N = ${count}
-    TRACK_SPREAD = 0.25
-    BEAMS = 40
-    SIGMA = 0.5
-    LAND_SIGMA = 0.35
-    WHEELBASE = ${wheelbase}
-    LOOKAHEAD = 3.2
-
-tunables()
+UNKNOWN_START = ${unknown}
+N = ${count}
+TRACK_SPREAD = 0.25
+BEAMS = 40
+SIGMA = 0.5
+LAND_SIGMA = 0.35
+WHEELBASE = ${wheelbase}
+LOOKAHEAD = 3.2
 LIDAR_FORWARD = 0.46
 A1, A2, A3, A4 = 0.03, 0.04, 0.06, 0.03
 
@@ -96,60 +92,44 @@ class Run:
         self.wall_gap = 3.2
         self.wall_held = False
         self.wall_preview = False
+        self.particles = None
+        self.prev_odom = None
+        self.trail = []
+        self.held_pose = None
+        self.field_grid = None
+        self.field_stamp = None
+        self.marks = None
+        self.marks_stamp = None
+        self.near = None
+        self.near_stamp = None
+        self.free_src = None
+        self.free_xs = None
+        self.free_ys = None
 
 run = Run()
-particles = None
-prev_odom = None
-trail = []
-held_pose = None
-_field_grid = None
-_field_stamp = None
-_marks = None
-_marks_stamp = None
-_near = None
-_near_stamp = None
-_free_src = None
-_free_xs = None
-_free_ys = None
 
 def init(sensors):
-    global run, particles, prev_odom, trail, held_pose
-    global _field_grid, _field_stamp, _marks, _marks_stamp, _near, _near_stamp
-    global _free_src, _free_xs, _free_ys
+    global run
     run = Run()
-    particles = None
-    prev_odom = None
-    trail = []
-    held_pose = None
-    _field_grid = None
-    _field_stamp = None
-    _marks = None
-    _marks_stamp = None
-    _near = None
-    _near_stamp = None
-    _free_src = None
-    _free_xs = None
-    _free_ys = None
     distance_field(sensors.task.map)
 
 def control(sensors):
-    global particles, prev_odom, held_pose
     m = sensors.task.map
     field = distance_field(m)
-    if particles is None:
-        particles = initial_cloud(m, field, sensors.task.path)
+    if run.particles is None:
+        run.particles = initial_cloud(m, field, sensors.task.path)
 
     pose = sensors.odometry.pose
     odom_dx, odom_dy, odom_dyaw = 0.0, 0.0, 0.0
-    if prev_odom is not None:
-        odom_dx = pose.x - prev_odom[0]
-        odom_dy = pose.y - prev_odom[1]
-        odom_dyaw = wrap(pose.yaw - prev_odom[2])
+    if run.prev_odom is not None:
+        odom_dx = pose.x - run.prev_odom[0]
+        odom_dy = pose.y - run.prev_odom[1]
+        odom_dyaw = wrap(pose.yaw - run.prev_odom[2])
         run.moved += math.hypot(odom_dx, odom_dy)
-        apply_motion(particles, prev_odom, (pose.x, pose.y, pose.yaw))
-    prev_odom = (pose.x, pose.y, pose.yaw)
+        apply_motion(run.particles, run.prev_odom, (pose.x, pose.y, pose.yaw))
+    run.prev_odom = (pose.x, pose.y, pose.yaw)
 
-    weights, log_mean, log_best = likelihood(particles, sensors, field, m)
+    weights, log_mean, log_best = likelihood(run.particles, sensors, field, m)
     just_locked = False
     if UNKNOWN_START and run.locked == 0:
         # Count control ticks, not sensors.time. Reset does not zero the
@@ -159,50 +139,50 @@ def control(sensors):
         sharp = np.maximum(weights, 0.0) ** 3
         total_w = float(np.sum(sharp))
         belief = sharp / total_w if total_w > 0.0 else np.full(N, 1.0 / N)
-        facing = np.abs(wrap_array(particles[:, 2])) < 0.45
+        facing = np.abs(wrap_array(run.particles[:, 2])) < 0.45
         score = np.where(facing, belief, -1.0)
-        best = particles[int(np.argmax(score if float(np.max(score)) > 0.0 else belief))]
+        best = run.particles[int(np.argmax(score if float(np.max(score)) > 0.0 else belief))]
         peak = float(np.max(belief))
-        if held_pose is None:
+        if run.held_pose is None:
             # One scan picks the corridor. After that the wheels carry it;
             # the other straight is not allowed to drag the pose across.
             estimate = (float(best[0]), float(best[1]), float(best[2]))
         else:
-            estimate = (held_pose[0] + odom_dx, held_pose[1] + odom_dy, wrap(held_pose[2] + odom_dyaw))
+            estimate = (run.held_pose[0] + odom_dx, run.held_pose[1] + odom_dy, wrap(run.held_pose[2] + odom_dyaw))
             # A sharper winner nearby replaces the guess. A jump across the
             # infield does not: that is the other oval straight.
             if peak > 0.07 and math.hypot(float(best[0]) - estimate[0], float(best[1]) - estimate[1]) < 5.0:
                 yaw = float(best[2]) if abs(wrap(float(best[2]) - estimate[2])) < 0.6 else estimate[2]
                 estimate = (float(best[0]), float(best[1]), yaw)
-        held_pose = estimate
+        run.held_pose = estimate
         # City and forest put almost all the weight on one particle. The
         # oval's best particle is only about a tenth, and that is already
         # the right straight. The warehouse bay stays near a few percent
         # until the car has moved, so it is not collapsed yet.
         if run.ticks >= 9 and peak > 0.07:
-            particles = np.column_stack((
-                held_pose[0] + run.rng.normal(0.0, 0.12, N),
-                held_pose[1] + run.rng.normal(0.0, 0.12, N),
-                wrap_array(held_pose[2] + run.rng.normal(0.0, 0.04, N)),
+            run.particles = np.column_stack((
+                run.held_pose[0] + run.rng.normal(0.0, 0.12, N),
+                run.held_pose[1] + run.rng.normal(0.0, 0.12, N),
+                wrap_array(run.held_pose[2] + run.rng.normal(0.0, 0.04, N)),
             ))
             run.locked = 1
             just_locked = True
             weights = np.full(N, 1.0 / N)
         # belief is the cubed peak test only. Leave weights on the raw
         # likelihood so the drawn cloud's covariance is the posterior.
-    mean = weighted_mean(particles, weights)
+    mean = weighted_mean(run.particles, weights)
     # Before the collapse the posterior can sit on one particle while the
-    # drawn cloud still covers the yard. The ellipse is that cloud, equally
+    # drawn cloud still covers the world. The ellipse is that cloud, equally
     # weighted, so the ring is the scatter on screen. After the collapse it
     # is the filter covariance.
     if UNKNOWN_START and run.locked == 0:
         ellipse_w = np.full(N, 1.0 / N)
-        ellipse_at = (float(np.mean(particles[:, 0])), float(np.mean(particles[:, 1])))
+        ellipse_at = (float(np.mean(run.particles[:, 0])), float(np.mean(run.particles[:, 1])))
     else:
-        raw_x = float(np.mean(particles[:, 0]))
-        raw_y = float(np.mean(particles[:, 1]))
-        raw_dx = particles[:, 0] - raw_x
-        raw_dy = particles[:, 1] - raw_y
+        raw_x = float(np.mean(run.particles[:, 0]))
+        raw_y = float(np.mean(run.particles[:, 1]))
+        raw_dx = run.particles[:, 0] - raw_x
+        raw_dy = run.particles[:, 1] - raw_y
         raw_var = float(np.mean(raw_dx * raw_dx + raw_dy * raw_dy))
         # Scatter guesses throws the cloud out several meters. While those
         # dots are still spread, the ring is that scatter. A tight cloud
@@ -213,43 +193,43 @@ def control(sensors):
         else:
             ellipse_w = weights
             ellipse_at = (mean[0], mean[1])
-    dxp = particles[:, 0] - ellipse_at[0]
-    dyp = particles[:, 1] - ellipse_at[1]
+    dxp = run.particles[:, 0] - ellipse_at[0]
+    dyp = run.particles[:, 1] - ellipse_at[1]
     var_x = max(0.0, float(np.dot(ellipse_w, dxp * dxp)))
     var_y = max(0.0, float(np.dot(ellipse_w, dyp * dyp)))
     cov_xy = float(np.dot(ellipse_w, dxp * dyp))
     axis, major, minor = covariance_ellipse(var_x, var_y, cov_xy)
     if not UNKNOWN_START or run.locked == 1:
         estimate = mean
-        if UNKNOWN_START and held_pose is not None:
+        if UNKNOWN_START and run.held_pose is not None:
             # A mirrored aisle can flip the mean heading. The wheels already
             # know the heading; only a small disagreement is a real correction.
-            predicted_yaw = wrap(held_pose[2] + odom_dyaw)
+            predicted_yaw = wrap(run.held_pose[2] + odom_dyaw)
             if abs(wrap(mean[2] - predicted_yaw)) > 0.6:
                 estimate = (mean[0], mean[1], predicted_yaw)
         if UNKNOWN_START:
-            held_pose = estimate
+            run.held_pose = estimate
         # Slide along the route onto the landmark-consistent pose, and
         # take the cloud with the estimate. Cross-track is left alone:
         # a jump between the oval's two straights is not a correction.
         if path_distance(sensors.task.path, estimate[0], estimate[1]) <= 4.0:
             corrected, delta = pin_along_track(estimate, sensors, field, m, sensors.task.path)
             if abs(delta[0]) + abs(delta[1]) > 1e-4:
-                particles[:, 0] += delta[0]
-                particles[:, 1] += delta[1]
+                run.particles[:, 0] += delta[0]
+                run.particles[:, 1] += delta[1]
                 ellipse_at = (float(ellipse_at[0]) + delta[0], float(ellipse_at[1]) + delta[1])
                 estimate = corrected
                 if UNKNOWN_START:
-                    held_pose = estimate
-    draw.points(np.column_stack((particles[:, 0], particles[:, 1], particles[:, 2], weights)), "#ff2bd6")
+                    run.held_pose = estimate
+    draw.points(np.column_stack((run.particles[:, 0], run.particles[:, 1], run.particles[:, 2], weights)), "#ff2bd6")
     draw.ellipse(float(ellipse_at[0]), float(ellipse_at[1]), axis, major, minor, "#ffd400")
     neff = 1.0 / max(1e-12, float(np.dot(weights, weights)))
     scan_ok = (not just_locked) and (log_best != 0.0 or log_mean != 0.0)
     inject = augmented_fraction(log_mean) if UNKNOWN_START and run.locked == 1 and scan_ok else 0.0
     if inject > 0.05 and run.moved > 2.0:
-        particles = resample(particles, weights, inject, field, m)
+        run.particles = resample(run.particles, weights, inject, field, m)
     elif (not just_locked) and neff < 0.55 * N and ((not UNKNOWN_START) or run.locked == 1):
-        particles = resample(particles, weights, 0.0, field, m)
+        run.particles = resample(run.particles, weights, 0.0, field, m)
     # Creep on the right-hand wall until one particle owns the scan.
     # Wall gains are the wall lesson's; the cap is the creep. After that,
     # pursuit. Off the route, back away instead of grinding the wall ahead.
@@ -283,11 +263,11 @@ def control(sensors):
                 throttle = min(throttle, 0.22)
     else:
         steer, throttle = pursue(sensors, estimate)
-    trail.append((float(estimate[0]), float(estimate[1])))
-    if len(trail) > 280:
-        del trail[: len(trail) - 280]
-    if len(trail) >= 2:
-        draw.path(trail, "#ff5d73")
+    run.trail.append((float(estimate[0]), float(estimate[1])))
+    if len(run.trail) > 280:
+        del run.trail[: len(run.trail) - 280]
+    if len(run.trail) >= 2:
+        draw.path(run.trail, "#ff5d73")
     draw.path(
         [
             (float(estimate[0]), float(estimate[1])),
@@ -298,18 +278,17 @@ def control(sensors):
     return steer, throttle
 
 def distance_field(m):
-    global _field_grid, _field_stamp
     grid = getattr(m, "grid", None)
     if grid is not None and getattr(grid, "shape", None) == (m.height, m.width):
-        _field_grid = grid
-        _field_stamp = m.stamp
+        run.field_grid = grid
+        run.field_stamp = m.stamp
         return grid
-    if _field_stamp == m.stamp and m.stamp != 0 and _field_grid is not None:
-        return _field_grid
+    if run.field_stamp == m.stamp and m.stamp != 0 and run.field_grid is not None:
+        return run.field_grid
     raw = np.frombuffer(base64.b64decode(m.field), dtype=np.uint8)
     decoded = raw.reshape((m.height, m.width)).astype(np.float32) * 0.01
-    _field_grid = decoded
-    _field_stamp = m.stamp
+    run.field_grid = decoded
+    run.field_stamp = m.stamp
     return decoded
 
 def initial_cloud(m, field, path):
@@ -323,7 +302,7 @@ def initial_cloud(m, field, path):
 
 def kidnapped_cloud(m, field, path):
     # Free cells first, so the drawn cloud (and a truncated draw) is a
-    # scatter across the yard. A route lattice sits behind them: a few
+    # scatter across the world. A route lattice sits behind them: a few
     # hundred uniform poses will not land on the car, and the route is
     # task info. Twelve headings, both ways around the loop included.
     cloud = free_cloud(N, field, m)
@@ -441,14 +420,13 @@ def landmark_points(m):
     # Short edges are cones, crates, barrels, trunks, pillars. Endpoints of
     # long edges are corners. Both break the shift symmetry of a corridor.
     # Cached on the map stamp. Nothing here is the true pose.
-    global _marks, _marks_stamp
-    if _marks_stamp == m.stamp and m.stamp != 0 and _marks is not None:
-        return _marks
+    if run.marks_stamp == m.stamp and m.stamp != 0 and run.marks is not None:
+        return run.marks
     raw = np.asarray(getattr(m, "segments", []), dtype=float)
     if raw.size < 4:
-        _marks = np.zeros((0, 2))
-        _marks_stamp = m.stamp
-        return _marks
+        run.marks = np.zeros((0, 2))
+        run.marks_stamp = m.stamp
+        return run.marks
     segs = raw.reshape((-1, 4))
     length = np.hypot(segs[:, 2] - segs[:, 0], segs[:, 3] - segs[:, 1])
     short = segs[length < 2.8]
@@ -464,9 +442,9 @@ def landmark_points(m):
         pts.append(long[:, 0:2])
         pts.append(long[:, 2:4])
     if not pts:
-        _marks = np.zeros((0, 2))
-        _marks_stamp = m.stamp
-        return _marks
+        run.marks = np.zeros((0, 2))
+        run.marks_stamp = m.stamp
+        return run.marks
     stacked = np.vstack(pts)
     # One point per 0.8 m cell. Short objects were stacked first, and
     # unique keeps the first row, so a cone is not dropped for a wall corner.
@@ -476,19 +454,18 @@ def landmark_points(m):
     kept = stacked[np.sort(first)]
     if kept.shape[0] > 320:
         kept = kept[:320]
-    _marks = np.asarray(kept, dtype=float)
-    _marks_stamp = m.stamp
-    return _marks
+    run.marks = np.asarray(kept, dtype=float)
+    run.marks_stamp = m.stamp
+    return run.marks
 
 def landmark_near(m):
-    global _near, _near_stamp
-    if _near_stamp == m.stamp and m.stamp != 0 and _near is not None:
-        return _near
+    if run.near_stamp == m.stamp and m.stamp != 0 and run.near is not None:
+        return run.near
     marks = landmark_points(m)
     near = np.zeros((m.height, m.width), dtype=bool)
     if marks.shape[0] == 0 or m.width < 2:
-        _near = near
-        _near_stamp = m.stamp
+        run.near = near
+        run.near_stamp = m.stamp
         return near
     res = float(m.resolution) if m.resolution else 0.5
     rad = int(math.ceil(1.6 / max(res, 0.05)))
@@ -501,8 +478,8 @@ def landmark_near(m):
         y1 = min(int(m.height), iy + rad + 1)
         if x1 > x0 and y1 > y0:
             near[y0:y1, x0:x1] = True
-    _near = near
-    _near_stamp = m.stamp
+    run.near = near
+    run.near_stamp = m.stamp
     return near
 
 def route_tangent(path, x, y, yaw):
@@ -608,18 +585,17 @@ def augmented_fraction(evidence):
     return min(0.25, (gap - 4.0) / 12.0)
 
 def free_cells(field):
-    global _free_src, _free_xs, _free_ys
-    if _free_src is field:
-        return _free_xs, _free_ys
+    if run.free_src is field:
+        return run.free_xs, run.free_ys
     ys, xs = np.nonzero(field > 0.55)
     if xs.size < 8:
         ys, xs = np.nonzero(field > 0.15)
     if xs.size == 0:
         xs = np.zeros(1, dtype=np.int32)
         ys = np.zeros(1, dtype=np.int32)
-    _free_src = field
-    _free_xs = xs
-    _free_ys = ys
+    run.free_src = field
+    run.free_xs = xs
+    run.free_ys = ys
     return xs, ys
 
 def free_cloud(n, field, m):

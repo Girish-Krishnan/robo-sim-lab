@@ -12,7 +12,7 @@ status: ready
 
 Jitter, and a slow walk away from the truth. Those are two different animals. White noise is a fresh coin flip every sample. Bias is one coin flip at the start of the run, then held, so the late error is that single draw, grown up.
 
-In the sim: you drive the oval, seed 1. The colored trail is the car and the blue trail is the guess. The graph is the distance between them as the clock runs. Pause stops the car, the clock, and the graph together. The same drive works in the other worlds.
+In the sim: you drive the oval, seed 1. The colored trail is the car and the blue trail is the guess. The graph is the distance between them as the clock runs. Hit Pause and everything freezes, so you can study the gap between where the car is and where it thinks it is. The same drive works in the other worlds.
 
 <svg viewBox="0 0 520 240" role="img" aria-label="White noise jitters around the truth. A bias walks away and stays walked away.">
   <rect width="520" height="240" rx="12" fill="#0e1418"/>
@@ -29,7 +29,7 @@ In the sim: you drive the oval, seed 1. The colored trail is the car and the blu
 
 **Bias** is drawn once from the seed and then held. Reset run replays that same draw. Speed bias scales every meter you travel. Gyro bias turns every second into a little extra yaw. Steering bias shows up on `steering_angle` and stays out of the pose. A heading you build from $\tan(\delta)$ puts that bias back into the curvature, and the blue trail leaves the road.
 
-This page has no program, so the draw is seed 1. Reset run replays it. Open Code and change `SEED` at the top of the file when you want a different coin flip.
+This page has no program, so the draw stays seed 1. Reset run replays that same coin flip. Crash or spin the wheels and the gap jumps. That's slip, not noise.
 
 ## Each sensor, written as an equation
 

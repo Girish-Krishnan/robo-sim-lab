@@ -80,7 +80,7 @@ The $\lambda$ floor keeps one bad beam from zeroing the particle. $\sigma$ is a 
 
 The starter's `map.field` is that lookup, precomputed, in centimeters, so the 20 Hz tick reads a table. A 0 is an occupied cell. `map.segments` is the wall list the grid came from: packed edges $x_0, y_0, x_1, y_1$. The true pose stays off the sample.
 
-The field scores the endpoint. A beam that passed through one wall and hit a second one still contributes its endpoint. These yards have few thin false openings at scan height, so that shortcut holds. A beam model would raycast. It is the stricter question, and it is too slow here if you ask it for every particle and every beam.
+The field scores the endpoint. A beam that passed through one wall and hit a second one still contributes its endpoint. These worlds have few thin false openings at scan height, so that shortcut holds. A beam model would raycast. It is the stricter question, and it is too slow here if you ask it for every particle and every beam.
 
 The scoring function in the program:
 

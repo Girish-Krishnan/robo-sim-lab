@@ -45,7 +45,7 @@ Heading error from a constant gyro bias $b_\omega$ grows like $b_\omega t$. Cros
 
 There is no controller in this lesson on purpose. You are the driver, so the only thing moving the blue trail is the integral above. A later lesson puts a path tracker on top of this same guess and shows what that costs. Reset run puts the car back and replays the same bias. The pose lives in the odometry frame. Adding it to a world coordinate, or to the camera yaw, gives a number in a mixed frame.
 
-The sensor noise is seed 1 unless a program sets `SEED`. This page has no program, so Reset run replays seed 1. Open Code and change `SEED` at the top of the file when you want a different draw.
+This page has no program, so you are on seed 1. Reset run replays that same draw. A program with `SEED` at the top is how a later lesson picks a different one.
 
 ## Try it
 

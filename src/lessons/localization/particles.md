@@ -9,13 +9,13 @@ prerequisites: localization/bayes
 status: ready
 ---
 
-A cloud of guesses, and the scan gets to vote. Each dot is a guess. Guesses that match the lidar survive. On the oval the starter begins in a tight neighborhood of the car, so the first frame already agrees. Press **Scatter guesses** to throw that cloud out about 7 m and watch the matching guesses survive. The red mean has a dark outline so it stays readable on the pink dots. Open the **Key** on the view for the color names: pink dots, yellow ring, red trail, and blue odometry. The red trail is the filter's mean, drawn on top of the dots.
+A cloud of guesses, and the scan gets to vote. Each dot is a guess. Guesses that match the lidar survive. On the oval the starter begins in a tight neighborhood of the car, so the first frame already agrees. Press **Scatter guesses** to throw that cloud out about 7 m. Watch the pink cloud shrink around the red dot. That's the car figuring out where it is. Open the **Key** on the view for the color names: pink dots, yellow ring, red trail, and blue odometry. The red trail is the filter's mean, drawn on top of the dots.
 
 In the sim, the tracking cloud runs on the oval. The Key on the map uses the same names.
 
 The yellow ring is two standard deviations of the cloud, how far the guesses sit from their mean. A small ring means the guesses agree.
 
-The starter keeps a few hundred particles and scores a few dozen lidar beams against a distance field built ahead of time. Control runs at 20 Hz, twenty times a second, and the filter has to finish inside that tick. Scoring every beam against thousands of particles is what makes the car stutter. The known map is a grid of 0.5 m cells. A wall covers many of those cells, so a few dozen beams still land on it, and that thinner scan is enough.
+The starter keeps a few hundred guesses and scores a few dozen lidar beams. A wall covers many cells of the known map, so that thinner scan still lands on it, and the car keeps its pace.
 
 {{scatter}}
 
@@ -23,9 +23,9 @@ On a straight every stretch of wall looks the same, so the red mean can sit a fe
 
 The blocks below are one tick of that filter. They are slices of the same program that is driving the oval.
 
-How many particles, and how far ahead pursuit looks:
+How many guesses, and how far ahead pursuit looks. These names sit at the top of the program:
 
-{{code:tunables}}
+{{code:settings}}
 
 **Drive it yourself** runs this filter on whatever path you drive. Turn it on, then use WASD or the arrows. Space brakes. The cloud keeps scoring the live scan.
 
@@ -88,5 +88,5 @@ Note: global localization, the kidnapped starter, is this same filter with a dif
 ## Try it
 
 1. Press Scatter guesses. The pink dots should open up, then tighten onto the car. The red mean stays visible on top of the dots, and the blue trail still walks away.
-2. In the tunables block, cut `N` to `40` and run again. The mean should jump more. Put `360` back.
+2. In the settings above, cut `N` to `40` and run again. The mean should jump more. Put `360` back.
 3. Turn on Drive it yourself and drive onto the infield. The yellow ring should swell while the scan is ambiguous, then tighten when a wall or a cone picks a winner.

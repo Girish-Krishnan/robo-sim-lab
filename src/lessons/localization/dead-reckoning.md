@@ -9,7 +9,7 @@ prerequisites: tracking/drift
 status: ready
 ---
 
-Give the guess its proper name. Dead reckoning is the pose you have been using. You start from a known pose, and you add up wheel speed and yaw rate. Nothing in that sum looks at a wall. When the motion measurement is biased, the pose is wrong, and every later addition is wrong in that new frame. It is the closed-eye step count from the odometry lesson.
+Watch the blue trail leave the car. That trail is dead reckoning. You start from a known pose, and you add up wheel speed and yaw rate. Nothing in that sum looks at a wall. When the motion measurement is biased, the pose is wrong, and every later addition is wrong in that new frame.
 
 In the sim: pursuit on the oval. The blue trail is that integral. The key on the view names the trails. This lesson does not hand you the wheel. The program keeps driving.
 
@@ -33,7 +33,7 @@ where $u_t$ is the odometry delta $(v, \omega)$, the change in the odometry pose
 
 If the cloud starts as a tight blob at the origin, you are **tracking**: you know roughly where you began, and you refuse to let the bias walk you off. If the cloud starts spread over the free cells of the map, you are doing **global localization**: the first scans have to pick a place. The kidnapped starter is that second problem. The pursuit starter is the first, which is the one that flattens the oval's cross-track curve.
 
-A floor plan is a description of the building. The robot's state is still the pose. `sensors.task.map` is allowed because a person could have surveyed it yesterday. The map's corner is called `corner`. The publisher keeps the name `origin` for a pose someone tried to smuggle into the sample, and drops that field. The map is in the odometry frame at reset. Particle $(0, 0)$ is the true start because both frames were zeroed together. A tracking filter may start there. A global filter spreads its particles across the free cells.
+A floor plan is a description of the building. The robot's state is still the pose. `sensors.task.map` is allowed because a person could have surveyed it yesterday. The map's corner is called `corner`. The map is in the odometry frame at reset. Particle $(0, 0)$ is the true start because both frames were zeroed together. A tracking filter may start there. A global filter spreads its particles across the free cells.
 
 ## Try it
 

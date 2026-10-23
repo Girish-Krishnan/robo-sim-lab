@@ -12,7 +12,7 @@ status: ready
 
 Hold the wheel and watch it draw a circle. That is the whole model, and it is a beautiful one. The rear axle rolls straight ahead in its own frame. The front axle is steered by an angle $\delta$. A constant $\delta$ is that circle, the way a shopping cart with the front wheels locked traces one radius around a parking lot.
 
-In the sim: a fixed steer on an open pad, with the colored trail showing the circle. Positive $\delta$ is a left turn, and the car starts on that circle so the lap stays on the open pad.
+Lock the wheel, hold the throttle, and watch the trail draw a near-perfect circle. Positive $\delta$ is a left turn, and the car starts on that circle so the lap stays on the open pad.
 
 <svg viewBox="0 0 560 340" role="img" aria-label="Top view: turn center, radius R, wheelbase L perpendicular to R, and steer angle delta">
   <rect width="560" height="340" rx="12" fill="#0e1418"/>

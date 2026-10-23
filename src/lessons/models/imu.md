@@ -42,7 +42,7 @@ $$\Delta\theta = b\,T.$$
 
 With $b = 0.0012$ rad/s and $T = 60$ s, $\Delta\theta = 0.072$ rad, about 4.1°. After traveling a distance $s$, the cross-track contribution of a heading error is roughly $s\,\Delta\theta$ while the error is still small and growing. On an oval lap of about 200 m that is meters. The noise around the bias averages down. The bias stays.
 
-Specific force $f$ and acceleration $a$ differ by gravity. In the world, $f = a - g$ with $g$ pointing down. On flat ground at rest, $a = 0$ and $f_z = +9.81$ in the body. A tilt $\phi$ leaks that into the horizontal axes. This course keeps the yards flat, so the accelerometer is here to make the sample look like a real IMU. Wheel speed remains the speed sensor. Integrating `accel.x` for a minute, with a bias of 0.02 m/s², invents tens of meters per second of fake speed.
+Specific force $f$ and acceleration $a$ differ by gravity. In the world, $f = a - g$ with $g$ pointing down. On flat ground at rest, $a = 0$ and $f_z = +9.81$ in the body. A tilt $\phi$ leaks that into the horizontal axes. This course keeps the worlds flat, so the accelerometer is here to make the sample look like a real IMU. Wheel speed remains the speed sensor. Integrating `accel.x` for a minute, with a bias of 0.02 m/s², invents tens of meters per second of fake speed.
 
 The gyro bias and the speed bias are drawn in a fixed order from `SEED` at the top of the program. When the console numbers disagree with the lesson, check that number before changing a gain. Reset run replays the draw you already have.
 

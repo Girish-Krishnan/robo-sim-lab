@@ -31,7 +31,7 @@ Three controls put something back, and they put back different things.
 
 Drag to look around, and scroll to zoom. The **Key** on the view names the colors: the speed-tinted trail is where the car went, blue is the wheel-and-gyro guess, and the lidar inset draws the scan with amber for close hits. After the first visit the key starts folded. It stays available on every lesson that draws those overlays.
 
-Try any world. This page works in all of them. The lessons menu at the top of this column lists them all. A lesson written for one yard keeps the World menu on that yard, and the note under the menu says so. A lesson that travels, like this one, invites you to switch.
+Try any world. This page works in all of them. The lessons menu at the top of this column lists them all. A lesson written for one world keeps the World menu on that world, and the note under the menu says so. A lesson that travels, like this one, invites you to switch.
 
 ## Try it
 

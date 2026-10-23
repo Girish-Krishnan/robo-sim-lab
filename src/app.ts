@@ -319,8 +319,7 @@ export async function mountApp(): Promise<void> {
     };
 
     let poseWarning: string | null = null;
-    const placeFromCode = (): SpawnPose => {
-      const source = codeEditor.getValue();
+    const placeFromCode = (source = codeEditor.getValue()): SpawnPose => {
       noiseSeed = readProgramSeed(source);
       robot.setNoiseSeed(noiseSeed);
       const parsed = readStartPose(source, yard.id);
@@ -336,8 +335,6 @@ export async function mountApp(): Promise<void> {
       const fallback = currentSpawn();
       const kind = mode === "lessons" && lessonSpawnKind ? "lesson" : mode === "code" && exampleSelect.value ? "example" : "world";
       poseWarning = invalidPoseMessage(parsed.x, parsed.y, problem, kind);
-      consolePanel.log(poseWarning, "error");
-      openConsole();
       return fallback;
     };
 
@@ -376,10 +373,8 @@ export async function mountApp(): Promise<void> {
     const hideStopped = () => {
       runBanner.hidden = true;
     };
-    const resetWorld = (rerun = false, source?: string) => {
-      const wasRunning = code.current === "running" || code.current === "loading";
-      if (wasRunning) stopProgram();
-      activeSpawn = placeFromCode();
+    const parkAtCodedStart = (source?: string) => {
+      activeSpawn = placeFromCode(source);
       paths.clear();
       driftGraph.reset();
       drawOps = [];
@@ -394,9 +389,24 @@ export async function mountApp(): Promise<void> {
       frameKidnappedCloud(true);
       camera.snap(robot.focus());
       if (handsOn()) applyDrive();
+    };
+    const showPoseWarning = () => {
+      if (!poseWarning) return;
+      consolePanel.log(poseWarning, "error");
+      openConsole();
+    };
+
+    const resetWorld = (rerun = false, source?: string) => {
+      const wasRunning = code.current === "running" || code.current === "loading";
+      if (wasRunning) stopProgram();
       const shouldRun = source !== undefined || (rerun && wasRunning);
-      if (shouldRun && (codeControls() || driveSelf)) runProgram(source);
-      else if (wasRunning && (codeControls() || driveSelf)) showStopped();
+      if (shouldRun && (codeControls() || driveSelf)) {
+        runProgram(source);
+        return;
+      }
+      parkAtCodedStart(source);
+      showPoseWarning();
+      if (wasRunning && (codeControls() || driveSelf)) showStopped();
     };
 
     const resetToSeed = () => {
@@ -406,7 +416,9 @@ export async function mountApp(): Promise<void> {
     const manualDrive = () => driveSelf && simArmed;
     const runProgram = (source?: string) => {
       if (!codeControls() && !driveSelf) return;
+      if (code.current === "running" || code.current === "loading") stopProgram();
       hideStopped();
+      parkAtCodedStart(source);
       if (trackCloud) {
         heldPrior = null;
         priorHoldUntil = -1;
@@ -414,10 +426,7 @@ export async function mountApp(): Promise<void> {
       consolePanel.clear();
       if (!consoleByUser) setConsoleOpen(false);
       consolePanel.log("— running —", "log");
-      if (poseWarning) {
-        consolePanel.log(poseWarning, "error");
-        openConsole();
-      }
+      showPoseWarning();
       editor?.highlightLine(null);
       window.dispatchEvent(new CustomEvent("robo-student-error", { detail: { text: "", line: null, chunk: null, local: null } }));
       code.run(source ?? codeEditor.getValue());
@@ -856,7 +865,7 @@ export async function mountApp(): Promise<void> {
           option.disabled = !allowed;
           option.title = allowed ? "" : why;
         }
-        worldSelect.title = ids && ids.length === 1 ? why : "Switch the yard. A running program starts again.";
+        worldSelect.title = ids && ids.length === 1 ? why : "Switch the world. A running program starts again.";
       },
       clearConsole: () => consolePanel.clear(),
       resetWorld,

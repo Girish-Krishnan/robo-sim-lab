@@ -140,7 +140,7 @@ export function regressionErrors(row: RunMetrics): string[] {
   const errors: string[] = [];
   const name = `${row.world}/${row.example}`;
   if (row.flipped) errors.push(`${name} flipped`);
-  if (row.outOfBounds) errors.push(`${name} left the yard`);
+  if (row.outOfBounds) errors.push(`${name} left the world`);
   if (row.example !== "mcl-global" && driftPercent(row) > 5) {
     errors.push(`${name} drift ${driftPercent(row).toFixed(1)}%`);
   }
@@ -293,7 +293,7 @@ export function lessonDemoReport(rows: RunMetrics[], extras: RunMetrics[] = []):
       "",
       "## World switches",
       "",
-      "A locked world is not offered in that lesson. The menu keeps it disabled. The start kind still matches the scenario in every yard, including the locked ones.",
+      "A locked world is not offered in that lesson. The menu keeps it disabled. The start kind still matches the scenario in every world, including the locked ones.",
       "",
       ...switchLines,
       "",

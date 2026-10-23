@@ -35,9 +35,9 @@ $$\alpha = \operatorname{atan2}(y_b, x_b),\quad \kappa = \frac{2\sin\alpha}{L_d}
 
 That is the pursuit lesson with $\theta$ replaced by $\hat\theta$ and the position replaced by the mean. Speed still comes from `sensors.odometry.speed`. Wheel speed is a good sensor. The derivative of $\hat x$ would add the filter's jitter to the throttle.
 
-`LOOKAHEAD` is in meters. The other lines are the filter's own knobs. `N` is the particle count for a known start.
+`LOOKAHEAD` is in meters. The other names are the filter's own settings, at the top of the program. `N` is the particle count for a known start.
 
-{{code:tunables}}
+{{code:settings}}
 
 The function that turns the estimate into that steer:
 
@@ -52,5 +52,5 @@ The motion model already used the odometry delta. Mixing `odometry.pose` back in
 ## Try it
 
 1. Run the starter on the oval for a full minute. The blue trail should still leave. The car and the red estimate should stay near the centerline. Late cross-track is about 0.34 m. The estimate finishes about 0.38 m from the car.
-2. In the tunables block, increase `LOOKAHEAD` to `6`. The cloud should look the same. The path should cut corners more, which is pursuit.
+2. In the settings above, increase `LOOKAHEAD` to `6`. The cloud should look the same. The path should cut corners more, which is pursuit.
 3. Turn on Drive it yourself and drive the straight. The particles should ride with the car, and the blue trail should keep its own opinion.

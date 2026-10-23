@@ -193,11 +193,18 @@ describe("course catalog", () => {
       expect(example.source, example.id).not.toMatch(/^aim = /m);
       expect(example.source, example.id).not.toMatch(/^ticks = /m);
       expect(example.source, example.id).not.toContain("class Memory");
+      expect(example.source, example.id).not.toContain("def tunables(");
+      expect(example.source, example.id).not.toMatch(/^[ \t]*global (?!run\s*$)/m);
     }
     const avoid = lessonById("reactive/avoid");
     expect(avoid?.worlds).toEqual(["forest", "track"]);
-    expect(lessonById("getting-started/sensors")?.markdown).toContain("class Run");
-    expect(lessonById("getting-started/sensors")?.markdown).toContain("{{code:Run}}");
+    expect(lessonById("models/lidar")?.worlds).toEqual(["track", "forest"]);
+    const sensors = lessonById("getting-started/sensors");
+    expect(sensors?.markdown).toContain("class Run");
+    expect(sensors?.markdown).toContain("{{code:Run}}");
+    expect(sensors?.markdown).toContain("That's it: one object, reset every run.");
+    expect(sensors?.markdown).not.toContain("practice tick");
+    expect(readChunks(EXAMPLES.find((example) => example.id === "avoid")?.source ?? "").has("settings")).toBe(true);
   });
 
   it("keeps American spelling in the lessons", () => {

@@ -16,7 +16,7 @@ In the sim: the same fixed command, with the camera far enough back to see the w
 
 The starter turns left at 0.34 rad and asks for a medium throttle. The car is placed on a pad checked to be clear of that circle: the south lawn in the city, the oval infield, the meadow south of the trees, and the open bay in the warehouse. Move the steer or the throttle a lot and that clearance ends.
 
-There is no goal pose. The lesson is the radius, and the fact that a fixed command repeats. Later controllers close the loop because a wall that curves, or a path that drifts, needs a command that can change.
+No destination this time. Send one command forever and watch the car carve the same circle lap after lap. Later controllers close the loop because a wall that curves, or a path that drifts, needs a command that can change.
 
 {{code:control}}
 

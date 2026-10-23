@@ -42,9 +42,9 @@ $$\alpha \in \big[\alpha - \arctan(w / r),\; \alpha + \arctan(w / r)\big]$$
 
 for a half-width $w$ a bit larger than the car, and then picks the opening with the best score. The starter writes that idea as a pass over the beams.
 
-The half-width of each wedge, in meters. `HALF` is how wide a hit is painted.
+The half-width of each wedge, in meters. `HALF` is how wide a hit is painted. It is a plain name at the top of the program.
 
-{{code:tunables}}
+{{code:settings}}
 
 The helper that paints those wedges:
 
@@ -52,7 +52,7 @@ The helper that paints those wedges:
 
 Throttle is a function of the nearest forward range $r_{\min}$. Far away, throttle is positive and modest. As $r_{\min}$ falls toward the bumper offset, throttle falls toward 0 and then toward a short reverse. One threshold would be wrong at every speed, so the starter uses a few bands.
 
-Reactive avoidance decides from this scan alone. This lesson runs in the forest, where the car threads trunks and keeps moving. The same program on the oval treats cones as blockers and stays off them. The warehouse stays locked: those aisles are tighter than this reactive rule, and the forest and the oval are the yards where it stays clean.
+Reactive avoidance decides from this scan alone. This lesson runs in the forest, where the car threads trunks and keeps moving. The same program on the oval treats cones as blockers and stays off them. The warehouse stays locked: those aisles are tighter than this reactive rule, and the forest and the oval are the worlds where it stays clean.
 
 A gap on the left has positive angle, and positive steering turns left. Negating the command "to match the camera" turns into the obstacle.
 
@@ -60,4 +60,4 @@ A gap on the left has positive angle, and positive steering turns left. Negating
 
 1. Run the starter in the forest. You should thread the corridor and keep moving.
 2. On the oval, watch it treat cones as blockers. A one-beam gap between cones should stay closed.
-3. Halve `HALF` in the tunables block and run the forest again. The car should start accepting gaps it cannot fit.
+3. Halve `HALF` in the settings above and run the forest again. The car should start accepting gaps it cannot fit.
