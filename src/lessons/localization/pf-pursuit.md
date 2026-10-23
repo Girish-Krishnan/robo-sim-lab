@@ -9,7 +9,7 @@ prerequisites: localization/particles, tracking/pursuit
 status: ready
 ---
 
-This is the same pure pursuit law as the path-tracking lesson, with one input changed. The lookahead is computed from the particle-filter mean. Wheel speed is still the wheel speed. The gyro still lives inside the motion model. The heading you steer by is the filter's heading. Three poses are in the picture at once: truth, the estimate, and raw odometry. The key on the view names them.
+This is the payoff. The same pure pursuit law as the path-tracking lesson, with one input changed. The lookahead is computed from the particle-filter mean. Wheel speed is still the wheel speed. The gyro still lives inside the motion model. The heading you steer by is the filter's heading. Three poses are in the picture at once: truth, the estimate, and raw odometry. The key on the view names them.
 
 In the sim: the oval, with the path trails and the particle cloud drawn.
 

@@ -332,12 +332,12 @@ function drawLegend(
 
 function drawScaleBar(rgba: Uint8Array, width: number, height: number, span: number): void {
   const plotPx = width - 72;
-  const metresPerPx = span / plotPx;
+  const metersPerPx = span / plotPx;
   let meters = 5;
   for (const choice of [5, 10, 20, 50, 100]) {
-    if (choice / metresPerPx <= 160) meters = choice;
+    if (choice / metersPerPx <= 160) meters = choice;
   }
-  const px = meters / metresPerPx;
+  const px = meters / metersPerPx;
   const x1 = width - 28;
   const x0 = x1 - px;
   const y = height - 28;

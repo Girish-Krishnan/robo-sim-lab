@@ -2,8 +2,8 @@ import RAPIER from "@dimforge/rapier3d-compat";
 import { ACKERMANN_BUGGY, CONTROL_DT, PHYSICS_DT, clampCommand, odomToWorld, worldToOdom, type DrawOp } from "./api";
 import { chunkOpenLine } from "./editor/chunks";
 import { formatStudentError } from "./editor/errors";
-import { spawnFor, worldSpawn } from "./sim/spawns";
-import { poseProblem, readProgramSeed, readStartPose, formatPoseNumber } from "./editor/program-header";
+import { spawnFor } from "./sim/spawns";
+import { invalidPoseMessage, poseProblem, readProgramSeed, readStartPose } from "./editor/program-header";
 import { BlockedAreas } from "./sim/blocked-areas";
 import { EXAMPLES } from "./editor/examples";
 import { BLANK_SOURCE, loadScratch, saveScratch } from "./editor/blank";
@@ -34,7 +34,7 @@ import { lessonById } from "./course/catalog";
 import { mountCourse } from "./course/shell";
 import { CodeSandbox, type SandboxState } from "./sandbox/controller";
 import { ConsolePanel } from "./ui/console-panel";
-import { Hud, type AppMode } from "./ui/hud";
+import { Hud, runBarLabel, type AppMode } from "./ui/hud";
 import { DriftGraph } from "./ui/drift-graph";
 import { mountLegend } from "./ui/legend";
 import { mountLabSplitter, mountSplitter } from "./ui/splitter";
@@ -68,16 +68,7 @@ export async function mountApp(): Promise<void> {
       return;
     }
     runState.dataset.state = state;
-    runState.textContent =
-      state === "running"
-        ? "Running"
-        : state === "loading"
-          ? "Loading"
-          : state === "error"
-            ? "Error"
-            : state === "stopped"
-              ? "Stopped"
-              : "Idle";
+    runState.textContent = runBarLabel(state, false, false, false);
     pythonStatus.hidden = state !== "loading";
   };
 
@@ -327,20 +318,27 @@ export async function mountApp(): Promise<void> {
       return yard.spawn;
     };
 
+    let poseWarning: string | null = null;
     const placeFromCode = (): SpawnPose => {
       const source = codeEditor.getValue();
       noiseSeed = readProgramSeed(source);
       robot.setNoiseSeed(noiseSeed);
       const parsed = readStartPose(source, yard.id);
-      if (!parsed) return currentSpawn();
+      if (!parsed) {
+        poseWarning = null;
+        return currentSpawn();
+      }
       const problem = poseProblem(solidsReady?.(yard.id) ?? [], parsed.x, parsed.y);
-      if (!problem) return { x: parsed.x, y: 0.84, z: parsed.y, yaw: (parsed.heading * Math.PI) / 180 };
-      consolePanel.log(
-        `START_POSE (${formatPoseNumber(parsed.x)}, ${formatPoseNumber(parsed.y)}) is ${problem}. Using this world's default start.`,
-        "error",
-      );
+      if (!problem) {
+        poseWarning = null;
+        return { x: parsed.x, y: 0.84, z: parsed.y, yaw: (parsed.heading * Math.PI) / 180 };
+      }
+      const fallback = currentSpawn();
+      const kind = mode === "lessons" && lessonSpawnKind ? "lesson" : mode === "code" && exampleSelect.value ? "example" : "world";
+      poseWarning = invalidPoseMessage(parsed.x, parsed.y, problem, kind);
+      consolePanel.log(poseWarning, "error");
       openConsole();
-      return worldSpawn(yard.id);
+      return fallback;
     };
 
     let trackCloud = false;
@@ -416,6 +414,10 @@ export async function mountApp(): Promise<void> {
       consolePanel.clear();
       if (!consoleByUser) setConsoleOpen(false);
       consolePanel.log("— running —", "log");
+      if (poseWarning) {
+        consolePanel.log(poseWarning, "error");
+        openConsole();
+      }
       editor?.highlightLine(null);
       window.dispatchEvent(new CustomEvent("robo-student-error", { detail: { text: "", line: null, chunk: null, local: null } }));
       code.run(source ?? codeEditor.getValue());
@@ -971,7 +973,13 @@ export async function mountApp(): Promise<void> {
         camera.update(frameDt, focus);
         view.followSun(focus.x, focus.z);
         const sampling = !codeControls() || code.current === "running";
-        hud.update(pausedView ?? robot.telemetry(), mode, code.current, simTime, paused, sampling);
+        const live = pausedView ?? robot.telemetry();
+        const moving = Math.abs(live.trueSpeed) > 0.15 || Math.abs(live.commandedThrottle) > 0.05;
+        if (!paused && handsOn()) {
+          runState.dataset.state = moving ? "running" : "idle";
+          runState.textContent = runBarLabel(code.current, false, true, moving);
+        }
+        hud.update(live, mode, code.current, simTime, paused, sampling, handsOn());
         view.render();
       } catch (error) {
         console.error(error);

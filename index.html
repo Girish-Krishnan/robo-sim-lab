@@ -110,6 +110,7 @@
                 <li><code>sensors.odometry.speed</code>, <code>.steering_angle</code>, <code>.pose.x</code>, <code>.pose.y</code>, <code>.pose.yaw</code>.</li>
                 <li><code>sensors.imu.yaw_rate</code>, <code>.accel.x</code>, <code>.accel.y</code>, <code>.accel.z</code>.</li>
                 <li><code>sensors.task.path</code>, <code>sensors.task.map</code> — a route and a floor plan, not a measurement of the car.</li>
+                <li><code>run</code> and <code>init(sensors)</code> — memory between ticks lives on one object. <code>init</code> builds a fresh <code>Run</code> at the start of every run. Inside <code>control</code>, write <code>run.ticks += 1</code>. Say <code>global run</code> only in <code>init</code>, where the object is replaced.</li>
                 <li><code>SEED</code> — draws the sensor bias once. The same number replays the same noise. Use it for <code>np.random.default_rng(SEED)</code> too.</li>
                 <li><code>START_POSE</code> — where the car is placed on Run and Reset. <code>x</code> and <code>y</code> are meters (<code>y</code> runs north), then heading in degrees. 0 faces north. This is not a sensor reading.</li>
                 <li>There is no true pose on <code>sensors</code>.</li>

@@ -91,6 +91,18 @@ function parseTriple(body: string): MapPose | null {
   return { x: parts[0]!, y: parts[1]!, heading: parts[2]! };
 }
 
+/** What the console says when a coded start is refused. */
+export function invalidPoseMessage(
+  x: number,
+  y: number,
+  problem: "off the map" | "inside a wall",
+  fallback: "lesson" | "example" | "world",
+): string {
+  const where =
+    fallback === "lesson" ? "this lesson's start" : fallback === "example" ? "this example's start" : "this world's default start";
+  return `START_POSE (${formatPoseNumber(x)}, ${formatPoseNumber(y)}) is ${problem}. Using ${where}.`;
+}
+
 /** Why a coded start cannot be used. Null means the point is clear. */
 export function poseProblem(solids: readonly Solid[], x: number, z: number): "off the map" | "inside a wall" | null {
   if (Math.abs(x) > 100 || Math.abs(z) > 100) return "off the map";

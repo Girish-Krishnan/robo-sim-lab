@@ -9,7 +9,7 @@ action: sandbox
 status: ready
 ---
 
-The car in the middle of the window is the whole course. This page is where a first visit lands. Drive, Code, and Lessons are three ways into that same view.
+That car is your lab. Everything here drives it. Drive, Code, and Lessons are three ways into that same view.
 
 ## Three ways to use the same car
 
@@ -27,11 +27,11 @@ Three controls put something back, and they put back different things.
 - **Reset code**, on a lesson that has a program, asks first, then throws away your edits and loads the original.
 - **Reset camera** puts the view behind the car.
 
-Sensor noise is not a button anymore. `SEED` at the top of a program draws the bias once, and Reset run replays that same number.
+`SEED` at the top of a program draws the sensor bias once. Reset run replays that same number, so a lap you liked can happen again.
 
 Drag to look around, and scroll to zoom. The **Key** on the view names the colors: the speed-tinted trail is where the car went, blue is the wheel-and-gyro guess, and the lidar inset draws the scan with amber for close hits. After the first visit the key starts folded. It stays available on every lesson that draws those overlays.
 
-This page is happy in every world. The lessons menu at the top of this column lists them all. A lesson written for one yard locks the others, and the World menu says why. A lesson that travels, like this one, invites you to switch.
+Try any world. This page works in all of them. The lessons menu at the top of this column lists them all. A lesson written for one yard keeps the World menu on that yard, and the note under the menu says so. A lesson that travels, like this one, invites you to switch.
 
 ## Try it
 

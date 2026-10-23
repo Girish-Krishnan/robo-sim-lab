@@ -78,7 +78,7 @@ tunables()
 LIDAR_FORWARD = 0.46
 A1, A2, A3, A4 = 0.03, 0.04, 0.06, 0.03
 
-class Memory:
+class Run:
     def __init__(self):
         self.rng = np.random.default_rng(SEED)
         self.moved = 0.0
@@ -97,7 +97,7 @@ class Memory:
         self.wall_held = False
         self.wall_preview = False
 
-memory = Memory()
+run = Run()
 particles = None
 prev_odom = None
 trail = []
@@ -113,10 +113,10 @@ _free_xs = None
 _free_ys = None
 
 def init(sensors):
-    global memory, particles, prev_odom, trail, held_pose
+    global run, particles, prev_odom, trail, held_pose
     global _field_grid, _field_stamp, _marks, _marks_stamp, _near, _near_stamp
     global _free_src, _free_xs, _free_ys
-    memory = Memory()
+    run = Run()
     particles = None
     prev_odom = None
     trail = []
@@ -145,17 +145,17 @@ def control(sensors):
         odom_dx = pose.x - prev_odom[0]
         odom_dy = pose.y - prev_odom[1]
         odom_dyaw = wrap(pose.yaw - prev_odom[2])
-        memory.moved += math.hypot(odom_dx, odom_dy)
+        run.moved += math.hypot(odom_dx, odom_dy)
         apply_motion(particles, prev_odom, (pose.x, pose.y, pose.yaw))
     prev_odom = (pose.x, pose.y, pose.yaw)
 
     weights, log_mean, log_best = likelihood(particles, sensors, field, m)
     just_locked = False
-    if UNKNOWN_START and memory.locked == 0:
+    if UNKNOWN_START and run.locked == 0:
         # Count control ticks, not sensors.time. Reset does not zero the
         # simulator clock, and a stale clock would collapse the prior
         # before the first frame can show it.
-        memory.ticks += 1
+        run.ticks += 1
         sharp = np.maximum(weights, 0.0) ** 3
         total_w = float(np.sum(sharp))
         belief = sharp / total_w if total_w > 0.0 else np.full(N, 1.0 / N)
@@ -179,13 +179,13 @@ def control(sensors):
         # oval's best particle is only about a tenth, and that is already
         # the right straight. The warehouse bay stays near a few percent
         # until the car has moved, so it is not collapsed yet.
-        if memory.ticks >= 9 and peak > 0.07:
+        if run.ticks >= 9 and peak > 0.07:
             particles = np.column_stack((
-                held_pose[0] + memory.rng.normal(0.0, 0.12, N),
-                held_pose[1] + memory.rng.normal(0.0, 0.12, N),
-                wrap_array(held_pose[2] + memory.rng.normal(0.0, 0.04, N)),
+                held_pose[0] + run.rng.normal(0.0, 0.12, N),
+                held_pose[1] + run.rng.normal(0.0, 0.12, N),
+                wrap_array(held_pose[2] + run.rng.normal(0.0, 0.04, N)),
             ))
-            memory.locked = 1
+            run.locked = 1
             just_locked = True
             weights = np.full(N, 1.0 / N)
         # belief is the cubed peak test only. Leave weights on the raw
@@ -195,7 +195,7 @@ def control(sensors):
     # drawn cloud still covers the yard. The ellipse is that cloud, equally
     # weighted, so the ring is the scatter on screen. After the collapse it
     # is the filter covariance.
-    if UNKNOWN_START and memory.locked == 0:
+    if UNKNOWN_START and run.locked == 0:
         ellipse_w = np.full(N, 1.0 / N)
         ellipse_at = (float(np.mean(particles[:, 0])), float(np.mean(particles[:, 1])))
     else:
@@ -219,7 +219,7 @@ def control(sensors):
     var_y = max(0.0, float(np.dot(ellipse_w, dyp * dyp)))
     cov_xy = float(np.dot(ellipse_w, dxp * dyp))
     axis, major, minor = covariance_ellipse(var_x, var_y, cov_xy)
-    if not UNKNOWN_START or memory.locked == 1:
+    if not UNKNOWN_START or run.locked == 1:
         estimate = mean
         if UNKNOWN_START and held_pose is not None:
             # A mirrored aisle can flip the mean heading. The wheels already
@@ -245,16 +245,16 @@ def control(sensors):
     draw.ellipse(float(ellipse_at[0]), float(ellipse_at[1]), axis, major, minor, "#ffd400")
     neff = 1.0 / max(1e-12, float(np.dot(weights, weights)))
     scan_ok = (not just_locked) and (log_best != 0.0 or log_mean != 0.0)
-    inject = augmented_fraction(log_mean) if UNKNOWN_START and memory.locked == 1 and scan_ok else 0.0
-    if inject > 0.05 and memory.moved > 2.0:
+    inject = augmented_fraction(log_mean) if UNKNOWN_START and run.locked == 1 and scan_ok else 0.0
+    if inject > 0.05 and run.moved > 2.0:
         particles = resample(particles, weights, inject, field, m)
-    elif (not just_locked) and neff < 0.55 * N and ((not UNKNOWN_START) or memory.locked == 1):
+    elif (not just_locked) and neff < 0.55 * N and ((not UNKNOWN_START) or run.locked == 1):
         particles = resample(particles, weights, 0.0, field, m)
     # Creep on the right-hand wall until one particle owns the scan.
     # Wall gains are the wall lesson's; the cap is the creep. After that,
     # pursuit. Off the route, back away instead of grinding the wall ahead.
     off_route = UNKNOWN_START and path_distance(sensors.task.path, estimate[0], estimate[1]) > 4.0
-    if UNKNOWN_START and memory.locked == 0:
+    if UNKNOWN_START and run.locked == 0:
         steer, throttle = follow_wall(sensors)
         speed = float(sensors.odometry.speed)
         if speed > 1.5:
@@ -316,9 +316,9 @@ def initial_cloud(m, field, path):
     cloud = np.zeros((N, 3), dtype=float)
     if UNKNOWN_START:
         return kidnapped_cloud(m, field, path)
-    cloud[:, 0] = memory.rng.normal(0.0, TRACK_SPREAD, N)
-    cloud[:, 1] = memory.rng.normal(0.0, TRACK_SPREAD, N)
-    cloud[:, 2] = memory.rng.normal(0.0, 0.06, N)
+    cloud[:, 0] = run.rng.normal(0.0, TRACK_SPREAD, N)
+    cloud[:, 1] = run.rng.normal(0.0, TRACK_SPREAD, N)
+    cloud[:, 2] = run.rng.normal(0.0, 0.06, N)
     return cloud
 
 def kidnapped_cloud(m, field, path):
@@ -339,9 +339,9 @@ def kidnapped_cloud(m, field, path):
         for heading in headings:
             if i >= N:
                 break
-            cloud[i, 0] = point.x + float(memory.rng.normal(0.0, 0.25))
-            cloud[i, 1] = point.y + float(memory.rng.normal(0.0, 0.25))
-            cloud[i, 2] = float(heading + memory.rng.normal(0.0, 0.02))
+            cloud[i, 0] = point.x + float(run.rng.normal(0.0, 0.25))
+            cloud[i, 1] = point.y + float(run.rng.normal(0.0, 0.25))
+            cloud[i, 2] = float(heading + run.rng.normal(0.0, 0.02))
             i += 1
     return cloud
 def apply_motion(cloud, before, after):
@@ -357,9 +357,9 @@ def apply_motion(cloud, before, after):
     std1 = math.sqrt(A1 * drot1 * drot1 + A2 * dtrans * dtrans) + 0.002
     std2 = math.sqrt(A3 * dtrans * dtrans + A4 * (drot1 * drot1 + drot2 * drot2)) + 0.01
     std3 = math.sqrt(A1 * drot2 * drot2 + A2 * dtrans * dtrans) + 0.002
-    s1 = drot1 + memory.rng.normal(0.0, std1, N)
-    s2 = dtrans + memory.rng.normal(0.0, std2, N)
-    s3 = drot2 + memory.rng.normal(0.0, std3, N)
+    s1 = drot1 + run.rng.normal(0.0, std1, N)
+    s2 = dtrans + run.rng.normal(0.0, std2, N)
+    s3 = drot2 + run.rng.normal(0.0, std3, N)
     heading = cloud[:, 2] + s1
     cloud[:, 0] += s2 * np.cos(heading)
     cloud[:, 1] += s2 * np.sin(heading)
@@ -416,7 +416,7 @@ def weighted_mean(cloud, weights):
 def resample(cloud, weights, inject=0.0, field=None, m=None):
     cumulative = np.cumsum(weights)
     cumulative[-1] = 1.0
-    slots = (np.arange(N) + memory.rng.random()) / N
+    slots = (np.arange(N) + run.rng.random()) / N
     index = np.clip(np.searchsorted(cumulative, slots, side="left"), 0, N - 1)
     picked = cloud[index].copy()
     # inject == 0 leaves the tracking cloud exactly as the low-variance draw.
@@ -565,7 +565,7 @@ def pin_along_track(estimate, sensors, field, m, path):
     zero = float(score[zero_i])
     best_i = int(np.argmax(score))
     # A trunk row puts most endpoints on a landmark, and the grid peak is
-    # only a little taller than the neighbouring cell. A sparse cone has
+    # only a little taller than the neighboring cell. A sparse cone has
     # to beat a clear gap before the cloud slides.
     near_frac = float(np.mean(near[zero_i])) if near.size else 0.0
     need = 0.16 if near_frac > 0.45 else 0.35
@@ -596,13 +596,13 @@ def augmented_fraction(evidence):
     # the corridor moves it by several. Only that drop injects new poses,
     # and never more than a quarter of the cloud: replacing the mode that
     # was right is how a symmetric aisle flips.
-    if memory.fast is None:
-        memory.fast = evidence
-        memory.slow = evidence
+    if run.fast is None:
+        run.fast = evidence
+        run.slow = evidence
         return 0.0
-    memory.slow += 0.02 * (evidence - memory.slow)
-    memory.fast += 0.2 * (evidence - memory.fast)
-    gap = memory.slow - memory.fast
+    run.slow += 0.02 * (evidence - run.slow)
+    run.fast += 0.2 * (evidence - run.fast)
+    gap = run.slow - run.fast
     if gap < 4.0:
         return 0.0
     return min(0.25, (gap - 4.0) / 12.0)
@@ -624,11 +624,11 @@ def free_cells(field):
 
 def free_cloud(n, field, m):
     xs, ys = free_cells(field)
-    pick = memory.rng.integers(0, int(xs.size), int(n))
+    pick = run.rng.integers(0, int(xs.size), int(n))
     cloud = np.zeros((int(n), 3), dtype=float)
     cloud[:, 0] = m.corner.x + (xs[pick] + 0.5) * m.resolution
     cloud[:, 1] = m.corner.y + (ys[pick] + 0.5) * m.resolution
-    cloud[:, 2] = memory.rng.uniform(-math.pi, math.pi, int(n))
+    cloud[:, 2] = run.rng.uniform(-math.pi, math.pi, int(n))
     return cloud
 
 def follow_wall(sensors):
@@ -650,57 +650,57 @@ def follow_wall(sensors):
     dist = max(0.3, side * math.cos(min(0.8, max(-0.8, alpha))))
     future = dist + look * math.sin(alpha)
     if (
-        memory.wall_phase == "follow"
+        run.wall_phase == "follow"
         and side < 6.5
         and diag < side * 2.0
         and abs(alpha) < 0.35
         and abs(dist - target_gap) < 1.0
     ):
-        memory.wall_gap = 0.75 * memory.wall_gap + 0.25 * dist
+        run.wall_gap = 0.75 * run.wall_gap + 0.25 * dist
         if abs(dist - target_gap) < 0.55:
-            memory.wall_held = True
-    buried = front < 1.05 or (side < 1.4 and alpha < -0.45) or (memory.wall_phase == "turn" and front < 1.3 and memory.wall_ticks > 8)
-    if memory.wall_reverse > 0:
-        memory.wall_reverse -= 1
+            run.wall_held = True
+    buried = front < 1.05 or (side < 1.4 and alpha < -0.45) or (run.wall_phase == "turn" and front < 1.3 and run.wall_ticks > 8)
+    if run.wall_reverse > 0:
+        run.wall_reverse -= 1
         return -0.4, -0.26
     if buried:
-        memory.wall_reverse = 16
-        memory.wall_phase = "follow"
-        memory.wall_ticks = 0
+        run.wall_reverse = 16
+        run.wall_phase = "follow"
+        run.wall_ticks = 0
         return -0.4, -0.26
-    if memory.wall_phase == "turn":
-        memory.wall_ticks += 1
+    if run.wall_phase == "turn":
+        run.wall_ticks += 1
         parallel_preview = max(side, 0.5) / math.sin(0.35)
         on_new_face = (
-            memory.wall_ticks > 20
+            run.wall_ticks > 20
             and abs(side - target_gap) < 0.9
             and abs(alpha) < 0.22
             and diag < side * 1.65
             and preview < parallel_preview * 1.3
         )
-        if on_new_face or memory.wall_ticks > 160:
-            memory.wall_phase = "follow"
-            memory.wall_ticks = 0
+        if on_new_face or run.wall_ticks > 160:
+            run.wall_phase = "follow"
+            run.wall_ticks = 0
             return 0.0, 0.1
-        return -min(0.52, math.atan(WHEELBASE / max(memory.wall_gap, 3.15))), 0.12
-    lost = memory.wall_held and memory.wall_gap < 4.2 and side > 6.2
-    if memory.wall_phase == "coast" or (memory.wall_phase == "follow" and lost):
-        if memory.wall_phase != "coast":
-            memory.wall_phase = "coast"
-            memory.wall_ticks = 0
-        memory.wall_ticks += 1
-        if memory.wall_ticks > 6:
-            memory.wall_phase = "turn"
-            memory.wall_ticks = 0
-            return -min(0.52, math.atan(WHEELBASE / max(memory.wall_gap, 3.15))), 0.08
+        return -min(0.52, math.atan(WHEELBASE / max(run.wall_gap, 3.15))), 0.12
+    lost = run.wall_held and run.wall_gap < 4.2 and side > 6.2
+    if run.wall_phase == "coast" or (run.wall_phase == "follow" and lost):
+        if run.wall_phase != "coast":
+            run.wall_phase = "coast"
+            run.wall_ticks = 0
+        run.wall_ticks += 1
+        if run.wall_ticks > 6:
+            run.wall_phase = "turn"
+            run.wall_ticks = 0
+            return -min(0.52, math.atan(WHEELBASE / max(run.wall_gap, 3.15))), 0.08
         return 0.0, 0.0
     parallel_preview = max(side, 0.5) / math.sin(0.35)
     settled = abs(side - target_gap) < 0.35 and abs(alpha) < 0.12
     if settled and preview < 10.5:
-        memory.wall_preview = True
+        run.wall_preview = True
     speed = float(sensors.odometry.speed)
-    ending = diag > max(6.2, side * 1.7) or (memory.wall_preview and preview > min(11.2, parallel_preview + 1.6))
-    corner_soon = memory.wall_held and side < 5.5 and ending and (settled or speed > 3.0)
+    ending = diag > max(6.2, side * 1.7) or (run.wall_preview and preview > min(11.2, parallel_preview + 1.6))
+    corner_soon = run.wall_held and side < 5.5 and ending and (settled or speed > 3.0)
     if corner_soon:
         if speed > 3.6:
             throttle = -0.72
@@ -732,30 +732,30 @@ def pursue(sensors, estimate):
         return 0.0, 0.0
     ahead = np.abs(sensors.lidar.angles) < 0.6
     front = float(np.min(sensors.lidar.ranges[ahead])) if np.any(ahead) else sensors.lidar.max_range
-    if memory.escape > 0:
-        memory.escape -= 1
+    if run.escape > 0:
+        run.escape -= 1
         draw.path([(point.x, point.y) for point in path], "#7dcea0")
-        return memory.escape_steer, -0.28
+        return run.escape_steer, -0.28
     if front < 0.95 and abs(sensors.odometry.speed) < 0.35:
         left = float(np.mean(sensors.lidar.ranges[sensors.lidar.angles > 0.3]))
         right = float(np.mean(sensors.lidar.ranges[sensors.lidar.angles < -0.3]))
-        memory.escape = 16
-        memory.escape_steer = 0.4 if left >= right else -0.4
+        run.escape = 16
+        run.escape_steer = 0.4 if left >= right else -0.4
         draw.path([(point.x, point.y) for point in path], "#7dcea0")
-        return memory.escape_steer, -0.28
+        return run.escape_steer, -0.28
 
     x, y, yaw = estimate
     n = len(path)
-    best = memory.path_index % n
+    best = run.path_index % n
     best_d = 1e9
     for step in range(min(n, 50)):
-        i = (memory.path_index + step) % n
+        i = (run.path_index + step) % n
         point = path[i]
         dist = math.hypot(point.x - x, point.y - y)
         if dist < best_d:
             best_d = dist
             best = i
-    memory.path_index = best
+    run.path_index = best
     target = path[best]
     for step in range(1, n):
         point = path[(best + step) % n]
@@ -779,8 +779,8 @@ def pursue(sensors, estimate):
     else:
         target_speed = 4.2
     error = target_speed - speed
-    memory.speed_integral = max(-2.0, min(2.0, memory.speed_integral + error * sensors.dt))
-    throttle = max(-0.55, min(0.72, 0.34 * error + 0.05 * memory.speed_integral))
+    run.speed_integral = max(-2.0, min(2.0, run.speed_integral + error * sensors.dt))
+    throttle = max(-0.55, min(0.72, 0.34 * error + 0.05 * run.speed_integral))
     draw.path([(point.x, point.y) for point in path], "#7dcea0")
     draw.points([(target.x, target.y)], "#f4d03f")
     return steer, throttle

@@ -255,10 +255,10 @@ describe("yard", () => {
       }
     }
     const end = robot.focus();
-    const travelled = Math.hypot(end.x - start.x, end.z - start.z);
-    console.log(`avoid ended at x=${end.x.toFixed(1)} z=${end.z.toFixed(1)} travelled=${travelled.toFixed(1)} up=${minUp.toFixed(2)}`);
+    const traveled = Math.hypot(end.x - start.x, end.z - start.z);
+    console.log(`avoid ended at x=${end.x.toFixed(1)} z=${end.z.toFixed(1)} traveled=${traveled.toFixed(1)} up=${minUp.toFixed(2)}`);
     expect(minUp).toBeGreaterThan(0.75);
     expect(end.z).toBeGreaterThan(22);
-    expect(travelled).toBeGreaterThan(20);
+    expect(traveled).toBeGreaterThan(20);
   }, 30000);
 });

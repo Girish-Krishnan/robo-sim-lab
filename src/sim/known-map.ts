@@ -65,7 +65,7 @@ export function buildKnownMap(
       }
     }
   }
-  const field = distanceCentimetres(occupied, width, height, windowed.resolution);
+  const field = distanceCentimeters(occupied, width, height, windowed.resolution);
   return {
     resolution: windowed.resolution,
     corner: { x: round2(windowed.minX), y: round2(windowed.minY) },
@@ -187,7 +187,7 @@ function inWindow(
 }
 
 /** Chamfer distance in centimeters, clipped at 2.55 m. 0 is an occupied cell. */
-function distanceCentimetres(occupied: Uint8Array, width: number, height: number, resolution: number): Uint8Array {
+function distanceCentimeters(occupied: Uint8Array, width: number, height: number, resolution: number): Uint8Array {
   const diag = 1.41421356237;
   const inf = 1e6;
   const d = new Float64Array(width * height);

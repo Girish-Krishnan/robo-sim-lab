@@ -10,7 +10,7 @@ prerequisites: models/imu
 status: ready
 ---
 
-The plots look jittery, and they also look slowly wrong. Those are two different animals. White noise is a fresh coin flip every sample. Bias is one coin flip at the start of the run, then held, so the late error is that single draw, grown up.
+Jitter, and a slow walk away from the truth. Those are two different animals. White noise is a fresh coin flip every sample. Bias is one coin flip at the start of the run, then held, so the late error is that single draw, grown up.
 
 In the sim: you drive the oval, seed 1. The colored trail is the car and the blue trail is the guess. The graph is the distance between them as the clock runs. Pause stops the car, the clock, and the graph together. The same drive works in the other worlds.
 

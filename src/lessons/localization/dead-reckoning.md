@@ -9,7 +9,7 @@ prerequisites: tracking/drift
 status: ready
 ---
 
-Dead reckoning is the name for the pose you have been using. You start from a known pose, and you add up wheel speed and yaw rate. Nothing in that sum looks at a wall. When the motion measurement is biased, the pose is wrong, and every later addition is wrong in that new frame. It is the closed-eye step count from the odometry lesson, given its proper name.
+Give the guess its proper name. Dead reckoning is the pose you have been using. You start from a known pose, and you add up wheel speed and yaw rate. Nothing in that sum looks at a wall. When the motion measurement is biased, the pose is wrong, and every later addition is wrong in that new frame. It is the closed-eye step count from the odometry lesson.
 
 In the sim: pursuit on the oval. The blue trail is that integral. The key on the view names the trails. This lesson does not hand you the wheel. The program keeps driving.
 

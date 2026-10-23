@@ -117,7 +117,7 @@ button.primary:hover { background: #49d0ba; }
   flex: none;
 }
 #toc-panel {
-  max-height: min(40vh, 320px);
+  max-height: min(220px, 28vh);
   overflow: auto;
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -719,13 +719,19 @@ body.splitter-drag iframe { pointer-events: none; }
 #editor { flex: 1 1 200px; min-height: 200px; overflow: hidden; }
 #app.mode-lessons #code-panel { overflow: hidden; }
 #app.mode-lessons #lesson-chrome {
-  flex: none;
+  flex: 0 0 auto;
+  max-height: min(340px, 46%);
   z-index: 5;
   background: #0e1316;
+  overflow: auto;
+}
+#app.mode-lessons #toc-panel {
+  flex: none;
+  max-height: min(220px, 28vh);
 }
 #app.mode-lessons #lesson {
-  flex: 1 1 0;
-  min-height: 140px;
+  flex: 1 1 auto;
+  min-height: 220px;
   overflow: auto;
 }
 #app.mode-lessons.lesson-has-code #lesson-chrome { order: 0; }
@@ -1073,14 +1079,16 @@ body.splitter-drag iframe { pointer-events: none; }
   #radar { width: 120px; height: 120px; }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 740px) {
   #app.mode-lessons main {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: minmax(112px, 24vh) minmax(0, 1fr);
   }
   #app.mode-lessons #splitter { display: none; }
-  #app.mode-lessons #code-panel { overflow: auto; position: relative; border-top: 1px solid var(--line); }
-  #app.mode-lessons #lesson { min-height: 0; }
+  #app.mode-lessons #code-panel { overflow: auto; position: relative; border-top: 1px solid var(--line); width: auto !important; }
+  #app.mode-lessons #lesson { min-height: 220px; }
+  #app.mode-lessons #lesson-chrome { max-height: 230px; overflow: hidden; }
+  #app.mode-lessons #toc-panel { max-height: 140px; }
   #app.mode-lessons.lesson-has-code.lab-open #lab-split { display: none !important; }
   #app.mode-lessons.lesson-has-code.lab-open #editor {
     display: block !important;

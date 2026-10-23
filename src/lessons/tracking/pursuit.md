@@ -10,7 +10,7 @@ prerequisites: reactive/wall
 status: ready
 ---
 
-Pure pursuit picks a point on the path a fixed distance ahead of the pose it believes, and steers the circular arc that reaches that point. It is how you ride a bike toward a tree you picked out ahead of you: the tree is the lookahead, and the lean is the arc that would arrive there. The world publishes the path on `sensors.task.path` in the odometry frame. On the oval that path is the centerline.
+Pick a point ahead of you and steer the arc that would land on it. That is pure pursuit, the way you ride a bike toward a tree you picked out: the tree is the lookahead, and the lean is the arc that would arrive there. The point sits a fixed distance ahead of the pose the car believes. The world publishes the path on `sensors.task.path` in the odometry frame. On the oval that path is the centerline.
 
 In the sim: the plan, the car, and the odometry trail are all drawn. The green line is the reference path.
 

@@ -9,7 +9,7 @@ prerequisites: localization/dead-reckoning
 status: ready
 ---
 
-A Bayes filter keeps a belief over poses, where dead reckoning kept one pose. Motion spreads the belief, the way a rumour gets fuzzier each time it is retold. A measurement pulls it back onto the poses that would have produced that measurement.
+One pose was never enough. A Bayes filter keeps a belief over poses, where dead reckoning kept one pose. Motion spreads the belief, the way a rumor gets fuzzier each time it is retold. A measurement pulls it back onto the poses that would have produced that measurement.
 
 In the sim: the filter on the oval, pulled back so the cloud fits once it is running. The key names the pink guesses, the yellow ring, and the trails.
 

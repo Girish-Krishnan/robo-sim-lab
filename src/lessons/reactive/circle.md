@@ -10,7 +10,7 @@ prerequisites: models/bicycle
 status: ready
 ---
 
-Open loop means the command ignores the sensors. The circle starter returns the same steering and the same throttle on every tick, like holding a garden hose at one angle and letting the water draw the arc. When it fails, the failure is the plant: the car itself, tires and steering and inertia, as distinct from the controller. Slip, a tight steer, or the wrong pad shows up there. The feedback has nothing to debug because there is none.
+Open loop is the pleasure of a fixed command. The circle starter returns the same steering and the same throttle on every tick, like holding a garden hose at one angle and letting the water draw the arc. When the lap goes wrong, the car itself is the story: tires, steering, and inertia. Slip, a tight steer, or the wrong pad shows up there. There is no feedback to debug, because you never asked the sensors what they saw.
 
 In the sim: the same fixed command, with the camera far enough back to see the whole lap.
 

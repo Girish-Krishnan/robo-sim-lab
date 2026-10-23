@@ -9,7 +9,7 @@ prerequisites: localization/pf-pursuit
 status: ready
 ---
 
-A kidnapped robot was moved while it was not measuring. The odometry origin is a fresh zero in a place the robot has not recognised. The prior, the belief before any scan, is spread over free space.
+Someone picked the robot up and set it down somewhere else. A kidnapped robot was moved while it was not measuring. The odometry origin is a fresh zero in a place the robot has not recognized. The prior, the belief before any scan, is spread over free space.
 
 In the sim, the camera stays overhead and the view holds that first cloud for 2 s. The car stays still during the hold. On seed 1 the guesses are already on the car when the hold ends, and the car then drives the route. When the hold ends, the car pulls away and is cruising at about 4 m/s by 4 s. The Key names the marks: pink dots are particles, the yellow ring is the 2-sigma spread, the red trail is the estimate, and the blue trail is odometry.
 

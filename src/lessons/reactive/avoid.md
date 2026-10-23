@@ -1,7 +1,7 @@
 ---
 title: Lidar obstacle avoidance
 order: 2
-worlds: forest, warehouse
+worlds: forest, track
 world: forest
 spawn: avoid
 starter: avoid
@@ -10,7 +10,7 @@ prerequisites: models/lidar
 status: ready
 ---
 
-Avoidance looks at the scan and steers toward a gap the car fits through. There is no map and no path. Pointed into the trees, a gap follower has trunks to thread instead of an empty road to hold.
+Now the car looks. Avoidance reads the scan and steers toward a gap the car actually fits through. There is no map and no path, just this sweep and the next one. Pointed into the trees, a gap follower has trunks to thread, and that is a much livelier puzzle than an empty road.
 
 In the sim: the forest, aimed into the trees, with the lidar drawn.
 
@@ -52,7 +52,7 @@ The helper that paints those wedges:
 
 Throttle is a function of the nearest forward range $r_{\min}$. Far away, throttle is positive and modest. As $r_{\min}$ falls toward the bumper offset, throttle falls toward 0 and then toward a short reverse. One threshold would be wrong at every speed, so the starter uses a few bands.
 
-Reactive avoidance decides from this scan alone. This lesson runs in the forest, where the car threads trunks and keeps moving. The same program on the oval treats cones as blockers and stays off them.
+Reactive avoidance decides from this scan alone. This lesson runs in the forest, where the car threads trunks and keeps moving. The same program on the oval treats cones as blockers and stays off them. The warehouse stays locked: those aisles are tighter than this reactive rule, and the forest and the oval are the yards where it stays clean.
 
 A gap on the left has positive angle, and positive steering turns left. Negating the command "to match the camera" turns into the obstacle.
 

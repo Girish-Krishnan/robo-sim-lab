@@ -10,7 +10,7 @@ prerequisites: getting-started/robot
 status: ready
 ---
 
-Hold the wheel at a fixed angle and the car draws a circle. The rear axle rolls straight ahead in its own frame. The front axle is steered by an angle $\delta$. A constant $\delta$ is that circle, the way a shopping trolley with the front wheels locked traces one radius around a car park.
+Hold the wheel and watch it draw a circle. That is the whole model, and it is a beautiful one. The rear axle rolls straight ahead in its own frame. The front axle is steered by an angle $\delta$. A constant $\delta$ is that circle, the way a shopping cart with the front wheels locked traces one radius around a parking lot.
 
 In the sim: a fixed steer on an open pad, with the colored trail showing the circle. Positive $\delta$ is a left turn, and the car starts on that circle so the lap stays on the open pad.
 

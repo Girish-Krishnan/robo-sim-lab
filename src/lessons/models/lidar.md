@@ -10,7 +10,7 @@ prerequisites: getting-started/sensors
 status: ready
 ---
 
-The lidar is a spinning range finder in a plane about a meter off the ground. Each control tick you get one full scan: 270 beams across a 270° field of view, so the beams are about 1° apart. On the oval the inner wall and the cones give the fan something solid to hit.
+This is how the car sees. A spinning range finder, about a meter off the ground, sweeps a plane and hands you the distances. Each control tick you get one full scan: 270 beams across a 270° field of view, so the beams are about 1° apart. On the oval the inner wall and the cones give that fan something solid to hit, and the first time you watch it is a little bit magic.
 
 In the sim: the oval, with the avoid program running and the scan drawn. The corner inset is the same scan from above. Amber dots are the close hits.
 
@@ -53,7 +53,7 @@ The right-hand wall in the wall-follow lesson is the beam near $-\pi/2$. Positiv
 
 Trees and shelf uprights are thinner than the gap the car needs. One long beam between two trunks can be a crack the bumper will never fit. The avoid program paints a wedge about as wide as the car around each hit, then looks for an opening in what remains.
 
-Here is that helper. `wide` is the scan after each return has blocked its neighbours.
+Here is that helper. `wide` is the scan after each return has blocked its neighbors.
 
 {{code:inflate}}
 

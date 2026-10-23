@@ -10,7 +10,7 @@ prerequisites: reactive/avoid
 status: ready
 ---
 
-Wall following steers to hold a distance from the wall on the driver's right. On the oval that wall is the inner wall of the east straight. The same program then has to survive the corner, where the wall ends for a moment and comes back on the next straight. It is the same habit as walking a corridor with your shoulder a constant distance from the wall: you feel the gap now, and you also feel whether you are aimed into the plaster.
+Stay with the wall. Wall following steers to hold a distance from whatever is on the driver's right. On the oval that wall is the inner wall of the east straight. The same program then has to survive the corner, where the wall ends for a moment and comes back on the next straight. It is the same habit as walking a corridor with your shoulder a constant distance from the wall: you feel the gap now, and you also feel whether you are aimed into the plaster.
 
 In the sim: the east straight, inner wall on the right, with the trails on so a lap is easy to see.
 

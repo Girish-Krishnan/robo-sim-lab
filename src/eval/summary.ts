@@ -154,7 +154,7 @@ export function regressionErrors(row: RunMetrics): string[] {
   if (row.example === "wall") {
     if (row.collisionCount > 0) errors.push(`${name} collisions ${row.collisionCount}`);
     if (row.stuckTime > 1) errors.push(`${name} stuck ${row.stuckTime.toFixed(1)} s`);
-    if (row.distance < 100) errors.push(`${name} travelled ${row.distance.toFixed(1)} m`);
+    if (row.distance < 100) errors.push(`${name} traveled ${row.distance.toFixed(1)} m`);
     if (row.world === "track" && row.laps < 1) errors.push(`${name} laps ${row.laps}`);
   }
   if (row.example === "avoid") {
@@ -162,7 +162,7 @@ export function regressionErrors(row: RunMetrics): string[] {
     const distance = AVOID_DISTANCE[row.world] ?? 80;
     if (row.collisionCount > contacts) errors.push(`${name} collisions ${row.collisionCount}`);
     if (row.stuckTime > 1) errors.push(`${name} stuck ${row.stuckTime.toFixed(1)} s`);
-    if (row.distance < distance) errors.push(`${name} travelled ${row.distance.toFixed(1)} m`);
+    if (row.distance < distance) errors.push(`${name} traveled ${row.distance.toFixed(1)} m`);
   }
   if (row.world === "forest" && row.example === "avoid") {
     const inside = Math.abs(row.final.x) < 22 && row.final.z > -22 && row.final.z < 42;
@@ -173,14 +173,14 @@ export function regressionErrors(row: RunMetrics): string[] {
     const distance = PURSUIT_DISTANCE[row.world] ?? 80;
     if (row.collisionCount > contacts) errors.push(`${name} collisions ${row.collisionCount}`);
     if (row.stuckTime > 2) errors.push(`${name} stuck ${row.stuckTime.toFixed(1)} s`);
-    if (row.distance < distance) errors.push(`${name} travelled ${row.distance.toFixed(1)} m`);
+    if (row.distance < distance) errors.push(`${name} traveled ${row.distance.toFixed(1)} m`);
     if (row.crossTrackMean > 3) errors.push(`${name} cross-track mean ${row.crossTrackMean.toFixed(2)} m`);
     if (row.laps < 1) errors.push(`${name} laps ${row.laps}`);
   }
   if (row.example === "mcl") {
     if (row.collisionCount > 0) errors.push(`${name} collisions ${row.collisionCount}`);
     if (row.stuckTime > 2) errors.push(`${name} stuck ${row.stuckTime.toFixed(1)} s`);
-    if (row.distance < (MCL_DISTANCE[row.world] ?? 100)) errors.push(`${name} travelled ${row.distance.toFixed(1)} m`);
+    if (row.distance < (MCL_DISTANCE[row.world] ?? 100)) errors.push(`${name} traveled ${row.distance.toFixed(1)} m`);
     if (row.crossTrackMean > (MCL_CROSS[row.world] ?? 1.5)) {
       errors.push(`${name} cross-track mean ${row.crossTrackMean.toFixed(2)} m`);
     }
@@ -204,7 +204,7 @@ export function regressionErrors(row: RunMetrics): string[] {
       errors.push(`${name} final pose ${row.finalPoseError.toFixed(2)} m`);
     }
     if (row.distance < (GLOBAL_DISTANCE[row.world] ?? 100)) {
-      errors.push(`${name} travelled ${row.distance.toFixed(1)} m`);
+      errors.push(`${name} traveled ${row.distance.toFixed(1)} m`);
     }
     if (row.laps < 1) errors.push(`${name} laps ${row.laps}`);
     if (row.world === "track" && row.seed === 1) {
@@ -248,24 +248,25 @@ export function lessonDemoReport(rows: RunMetrics[], extras: RunMetrics[] = []):
     }
     if (row.collisionCount !== 0) errors.push(`${lesson.id} contacts ${row.collisionCount}`);
     if (row.stuckTime !== 0) errors.push(`${lesson.id} stuck ${row.stuckTime.toFixed(2)} s`);
-    if (row.distance < DEMO_DISTANCE) errors.push(`${lesson.id} travelled ${row.distance.toFixed(1)} m`);
+    if (row.distance < DEMO_DISTANCE) errors.push(`${lesson.id} traveled ${row.distance.toFixed(1)} m`);
     lines.push(
       `| ${lesson.title} | ${row.world} | ${row.example} | ${row.collisionCount} | ${row.stuckTime.toFixed(2)} | ${row.distance.toFixed(1)} |`,
     );
   }
   const switchLines = [
-    "| Lesson | World | Spawn kind | Matches scenario |",
-    "| --- | --- | --- | --- |",
+    "| Lesson | World | Allowed | Spawn kind | Matches scenario |",
+    "| --- | --- | --- | --- | --- |",
   ];
   for (const lesson of LESSONS) {
     if (lesson.status !== "ready") continue;
     for (const world of ["city", "track", "forest", "warehouse"] as WorldId[]) {
+      const allowed = lesson.worlds.includes(world);
       const pose = resolveSpawnIn(lesson, world);
       const expected = lesson.spawn === "default" ? worldSpawn(world) : spawnFor(world, lesson.spawn, "scenario");
       const yawGap = Math.atan2(Math.sin(pose.yaw - expected.yaw), Math.cos(pose.yaw - expected.yaw));
       const same = Math.hypot(pose.x - expected.x, pose.z - expected.z) < 0.05 && Math.abs(yawGap) < 0.05;
       if (!same) errors.push(`${lesson.id} in ${world} left its ${lesson.spawn} start`);
-      switchLines.push(`| ${lesson.title} | ${world} | ${lesson.spawn} | ${same ? "yes" : "NO"} |`);
+      switchLines.push(`| ${lesson.title} | ${world} | ${allowed ? "yes" : "locked"} | ${lesson.spawn} | ${same ? "yes" : "NO"} |`);
     }
   }
   const seedLines = [
@@ -276,7 +277,7 @@ export function lessonDemoReport(rows: RunMetrics[], extras: RunMetrics[] = []):
     const cap = row.example === "avoid" ? (AVOID_CONTACTS[row.world] ?? 1) : row.example === "pursuit" ? (PURSUIT_CONTACTS[row.world] ?? 0) : 0;
     if (row.collisionCount > cap) errors.push(`${row.world}/${row.example} seed ${row.seed} contacts ${row.collisionCount}`);
     if (row.stuckTime !== 0) errors.push(`${row.world}/${row.example} seed ${row.seed} stuck ${row.stuckTime.toFixed(2)} s`);
-    if (row.distance < DEMO_DISTANCE) errors.push(`${row.world}/${row.example} seed ${row.seed} travelled ${row.distance.toFixed(1)} m`);
+    if (row.distance < DEMO_DISTANCE) errors.push(`${row.world}/${row.example} seed ${row.seed} traveled ${row.distance.toFixed(1)} m`);
     seedLines.push(
       `| ${row.world} | ${row.example} | ${row.seed} | ${row.collisionCount} | ${row.stuckTime.toFixed(2)} | ${row.distance.toFixed(1)} |`,
     );
@@ -292,7 +293,7 @@ export function lessonDemoReport(rows: RunMetrics[], extras: RunMetrics[] = []):
       "",
       "## World switches",
       "",
-      "Changing the yard keeps the lesson's kind of start.",
+      "A locked world is not offered in that lesson. The menu keeps it disabled. The start kind still matches the scenario in every yard, including the locked ones.",
       "",
       ...switchLines,
       "",

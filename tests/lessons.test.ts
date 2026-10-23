@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 import { LESSONS, MODULES, lessonById, resolveSpawnIn } from "../src/course/catalog";
 import { progressCard } from "../src/course/shell";
 import { renderMarkdown } from "../src/course/markdown";
-import { displayedOdom } from "../src/ui/hud";
+import { displayedOdom, modeLabel, runBarLabel } from "../src/ui/hud";
 import { chunkAtLine, readChunks } from "../src/editor/chunks";
 import { formatStudentError } from "../src/editor/errors";
 import { EXAMPLES } from "../src/editor/examples";
-import { readProgramSeed, readStartPose, poseProblem } from "../src/editor/program-header";
+import { invalidPoseMessage, readProgramSeed, readStartPose, poseProblem } from "../src/editor/program-header";
 import { solidsFor } from "../src/eval/scenarios";
 import { spawnFor, worldSpawn } from "../src/sim/spawns";
 import type { WorldId } from "../src/sim/worlds";
@@ -162,6 +162,49 @@ describe("course catalog", () => {
     expect(readStartPose(source, "forest")).toBeNull();
     expect(readStartPose("START_POSE = (3, 4, 180)\n", "city")).toEqual({ x: 3, y: 4, heading: 180 });
     expect(poseProblem([], 200, 0)).toBe("off the map");
+  });
+
+  it("refuses a bad START_POSE with the lesson start, not a silent world default", () => {
+    expect(invalidPoseMessage(200, 0, "off the map", "lesson")).toBe(
+      "START_POSE (200, 0) is off the map. Using this lesson's start.",
+    );
+    expect(invalidPoseMessage(1.5, -4, "inside a wall", "example")).toBe(
+      "START_POSE (1.5, -4) is inside a wall. Using this example's start.",
+    );
+    expect(invalidPoseMessage(0, 0, "inside a wall", "world")).toContain("this world's default start");
+  });
+
+  it("names hands-on driving as Driving, and keeps a halted lesson ready", () => {
+    expect(modeLabel("lessons", "stopped", false, true, true)).toBe("Lesson · driving");
+    expect(modeLabel("lessons", "stopped", false, true, false)).toBe("Lesson · ready");
+    expect(modeLabel("lessons", "running", false, false, false)).toBe("Lesson · running");
+    expect(modeLabel("lessons", "stopped", true, true, true)).toBe("paused");
+    expect(runBarLabel("stopped", false, true, true)).toBe("Driving");
+    expect(runBarLabel("stopped", false, true, false)).toBe("Ready");
+    expect(runBarLabel("running", false, false, false)).toBe("Running");
+    expect(runBarLabel("stopped", true, true, true)).toBe("Paused");
+  });
+
+  it("keeps tick memory on one Run object in every example", () => {
+    for (const example of EXAMPLES) {
+      expect(example.source, example.id).toContain("class Run:");
+      expect(example.source, example.id).toContain("def init(sensors):");
+      expect(example.source, example.id).toContain("run = Run()");
+      expect(example.source, example.id).not.toMatch(/^aim = /m);
+      expect(example.source, example.id).not.toMatch(/^ticks = /m);
+      expect(example.source, example.id).not.toContain("class Memory");
+    }
+    const avoid = lessonById("reactive/avoid");
+    expect(avoid?.worlds).toEqual(["forest", "track"]);
+    expect(lessonById("getting-started/sensors")?.markdown).toContain("class Run");
+    expect(lessonById("getting-started/sensors")?.markdown).toContain("{{code:Run}}");
+  });
+
+  it("keeps American spelling in the lessons", () => {
+    const british = /\b(recognised|neighbours|travelling|trolley|neighbouring|kerbs?|travelled|metres|rumour|colour|favourite|behaviour|centre)\b/i;
+    for (const lesson of LESSONS) {
+      expect(lesson.markdown, lesson.id).not.toMatch(british);
+    }
   });
 
   it("accepts every example start, and keeps the filter free of placeholder functions", () => {

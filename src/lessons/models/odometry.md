@@ -10,7 +10,7 @@ prerequisites: models/bicycle
 status: ready
 ---
 
-Wheel odometry is a running guess of where the car is. Each tick it adds "how far the rear wheels turned" and "how much the gyro says we yawed." It is the same trick as pacing a room with your eyes closed: the count can be careful, and the room you imagine still slides away from the room you are standing in.
+Close your eyes and keep walking. Wheel odometry is that same brave guess, done by the car. Each tick it adds "how far the rear wheels turned" and "how much the gyro says we yawed." The count can be careful, and the room you imagine still slides away from the room you are standing in.
 
 In the sim: you drive. WASD or the arrow keys, Space to brake. The colored trail is the car. The blue trail is the guess. The little graph is how far those two have drifted apart, in meters, as the clock runs. Pause freezes the car, the clock, and the graph together.
 
@@ -24,12 +24,12 @@ The steering angle is measured and published, with its own small bias, and the p
 
 <svg viewBox="0 0 480 230" role="img" aria-label="True path and odometry trail separating over one lap">
   <rect width="480" height="230" rx="12" fill="#10161a"/>
-  <path d="M40 150 C 120 150, 160 70, 250 70 C 340 70, 380 160, 450 150" fill="none" stroke="#3f8cc0" stroke-width="4"/>
-  <path d="M40 150 C 130 158, 180 96, 270 88 C 360 80, 400 176, 452 168" fill="none" stroke="#e3a23a" stroke-width="3"/>
+  <path d="M40 150 C 120 150, 160 70, 250 70 C 340 70, 380 160, 450 150" fill="none" stroke="#e3a23a" stroke-width="4"/>
+  <path d="M40 150 C 130 158, 180 96, 270 88 C 360 80, 400 176, 452 168" fill="none" stroke="#3f8cc0" stroke-width="3"/>
   <circle cx="40" cy="150" r="5" fill="#f4f1ea"/>
   <text x="52" y="146" fill="#f4f1ea" font-size="12" font-family="sans-serif">start, both together</text>
-  <text x="300" y="58" fill="#7eb6d6" font-size="13" font-family="sans-serif">true path</text>
-  <text x="300" y="196" fill="#e3a23a" font-size="13" font-family="sans-serif">odometry</text>
+  <text x="300" y="58" fill="#e3a23a" font-size="13" font-family="sans-serif">true path</text>
+  <text x="300" y="196" fill="#6ea8ff" font-size="13" font-family="sans-serif">odometry</text>
   <text x="16" y="214" fill="#8e9b94" font-size="13" font-family="sans-serif">A small heading bias bends the guess off the car. The gap grows with time.</text>
 </svg>
 

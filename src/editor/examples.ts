@@ -37,7 +37,8 @@ const circle = `${programPreamble("circle")}# Circle drive
 #   steering  radians, positive = left, clamped to ±${maxSteer}
 #   throttle  -1 … 1, positive = forward
 #
-# Code above control() runs once per Run. Names there persist across ticks.
+# Values that last from one tick to the next live on run. init(sensors)
+# builds a fresh Run at the start of every run, so a Reset starts clean.
 # Wheelbase is ${wheelbase} m, so this steer is a circle of roughly
 # ${wheelbase} / tan(0.34) meters (about 5.4 m). The car is placed on an
 # open pad for this example: the south lawn, the oval infield, the meadow
@@ -45,15 +46,22 @@ const circle = `${programPreamble("circle")}# Circle drive
 
 import numpy as np
 
-ticks = 0
+class Run:
+    def __init__(self):
+        self.ticks = 0
+
+run = Run()
+
+def init(sensors):
+    global run
+    run = Run()
 
 def control(sensors):
-    global ticks
-    ticks += 1
-    if ticks == 1:
+    run.ticks += 1
+    if run.ticks == 1:
         print("lidar beams", int(sensors.lidar.ranges.shape[0]))
         print("odometry fields: speed, steering_angle, pose")
-    if ticks % 20 == 0:
+    if run.ticks % 20 == 0:
         nearest = float(np.min(sensors.lidar.ranges))
         print(
             f"t={sensors.time:.1f}",
@@ -105,16 +113,25 @@ def tunables():
     HALF = 1.35
 
 tunables()
-aim = 0.0
-reverse = 0
-phase = "run"
-phase_ticks = 0
-cooldown = 0
-held_sign = 1.0
-anchor_x = 0.0
-anchor_y = 0.0
-anchor_t = 0.0
-saw_anchor = False
+
+class Run:
+    def __init__(self):
+        self.aim = 0.0
+        self.reverse = 0
+        self.phase = "run"
+        self.phase_ticks = 0
+        self.cooldown = 0
+        self.held_sign = 1.0
+        self.anchor_x = 0.0
+        self.anchor_y = 0.0
+        self.anchor_t = 0.0
+        self.saw_anchor = False
+
+run = Run()
+
+def init(sensors):
+    global run
+    run = Run()
 
 def inflate(ranges, angles):
     # A return at range r blocks beams within atan(HALF / r) of it.
@@ -130,8 +147,6 @@ def keep_misses(ranges, max_range):
     return np.where(ranges >= max_range - 1e-6, max_range, ranges)
 
 def control(sensors):
-    global aim, reverse, phase, phase_ticks, cooldown, held_sign
-    global anchor_x, anchor_y, anchor_t, saw_anchor
     ranges = np.asarray(sensors.lidar.ranges, dtype=float)
     angles = np.asarray(sensors.lidar.angles, dtype=float)
     ranges = keep_misses(ranges, sensors.lidar.max_range)
@@ -160,7 +175,7 @@ def control(sensors):
     forward = np.abs(angles) < window
     score = np.where(forward, wide * pref, -1.0)
     gap = float(angles[int(np.argmax(score))])
-    aim = 0.6 * aim + 0.4 * gap
+    run.aim = 0.6 * run.aim + 0.4 * gap
     # Widest opening anywhere in the scan. A corner's exit is often beside
     # the nose, outside the forward window the gap follower uses.
     exit_angle = float(angles[int(np.argmax(wide))])
@@ -173,71 +188,71 @@ def control(sensors):
 
     speed = float(sensors.odometry.speed)
     pose = sensors.odometry.pose
-    if not saw_anchor:
-        anchor_x, anchor_y, anchor_t = pose.x, pose.y, sensors.time
-        saw_anchor = True
-    if sensors.time - anchor_t > 2.5:
-        moved = math.hypot(pose.x - anchor_x, pose.y - anchor_y)
+    if not run.saw_anchor:
+        run.anchor_x, run.anchor_y, run.anchor_t = pose.x, pose.y, sensors.time
+        run.saw_anchor = True
+    if sensors.time - run.anchor_t > 2.5:
+        moved = math.hypot(pose.x - run.anchor_x, pose.y - run.anchor_y)
         stalled = moved < 1.2 and abs(speed) < 0.55
-        anchor_x, anchor_y, anchor_t = pose.x, pose.y, sensors.time
+        run.anchor_x, run.anchor_y, run.anchor_t = pose.x, pose.y, sensors.time
     else:
         stalled = False
-    if cooldown > 0:
-        cooldown -= 1
+    if run.cooldown > 0:
+        run.cooldown -= 1
 
     # Back out of a stall, yaw toward the widest gap while still reversing
     # (steer sign flips with speed), then drive into that gap. The gap is
     # re-read each tick because a body angle goes stale as the car yaws.
-    if phase == "back":
-        phase_ticks += 1
+    if run.phase == "back":
+        run.phase_ticks += 1
         rear = np.abs(angles) > 2.0
         rear_range = float(np.min(ranges[rear])) if np.any(rear) else sensors.lidar.max_range
         # The tail is about 1.6 m behind the lidar, and the rear 90 deg is
         # not scanned. A side-rear beam inside 1.7 m means that corner is
         # already at the bumper. Stop backing before the second contact.
-        if phase_ticks > 40 or (phase_ticks > 10 and rear_range < 1.7):
-            phase = "spin" if abs(exit_angle) > 0.8 else "go"
-            phase_ticks = 0
-        return float(np.clip(0.22 * held_sign, -0.3, 0.3)), -0.4
-    if phase == "spin":
-        phase_ticks += 1
-        if abs(exit_angle) < 0.6 or phase_ticks > 50:
-            phase = "go"
-            phase_ticks = 0
+        if run.phase_ticks > 40 or (run.phase_ticks > 10 and rear_range < 1.7):
+            run.phase = "spin" if abs(exit_angle) > 0.8 else "go"
+            run.phase_ticks = 0
+        return float(np.clip(0.22 * run.held_sign, -0.3, 0.3)), -0.4
+    if run.phase == "spin":
+        run.phase_ticks += 1
+        if abs(exit_angle) < 0.6 or run.phase_ticks > 50:
+            run.phase = "go"
+            run.phase_ticks = 0
         else:
             return float(np.clip(-exit_angle, -0.52, 0.52)), -0.4
-    if phase == "go":
-        phase_ticks += 1
-        if phase_ticks > 50:
-            phase = "run"
-            phase_ticks = 0
-            cooldown = 30
+    if run.phase == "go":
+        run.phase_ticks += 1
+        if run.phase_ticks > 50:
+            run.phase = "run"
+            run.phase_ticks = 0
+            run.cooldown = 30
         return float(np.clip(exit_angle * 0.9, -0.5, 0.5)), 0.26
-    if (stalled or (front_range < 2.0 and left_clear < 3.0 and right_clear < 3.0 and abs(speed) < 1.0)) and cooldown == 0:
-        held_sign = 1.0 if left_clear < right_clear else -1.0
-        phase = "back"
-        phase_ticks = 0
-        return float(np.clip(0.22 * held_sign, -0.3, 0.3)), -0.36
+    if (stalled or (front_range < 2.0 and left_clear < 3.0 and right_clear < 3.0 and abs(speed) < 1.0)) and run.cooldown == 0:
+        run.held_sign = 1.0 if left_clear < right_clear else -1.0
+        run.phase = "back"
+        run.phase_ticks = 0
+        return float(np.clip(0.22 * run.held_sign, -0.3, 0.3)), -0.36
 
-    if reverse > 0:
+    if run.reverse > 0:
         rear = np.abs(angles) > 2.0
         rear_range = float(np.min(ranges[rear])) if np.any(rear) else sensors.lidar.max_range
         if rear_range < 1.7:
-            reverse = 0
+            run.reverse = 0
         else:
-            reverse -= 1
+            run.reverse -= 1
             return turn, -0.28
     # Creep into a dead end is a contact the 1.55 m check still allows,
     # because the bumper arrives while the car is already slow. Back up
     # sooner, and only then: a fast straight (the oval) does not reverse.
     if front_range < 1.55 or ((not weave) and abs(speed) < 0.8 and front_range < 2.15):
-        reverse = 12
+        run.reverse = 12
         return turn, -0.28
     # A stopped car does not yaw. If a side is open, roll into it.
     if abs(speed) < 0.35 and max(left_clear, right_clear) > front_range + 0.8:
         return turn, 0.2
 
-    steering = float(np.clip(aim * 1.15, -0.5, 0.5))
+    steering = float(np.clip(run.aim * 1.15, -0.5, 0.5))
     if front_range < 8.0 and speed > 3.0:
         throttle = -0.55
     elif front_range < 5.0 and speed > 1.8:
@@ -297,13 +312,22 @@ def tunables():
 
 tunables()
 WHEELBASE = 1.9
-# follow the wall, coast past the corner, then arc onto the next face.
-phase = "follow"
-phase_ticks = 0
-reverse = 0
-gap = TARGET
-locked = False
-saw_preview = False
+
+class Run:
+    def __init__(self):
+        # follow the wall, coast past the corner, then arc onto the next face.
+        self.phase = "follow"
+        self.phase_ticks = 0
+        self.reverse = 0
+        self.gap = TARGET
+        self.locked = False
+        self.saw_preview = False
+
+run = Run()
+
+def init(sensors):
+    global run
+    run = Run()
 
 def beam(ranges, angles, center, width):
     mask = np.abs(angles - center) < width
@@ -324,10 +348,9 @@ def wall_steer(target, future, alpha, kp, kd):
 
 def corner_steer():
     # Radius matches the standoff, so the arc is centered on the corner.
-    return -min(0.52, math.atan(WHEELBASE / max(gap, 3.15)))
+    return -min(0.52, math.atan(WHEELBASE / max(run.gap, 3.15)))
 
 def control(sensors):
-    global phase, phase_ticks, reverse, gap, locked, saw_preview
     ranges = np.asarray(sensors.lidar.ranges, dtype=float)
     angles = np.asarray(sensors.lidar.angles, dtype=float)
     side = beam(ranges, angles, -math.pi / 2, 0.14)
@@ -341,44 +364,44 @@ def control(sensors):
     # the next face arriving at a slant, and chasing them widens the arc
     # until it cuts the corner.
     if (
-        phase == "follow"
+        run.phase == "follow"
         and side < 6.5
         and diag < side * 2.0
         and abs(alpha) < 0.35
         and abs(dist - TARGET) < 1.0
     ):
-        gap = 0.75 * gap + 0.25 * dist
+        run.gap = 0.75 * run.gap + 0.25 * dist
         if abs(dist - TARGET) < 0.55:
-            locked = True
+            run.locked = True
 
     # The bumper is about 0.7 m ahead of the lidar, so a forward reading
     # near 1 m is already a contact. Back up before the nose stays planted.
-    buried = front < 1.05 or (side < 1.4 and alpha < -0.45) or (phase == "turn" and front < 1.3 and phase_ticks > 8)
-    if reverse > 0:
-        reverse -= 1
+    buried = front < 1.05 or (side < 1.4 and alpha < -0.45) or (run.phase == "turn" and front < 1.3 and run.phase_ticks > 8)
+    if run.reverse > 0:
+        run.reverse -= 1
         # Wheels right while reversing: yaw rate flips with speed, so the
         # nose swings left, away from the wall.
         return -0.4, -0.26
     if buried:
-        reverse = 16
-        phase = "follow"
-        phase_ticks = 0
+        run.reverse = 16
+        run.phase = "follow"
+        run.phase_ticks = 0
         return -0.4, -0.26
 
-    if phase == "turn":
-        phase_ticks += 1
+    if run.phase == "turn":
+        run.phase_ticks += 1
         # A real new face: parallel, both beams on it, and the shallow beam
         # still sees it continuing. Time alone is not enough at a creep.
         on_new_face = (
-            phase_ticks > 20
+            run.phase_ticks > 20
             and abs(side - TARGET) < 0.9
             and abs(alpha) < 0.22
             and diag < side * 1.65
             and preview < max(side, 0.5) / math.sin(0.35) * 1.3
         )
-        if on_new_face or phase_ticks > 160:
-            phase = "follow"
-            phase_ticks = 0
+        if on_new_face or run.phase_ticks > 160:
+            run.phase = "follow"
+            run.phase_ticks = 0
             return 0.0, 0.1
         return corner_steer(), 0.12
 
@@ -386,15 +409,15 @@ def control(sensors):
     # driving let the rear axle reach the corner, then the arc starts.
     # Gradual slip still counts. Requiring a one-tick jump misses a car
     # that yaws off the wall over a second and then has nothing beside it.
-    lost = locked and gap < 4.2 and side > 6.2
-    if phase == "coast" or (phase == "follow" and lost):
-        if phase != "coast":
-            phase = "coast"
-            phase_ticks = 0
-        phase_ticks += 1
-        if phase_ticks > 6:
-            phase = "turn"
-            phase_ticks = 0
+    lost = run.locked and run.gap < 4.2 and side > 6.2
+    if run.phase == "coast" or (run.phase == "follow" and lost):
+        if run.phase != "coast":
+            run.phase = "coast"
+            run.phase_ticks = 0
+        run.phase_ticks += 1
+        if run.phase_ticks > 6:
+            run.phase = "turn"
+            run.phase_ticks = 0
             return corner_steer(), 0.08
         return 0.0, 0.0
 
@@ -408,12 +431,12 @@ def control(sensors):
     # A short wall never shows up on the shallow beam. Only trust that beam
     # after it has actually been on the wall.
     if settled and preview < 10.5:
-        saw_preview = True
+        run.saw_preview = True
     # A fast car cannot wait until it is perfectly settled to start braking.
     # Steering stays at zero either way: a half-lost beam turns the nose in.
     speed = float(sensors.odometry.speed)
-    ending = diag > max(6.2, side * 1.7) or (saw_preview and preview > min(11.2, parallel_preview + 1.6))
-    corner_soon = locked and side < 5.5 and ending and (settled or speed > 3.0)
+    ending = diag > max(6.2, side * 1.7) or (run.saw_preview and preview > min(11.2, parallel_preview + 1.6))
+    corner_soon = run.locked and side < 5.5 and ending and (settled or speed > 3.0)
     if corner_soon:
         # The straight may be near 5 m/s. The shallow beam sees the wall end
         # several meters early. Shed that before the arc. Holding the brake

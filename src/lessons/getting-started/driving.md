@@ -10,7 +10,7 @@ prerequisites: getting-started/sensors
 status: ready
 ---
 
-Before a controller, drive the car yourself. The keys send the same pair a Python program returns: a steering angle and a throttle. The simulator slews the steering, so full lock arrives over a few frames, the way a steering rack does.
+Take the wheel. Before any controller exists, you should feel what this car can do. The keys send the same pair a Python program returns: a steering angle and a throttle. The simulator slews the steering, so full lock arrives over a few frames, the way a steering rack does.
 
 W or the up arrow drives forward. S or down reverses, more gently than full forward. A or left steers left. D or right steers right. Space brakes. R resets the world while you are driving by hand.
 
@@ -22,7 +22,7 @@ On the city street the roundabout, the planters, and the lamp posts all return h
 
 ## The two trails
 
-The colored trail is where the car went. The blue trail is where dead reckoning thinks it went. They start together and slowly separate. That gap is the subject of the odometry and localization lessons. Careful driving leaves the gap where it is. This page has no program, so the bias is seed 1, and Reset run replays it.
+The colored trail is where the car went. The blue trail is where dead reckoning thinks it went. They start together and slowly separate. That gap is the subject of the odometry and localization lessons. Drive gently and the two trails stay close. This page has no program, so the bias is seed 1, and Reset run replays it.
 
 ## Try it
 

@@ -10,7 +10,7 @@ prerequisites: models/odometry
 status: ready
 ---
 
-The IMU in this sandbox is a yaw gyro and a three-axis accelerometer. There is no magnetometer, so nothing here measures absolute heading. Yaw is the integral of the gyro, the way a spinning office chair tells you how far you have turned and forgets which way the door was. On a steady circle that rate sits near $(v/L)\tan\delta$, plus a bias that stays put.
+Spin an office chair and try to say which way the door is. The IMU in this sandbox is a yaw gyro and a three-axis accelerometer, and it has the same problem. There is no magnetometer, so nothing here measures absolute heading. Yaw is the integral of the gyro: you can say how far you have turned, and you have lost the door. On a steady circle that rate sits near $(v/L)\tan\delta$, plus a bias that stays put.
 
 In the sim: the circle program on an open pad, so the yaw rate has a steady value to compare.
 
@@ -40,7 +40,7 @@ A constant bias $b$ on the yaw gyro, integrated for $T$ seconds, is a heading er
 
 $$\Delta\theta = b\,T.$$
 
-With $b = 0.0012$ rad/s and $T = 60$ s, $\Delta\theta = 0.072$ rad, about 4.1°. After travelling a distance $s$, the cross-track contribution of a heading error is roughly $s\,\Delta\theta$ while the error is still small and growing. On an oval lap of about 200 m that is meters. The noise around the bias averages down. The bias stays.
+With $b = 0.0012$ rad/s and $T = 60$ s, $\Delta\theta = 0.072$ rad, about 4.1°. After traveling a distance $s$, the cross-track contribution of a heading error is roughly $s\,\Delta\theta$ while the error is still small and growing. On an oval lap of about 200 m that is meters. The noise around the bias averages down. The bias stays.
 
 Specific force $f$ and acceleration $a$ differ by gravity. In the world, $f = a - g$ with $g$ pointing down. On flat ground at rest, $a = 0$ and $f_z = +9.81$ in the body. A tilt $\phi$ leaks that into the horizontal axes. This course keeps the yards flat, so the accelerometer is here to make the sample look like a real IMU. Wheel speed remains the speed sensor. Integrating `accel.x` for a minute, with a bias of 0.02 m/s², invents tens of meters per second of fake speed.
 

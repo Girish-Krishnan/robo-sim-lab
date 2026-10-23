@@ -10,7 +10,7 @@ prerequisites: getting-started/sandbox
 status: ready
 ---
 
-This is a small car. The front wheels steer and the rear wheels drive. The wheelbase, the distance from the rear axle to the front axle, is 1.9 m, so a full-lock turn still needs several meters of room.
+Meet the car. It is small, the front wheels steer, and the rear wheels drive. The wheelbase, the distance from the rear axle to the front axle, is 1.9 m, so a full-lock turn still needs several meters of room. That length is the whole personality of the machine: it cannot spin in place, and every turn is an arc you can picture.
 
 The steering command and the angle the wheels have actually reached are two numbers on the HUD. While those numbers differ, the wheels are still slewing: they are turning toward the angle you asked for, and they have not arrived yet.
 
@@ -18,7 +18,7 @@ In the sim: both the command and the wheel angle are on the readout under the vi
 
 The lidar sits on the roof, about 0.46 m ahead of the body center and a bit over a meter off the ground. Walls, trunks, shelves, and cones reach it. A curb is below the scan.
 
-The bicycle lesson writes the turn as one equation and names the coordinate frames. This lesson is only the car you are driving. Throttle near 0 applies a small hold brake, so letting go of the key is a gentle stop.
+The bicycle lesson writes the turn as one equation and names the coordinate frames. Here: just the car. The math comes in the bicycle lesson. Throttle near 0 applies a small hold brake, so letting go of the key is a gentle stop.
 
 ## Try it
 

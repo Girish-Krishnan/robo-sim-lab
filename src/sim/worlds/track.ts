@@ -121,11 +121,11 @@ export async function mountTrack(
   group.add(infield);
 
   const paint = new THREE.MeshBasicMaterial({ color: 0xf4f1e6 });
-  const kerb = new THREE.MeshBasicMaterial({ color: 0xe25b2a });
-  const kerb2 = new THREE.MeshBasicMaterial({ color: 0xf7f4ee });
+  const curb = new THREE.MeshBasicMaterial({ color: 0xe25b2a });
+  const curb2 = new THREE.MeshBasicMaterial({ color: 0xf7f4ee });
   for (let z = -Z_IN + 2; z < Z_IN - 2; z += 2.2) {
     for (const x of [INNER + 0.7, OUTER - 0.7, -INNER - 0.7, -OUTER + 0.7]) {
-      const a = new THREE.Mesh(new THREE.PlaneGeometry(0.55, 1.05), (Math.round(z / 2.2) % 2 === 0 ? kerb : kerb2));
+      const a = new THREE.Mesh(new THREE.PlaneGeometry(0.55, 1.05), (Math.round(z / 2.2) % 2 === 0 ? curb : curb2));
       a.rotation.x = -Math.PI / 2;
       a.position.set(x, 0.07, z);
       group.add(a);
@@ -133,7 +133,7 @@ export async function mountTrack(
   }
   // Start/finish across the east straight.
   for (let i = 0; i < 8; i++) {
-    const band = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 0.55), i % 2 === 0 ? paint : kerb);
+    const band = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 0.55), i % 2 === 0 ? paint : curb);
     band.rotation.x = -Math.PI / 2;
     band.position.set(10.2 + i * 1.35, 0.08, TRACK_SPAWN.z);
     group.add(band);

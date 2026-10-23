@@ -66,7 +66,7 @@ export async function mountCourse(host: CourseHost): Promise<void> {
   let labId: string | null = null;
   let saveTimer = 0;
   let opening = 0;
-  let tocOpen = true;
+  let tocOpen = false;
   const openModules = new Set<string>();
   let tocReady = false;
   const slices = new Map<string, SliceEditor>();
@@ -371,7 +371,7 @@ export async function mountCourse(host: CourseHost): Promise<void> {
     const note = document.createElement("p");
     note.className = "lesson-world-note";
     note.textContent = worldNote(lesson);
-    note.hidden = lesson.worlds.length < 2;
+    note.hidden = false;
     nav.append(bar, panel, note);
 
     toggle.addEventListener("click", () => {
@@ -434,7 +434,9 @@ function worldNote(lesson: Lesson): string {
   const label = (id: string) => WORLDS.find((world) => world.id === id)?.label ?? id;
   const home = label(lesson.world);
   const others = lesson.worlds.filter((id) => id !== lesson.world).map(label);
-  if (others.length === 0) return "";
+  if (others.length === 0) {
+    return `This lesson is written for ${home}. The World menu stays on that yard.`;
+  }
   return `This lesson also runs in ${others.join(", ")}. Pick one from World. The numbers in the text are for ${home}.`;
 }
 

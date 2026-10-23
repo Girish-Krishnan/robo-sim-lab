@@ -10,7 +10,7 @@ prerequisites: tracking/pursuit, models/noise
 status: ready
 ---
 
-Pure pursuit on the oval is a good controller attached to a drifting pose. The path plot is the picture: the plan stays on the centerline, the car follows it at first, and the odometry trail walks away. Cross-track of the true car grows because the controller is steering the ghost, the way a careful driver following a phone map still leaves the road when the blue dot is wrong.
+A good driver with a bad map still leaves the road. Pure pursuit on the oval is a good controller attached to a drifting pose. The path plot is the picture: the plan stays on the centerline, the car follows it at first, and the odometry trail walks away. Cross-track of the true car grows because the controller is steering the ghost, the way a careful driver following a phone map still leaves the road when the blue dot is wrong.
 
 Cross-track here is the distance from the true position to the reference path, a chain of short straight segments (a polyline). The odometry pose stays close to the path by construction, because pursuit is tracking that pose. The car is what leaves.
 

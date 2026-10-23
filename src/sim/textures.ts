@@ -62,10 +62,10 @@ export function padTexture(): THREE.CanvasTexture {
     y: ((24 - z) / 48) * size,
   });
 
-  // The pad plane is rotated -90° on X and the canvas texture flips Y,
-  // so a mark drawn toward larger canvas y lands on world +Z (north).
-  // Unrotated canvas text then reads left to right for a driver heading north,
-  // with the arrow tip ahead of the word.
+  // The pad plane is rotated -90° on X and the canvas texture flips Y.
+  // Larger canvas y lands ahead of the car, north, where a driver on this
+  // street is heading. Unrotated canvas text reads upright from the chase
+  // camera behind the car. The word sits past the chevron's tip.
   const spawn = worldToPx(5.4, 0);
   ctx.strokeStyle = "rgba(227, 162, 58, 0.95)";
   ctx.lineWidth = 6;
@@ -80,7 +80,7 @@ export function padTexture(): THREE.CanvasTexture {
   ctx.font = "600 28px sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText("START", spawn.x, spawn.y - 36);
+  ctx.fillText("START", spawn.x, spawn.y + 52);
 
   return canvasTexture(canvas);
 }

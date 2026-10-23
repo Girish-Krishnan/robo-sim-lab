@@ -75,7 +75,15 @@ function meshFor(RAPIER: Rapier, collider: InstanceType<Rapier["Collider"]>): TH
   if (kind === RAPIER.ShapeType.Cuboid) {
     const half = collider.halfExtents();
     if (half.x > 40 || half.y > 40 || half.z > 40) return null;
-    return new THREE.Mesh(new THREE.BoxGeometry(half.x * 2, half.y * 2, half.z * 2));
+    // Building bodies are this tall, and the visible roof and parapet sit
+    // just above the physics box. Grow the shade so the roof reads as blocked.
+    const roof = half.y > 1.5;
+    const hx = roof ? half.x + 0.45 : half.x;
+    const hy = roof ? half.y + 0.55 : half.y;
+    const hz = roof ? half.z + 0.45 : half.z;
+    const geometry = new THREE.BoxGeometry(hx * 2, hy * 2, hz * 2);
+    if (roof) geometry.translate(0, 0.55, 0);
+    return new THREE.Mesh(geometry);
   }
   if (kind === RAPIER.ShapeType.Ball) {
     return new THREE.Mesh(new THREE.SphereGeometry(collider.radius(), 16, 12));

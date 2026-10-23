@@ -157,7 +157,7 @@ async function drive(
     speed: number,
     state: WallState,
   ) => { steering: number; throttle: number },
-): Promise<{ travelled: number; minUp: number; end: { x: number; z: number }; nearest: number }> {
+): Promise<{ traveled: number; minUp: number; end: { x: number; z: number }; nearest: number }> {
   const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
   world.timestep = DT;
   const ground = world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(0, -0.5, 0));
@@ -193,7 +193,7 @@ async function drive(
     }
   }
   const end = robot.focus();
-  return { travelled: Math.hypot(end.x - start.x, end.z - start.z), minUp, end: { x: end.x, z: end.z }, nearest };
+  return { traveled: Math.hypot(end.x - start.x, end.z - start.z), minUp, end: { x: end.x, z: end.z }, nearest };
 }
 
 describe("environments", () => {
@@ -216,9 +216,9 @@ describe("environments", () => {
   it("laps the track with the wall-follow policy without rolling", async () => {
     await RAPIER.init({});
     const result = await drive(buildTrackSolids(), TRACK_SPAWN, 10, wallCommand);
-    console.log(`track wall-follow x=${result.end.x.toFixed(1)} z=${result.end.z.toFixed(1)} travelled=${result.travelled.toFixed(1)} nearest=${result.nearest.toFixed(2)}`);
+    console.log(`track wall-follow x=${result.end.x.toFixed(1)} z=${result.end.z.toFixed(1)} traveled=${result.traveled.toFixed(1)} nearest=${result.nearest.toFixed(2)}`);
     expect(result.minUp).toBeGreaterThan(0.75);
-    expect(result.travelled).toBeGreaterThan(18);
+    expect(result.traveled).toBeGreaterThan(18);
     expect(result.nearest).toBeLessThan(8);
   });
 
@@ -226,13 +226,13 @@ describe("environments", () => {
     await RAPIER.init({});
     const forest = await drive(buildForestSolids(), wallSpawn("forest"), 12, wallCommand);
     const warehouse = await drive(buildWarehouseSolids(), wallSpawn("warehouse"), 14, wallCommand);
-    console.log(`forest travelled=${forest.travelled.toFixed(1)} nearest=${forest.nearest.toFixed(2)} up=${forest.minUp.toFixed(2)}`);
-    console.log(`warehouse travelled=${warehouse.travelled.toFixed(1)} nearest=${warehouse.nearest.toFixed(2)} up=${warehouse.minUp.toFixed(2)}`);
+    console.log(`forest traveled=${forest.traveled.toFixed(1)} nearest=${forest.nearest.toFixed(2)} up=${forest.minUp.toFixed(2)}`);
+    console.log(`warehouse traveled=${warehouse.traveled.toFixed(1)} nearest=${warehouse.nearest.toFixed(2)} up=${warehouse.minUp.toFixed(2)}`);
     expect(forest.minUp).toBeGreaterThan(0.75);
     expect(warehouse.minUp).toBeGreaterThan(0.75);
     expect(forest.nearest).toBeLessThan(10);
     expect(warehouse.nearest).toBeLessThan(10);
-    expect(forest.travelled).toBeGreaterThan(15);
-    expect(warehouse.travelled).toBeGreaterThan(15);
+    expect(forest.traveled).toBeGreaterThan(15);
+    expect(warehouse.traveled).toBeGreaterThan(15);
   });
 });

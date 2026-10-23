@@ -10,15 +10,21 @@ prerequisites: getting-started/robot
 status: ready
 ---
 
-`control(sensors)` receives a fresh sample twenty times a second. That object is the whole contract between your program and the car.
+Twenty times a second, your program gets a fresh look at the world. `control(sensors)` is that look, and it is the whole contract between your program and the car.
 
 You get lidar, wheel odometry, an IMU, the time, and a task. The task can carry a path and, later, a known map. The true pose, the true velocity, and the physics body stay with the simulator. The HUD speed is for the person watching.
 
 That split is the point of the lab. A controller that could read the true position would look brilliant and would have skipped the sensing. Localization means something once the estimate is built from the same sensors a real robot would have.
 
-The Python side is a sandbox. NumPy is there. `print` and tracebacks show up in the console. Names you create above `control` live for the whole run. A name you create inside `control` lives for that tick, unless you declare it global or keep it on an object you built above `control`.
+The Python side is a sandbox. NumPy is there. `print` and tracebacks show up in the console. The circle below keeps a tick count on `run`, and every other example remembers the last tick the same way.
 
-Open **Full program** once. The first lines are `SEED` and `START_POSE`. `SEED` draws the sensor bias once, and the same number replays the same noise. Use it for your own random numbers too: `np.random.default_rng(SEED)`. `START_POSE` is where the car is placed on Run and Reset. `x` and `y` are meters on the map (`y` runs north), and the third number is heading in degrees. 0 faces north. That chooses a start. It is not a sensor, and it is not the true pose. A dict with one pose per world lets the same program travel. A bare tuple is the one-world form. A pose inside a wall, or off the map, is refused in the console and the world's usual start is used instead.
+Open **Full program** once. The first lines are `SEED` and `START_POSE`. `SEED` draws the sensor bias once, and the same number replays the same noise. Use it for your own random numbers too: `np.random.default_rng(SEED)`. `START_POSE` is where the car is placed on Run and Reset. `x` and `y` are meters on the map (`y` runs north), and the third number is heading in degrees. 0 faces north. That chooses a start. It is not a sensor, and it is not the true pose. A dict with one pose per world lets the same program travel. A bare tuple is the one-world form. A pose inside a wall, or off the map, is refused in the console, and this lesson's start is used instead.
+
+Note: The car's memory between ticks is one object, called `run`. Every example does it this way. `class Run` holds the fields, and `init(sensors)` builds a fresh `Run` at the start of every run. That also throws away a practice tick the lab takes before your code is live. Inside `control`, write `run.ticks += 1`. You do not need `global` for that. `init` is the one place that says `global run`, because it replaces the object. A distance or a gain you set once can stay an ordinary name. The particle filter keeps its cloud in a few arrays beside `run`, and the same `init` clears those too.
+
+{{code:Run}}
+
+{{code:init}}
 
 In the sim: the circle program on the south lawn, so the sample is changing and the car has room. The same program is happy on the oval infield, the south meadow, and the warehouse bay. The World menu lists them.
 
