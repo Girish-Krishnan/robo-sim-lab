@@ -1122,3 +1122,35 @@ body.splitter-drag iframe { pointer-events: none; }
     min-height: 0;
   }
 }
+
+/* A short window cannot spare a tall contents list. Cap the list, and keep the
+   lesson, the editor, and the console in the column above Run. */
+@media (max-height: 600px) {
+  #app.mode-lessons #toc-panel { max-height: 80px; }
+  #app.mode-lessons #lesson-nav { padding: 4px 8px; gap: 2px; }
+  #app.mode-lessons .lesson-world-note {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  #app.mode-lessons .lesson-scroll { padding: 8px 12px 12px; }
+  #app.mode-lessons.lesson-has-code.lab-open #lesson,
+  #app.mode-lessons.lesson-has-code.lab-open #editor { min-height: 0; }
+  #app.mode-lessons.lesson-has-code #try-bar {
+    position: static;
+    padding: 3px 6px;
+    gap: 4px;
+    row-gap: 2px;
+  }
+  #app.mode-lessons.lesson-has-code #try-bar button {
+    min-height: 24px;
+    padding: 2px 7px;
+    font-size: 12px;
+  }
+  #app.mode-lessons.lesson-has-code.console-open .console-wrap {
+    flex: 0 0 48px;
+    height: 48px;
+    min-height: 0;
+    max-height: 48px;
+  }
+}

@@ -252,6 +252,7 @@ describe("course catalog", () => {
     expect(css).toContain("#app.mode-lessons.lesson-has-code.lab-open #lesson");
     expect(css).toMatch(/lab-open #lesson \{\s*flex: 1 1 0;/);
     expect(css).toMatch(/lab-open #lesson-chrome,[\s\S]*?display: none !important;/);
+    expect(css).toMatch(/@media \(max-height: 600px\) \{[\s\S]*?#toc-panel \{ max-height: 80px; \}/);
     expect(DEFAULT_SPAWN.z).toBeCloseTo(-1);
     expect(spawnFor("city", "avoid", "scenario").z).toBeCloseTo(0);
   });
