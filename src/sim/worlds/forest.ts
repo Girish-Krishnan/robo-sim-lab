@@ -101,16 +101,16 @@ export function buildForestSolids(): Solid[] {
   for (let i = 0; i < 6; i++) {
     const z = 6 + i * 9;
     const side = i % 2 === 0 ? 1 : -1;
-    const x = parkOffTheLanes(Math.sin(z * 0.09) * 1.2 + side * 3.4, z);
-    solids.push(logSolid(x, z, 0.72, 2.6, side * 0.7));
+    const parked = parkOffTheLanes(Math.sin(z * 0.09) * 1.2 + side * 3.4, z);
+    solids.push(logSolid(parked.x, parked.z, 0.72, 2.6, side * 0.7));
   }
   return solids;
 }
 
 /**
- * The 42 trees that used to be painted with no collider. x is nudged off
- * the trail, the west return lane, and the outside wall-follow line so a
- * scripted lap still has a gap. The same draw is burned again while
+ * The 42 trees that used to be painted with no collider. They are nudged
+ * off the trail, the west return, and the lap wall follow drives around
+ * the outside of the corridor fence. The same draw is burned again while
  * dressing ferns, which keeps those plants where they were.
  */
 function forestBackground(rand: () => number): { kind: "tree" | "pine"; x: number; z: number; height: number }[] {
@@ -123,27 +123,35 @@ function forestBackground(rand: () => number): { kind: "tree" | "pine"; x: numbe
     rand();
     const jitter = 0.75 + rand() * 0.45;
     const specScale = pick === 1 ? 7.5 : pick === 2 ? 5.5 : 8;
-    x = parkOffTheLanes(x, z);
+    const parked = parkOffTheLanes(x, z);
     const height = (specScale * jitter) / (pick === 1 ? 2.4 : 2.15);
-    trees.push({ kind: pick === 1 ? "pine" : "tree", x, z, height });
+    trees.push({ kind: pick === 1 ? "pine" : "tree", x: parked.x, z: parked.z, height });
   }
   return trees;
 }
 
-function parkOffTheLanes(x: number, z: number): number {
-  const trail = Math.sin(z * 0.09) * 1.2;
-  if (Math.abs(x - trail) < 2.3) x = x >= trail ? trail + 2.5 : trail - 2.5;
-  if (z > -16 && z < 38 && Math.abs(x + 20.1) < 2) x = -22.8;
-  if (x > 16.7 && x < 23.2) x = 17.05;
+function parkOffTheLanes(x: number, z: number): { x: number; z: number } {
+  const clear = () => {
+    const trail = Math.sin(z * 0.09) * 1.2;
+    if (Math.abs(x - trail) < 2.3) x = x >= trail ? trail + 2.5 : trail - 2.5;
+    // Pursuit returns on x=-20.1, inside the west fence.
+    if (z > -16 && z < 38 && Math.abs(x + 20.1) < 2.4) x = -26;
+    // Wall follow holds about 3.2 m off the outside of the corridor fence
+    // (east face x≈16.7, west x≈-24.4, north z≈38.2, south z≈-16.2).
+    if (z > -22 && z < 46 && x > 16.2 && x < 25) x = 29;
+    if (z > -22 && z < 46 && x < -23.8 && x > -34) x = -37;
+    if (x > -38 && x < 32 && z > 37.4 && z < 46) z = 47;
+    if (x > -38 && x < 32 && z < -15.4 && z > -24) z = -28;
+  };
+  clear();
   for (const point of referenceRoute("forest")) {
     const dx = x - point.x;
     const dz = z - point.z;
     if (dx * dx + dz * dz >= 3.2 * 3.2) continue;
-    x = point.x >= 0 ? point.x + 3.4 : point.x - 3.4;
+    x = point.x >= 0 ? point.x + 3.6 : point.x - 3.6;
   }
-  if (x > 16.7 && x < 23.2) x = 26;
-  if (z > -16 && z < 38 && Math.abs(x + 20.1) < 2.2) x = -26;
-  return x;
+  clear();
+  return { x, z };
 }
 
 function forestHeight(x: number, z: number): number {
