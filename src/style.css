@@ -719,11 +719,12 @@ body.splitter-drag iframe { pointer-events: none; }
 #editor { flex: 1 1 200px; min-height: 200px; overflow: hidden; }
 #app.mode-lessons #code-panel { overflow: hidden; }
 #app.mode-lessons #lesson-chrome {
-  flex: 0 1 auto;
-  max-height: min(200px, 30%);
+  /* The nav and the contents list keep their height. A code lesson's editor
+     is what gives up space when the pane is short. */
+  flex: none;
   z-index: 5;
   background: #0e1316;
-  overflow: auto;
+  overflow: visible;
 }
 #app.mode-lessons #toc-panel {
   flex: none;
@@ -731,7 +732,7 @@ body.splitter-drag iframe { pointer-events: none; }
 }
 #app.mode-lessons #lesson {
   flex: 1 1 auto;
-  min-height: 240px;
+  min-height: 120px;
   overflow: auto;
 }
 #app.mode-lessons.lesson-has-code #lesson-chrome { order: 0; }
@@ -750,9 +751,9 @@ body.splitter-drag iframe { pointer-events: none; }
 #app.mode-lessons.lesson-has-code.lab-open #lab-split { display: block !important; }
 #app.mode-lessons.lesson-has-code.lab-open #editor {
   display: block !important;
-  flex: 1 1 200px;
+  flex: 1 4 140px;
   height: auto;
-  min-height: 200px;
+  min-height: 72px;
   max-height: none;
 }
 #app.mode-lessons.lesson-has-code.console-open .console-wrap {

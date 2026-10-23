@@ -10,13 +10,11 @@ prerequisites: models/bicycle
 status: ready
 ---
 
-Open loop is the pleasure of a fixed command. The circle starter returns the same steering and the same throttle on every tick, like holding a garden hose at one angle and letting the water draw the arc. When the lap goes wrong, the car itself is the story: tires, steering, and inertia. Slip, a tight steer, or the wrong pad shows up there. There is no feedback to debug, because you never asked the sensors what they saw.
+Watch the car lean into a left turn and trace the same circle, lap after lap. The program sends one command, 0.34 rad of left steer and a medium throttle, every tick, and never checks where it is. That's open loop.
 
-In the sim: the same fixed command, with the camera far enough back to see the whole lap.
+In the sim: the same fixed command, with the camera far enough back to see the whole lap. The car is placed on a pad checked to be clear of that circle: the south lawn in the city, the oval infield, the meadow south of the trees, and the open bay in the warehouse. Move the steer or the throttle a lot and that clearance ends.
 
-The starter turns left at 0.34 rad and asks for a medium throttle. The car is placed on a pad checked to be clear of that circle: the south lawn in the city, the oval infield, the meadow south of the trees, and the open bay in the warehouse. Move the steer or the throttle a lot and that clearance ends.
-
-No destination this time. Send one command forever and watch the car carve the same circle lap after lap. Later controllers close the loop because a wall that curves, or a path that drifts, needs a command that can change.
+When the lap goes wrong, the car itself is the story: tires, steering, and inertia. Slip, a tight steer, or the wrong pad shows up there. There is no feedback to debug, because you never asked the sensors what they saw. Later controllers close the loop because a wall that curves, or a path that drifts, needs a command that can change.
 
 {{code:control}}
 

@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { LESSONS, MODULES, lessonById, resolveSpawnIn } from "../src/course/catalog";
 import { progressCard } from "../src/course/shell";
@@ -6,9 +7,10 @@ import { displayedOdom, modeLabel, runBarLabel } from "../src/ui/hud";
 import { chunkAtLine, readChunks } from "../src/editor/chunks";
 import { formatStudentError } from "../src/editor/errors";
 import { EXAMPLES } from "../src/editor/examples";
-import { invalidPoseMessage, readProgramSeed, readStartPose, poseProblem } from "../src/editor/program-header";
+import { invalidPoseMessage, poseProblem, programPreamble, readProgramSeed, readStartPose } from "../src/editor/program-header";
 import { solidsFor } from "../src/eval/scenarios";
 import { spawnFor, worldSpawn } from "../src/sim/spawns";
+import { DEFAULT_SPAWN } from "../src/sim/vehicle";
 import type { WorldId } from "../src/sim/worlds";
 
 describe("course catalog", () => {
@@ -212,6 +214,40 @@ describe("course catalog", () => {
     for (const lesson of LESSONS) {
       expect(lesson.markdown, lesson.id).not.toMatch(british);
     }
+  });
+
+  it("keeps the lesson chrome from shrinking, and leads the quiet lessons with the car", () => {
+    const css = readFileSync(new URL("../src/style.css", import.meta.url), "utf8");
+    const blocks = [...css.matchAll(/#app\.mode-lessons #lesson-chrome \{[^}]+\}/g)].map((match) => match[0]);
+    expect(blocks.length).toBeGreaterThan(0);
+    expect(blocks[0]).toContain("flex: none");
+    for (const block of blocks) expect(block).not.toContain("0 1 auto");
+
+    const openers: [string, string, string][] = [
+      ["reactive/circle", "Watch the car lean into a left turn", "Open loop is the pleasure"],
+      ["getting-started/sandbox", "That car is yours to drive, crash and program", "That car is your lab"],
+      ["reactive/wall", "Watch the car hug the wall", "Stay with the wall"],
+      ["tracking/pursuit", "Watch the car chase a point", "like a dog chasing"],
+      ["tracking/drift", "Watch the car slide off the centerline", "Watch the oval"],
+      ["localization/dead-reckoning", "Watch the blue trail peel away", "Watch the blue trail leave the car"],
+      ["localization/bayes", "Watch the pink cloud swell", "One pose was never enough"],
+      ["localization/particles", "Press **Scatter guesses** and watch pink dots", "A cloud of guesses"],
+      ["localization/pf-pursuit", "This is the payoff: the car drives the oval", "Three poses are in the picture"],
+    ];
+    for (const [id, lead, gone] of openers) {
+      const body = lessonById(id)?.markdown ?? "";
+      const prose = body.replace(/^---[\s\S]*?---\n/, "");
+      expect(prose.trimStart().startsWith(lead), id).toBe(true);
+      expect(body, id).not.toContain(gone);
+    }
+    expect(lessonById("tracking/pursuit")?.markdown).toContain("like riding a bike toward a tree");
+    const bicycle = lessonById("models/bicycle")?.markdown ?? "";
+    expect(bicycle.match(/draw a circle/g)?.length ?? 0).toBe(1);
+    const lidar = lessonById("models/lidar")?.markdown ?? "";
+    expect(lidar.match(/270 beams/g)?.length ?? 0).toBe(1);
+    expect(programPreamble("circle")).toContain("90 faces east");
+    expect(lessonById("getting-started/sensors")?.markdown).toContain("90 faces east");
+    expect(DEFAULT_SPAWN.z).toBeCloseTo(-1);
   });
 
   it("accepts every example start, and keeps the filter free of placeholder functions", () => {

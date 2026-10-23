@@ -9,11 +9,11 @@ prerequisites: tracking/drift
 status: ready
 ---
 
-Watch the blue trail leave the car. That trail is dead reckoning. You start from a known pose, and you add up wheel speed and yaw rate. Nothing in that sum looks at a wall. When the motion measurement is biased, the pose is wrong, and every later addition is wrong in that new frame.
+Watch the blue trail peel away from the car. That's dead reckoning: add up wheel speed and yaw rate, never look at a wall, and a tiny bias grows with every meter.
 
 In the sim: pursuit on the oval. The blue trail is that integral. The key on the view names the trails. This lesson does not hand you the wheel. The program keeps driving.
 
-On reset, the known pose is the origin of the odometry frame, which really is where the car is. That gift expires. After that, `sensors.odometry.pose` is the integral of wheel speed and yaw rate. The path tracker believed it, and on the oval the true cross-track grew from about 0.18 m to about 2.23 m.
+On reset, the known pose is the origin of the odometry frame, which really is where the car is. That gift expires. The path tracker believed the integral, and on the oval the true cross-track grew from about 0.18 m to about 2.23 m.
 
 Localization puts the building back in the problem. This module gives you a map the way a building gives a robot a floor plan: walls in the same frame as the odometry. The lidar is the measurement. The filter's job is a pose you can hand to pure pursuit in place of the raw integral.
 

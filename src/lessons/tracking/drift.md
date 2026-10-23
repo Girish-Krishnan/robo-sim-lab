@@ -10,7 +10,7 @@ prerequisites: tracking/pursuit, models/noise
 status: ready
 ---
 
-Watch the oval. Pure pursuit is a good controller attached to a drifting pose. The plan stays on the centerline, the car follows it at first, and the blue trail walks away. Cross-track of the true car grows because the controller is steering the ghost.
+Watch the car slide off the centerline while the blue trail swears it's dead on. Pursuit steers by the odometry guess, gyro bias twists that guess, and the real car follows the ghost.
 
 Cross-track here is the distance from the true position to the reference path, a chain of short straight segments (a polyline). The odometry pose stays close to the path by construction, because pursuit is tracking that pose. The car is what leaves.
 

@@ -6,7 +6,7 @@ export interface MapPose {
   x: number;
   /** North-south map axis, which is world z. */
   y: number;
-  /** Degrees. 0 faces north. */
+  /** Degrees. 0 faces north, 90 faces east. */
   heading: number;
 }
 
@@ -30,7 +30,8 @@ export function programPreamble(kind: PoseKind): string {
   return `# SEED draws the sensor bias once. The same number replays the same noise.
 # Your own random numbers should use np.random.default_rng(SEED) too.
 # START_POSE places the car on Run and Reset. x and y are meters on the map
-# (y runs north), and the third number is heading in degrees. 0 faces north.
+# (y runs north), and the third number is heading in degrees. 0 faces north,
+# and 90 faces east.
 # This chooses where the car starts. It is not a sensor reading.
 SEED = 1
 START_POSE = {

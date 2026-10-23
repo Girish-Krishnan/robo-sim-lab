@@ -9,7 +9,7 @@ action: sandbox
 status: ready
 ---
 
-That car is your lab. Everything here drives it. Drive, Code, and Lessons are three ways into that same view.
+That car is yours to drive, crash and program. Press W and it rolls; open Code and a Python program drives it instead. Same car, same world, three ways in.
 
 ## Three ways to use the same car
 

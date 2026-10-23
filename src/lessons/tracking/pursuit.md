@@ -10,11 +10,11 @@ prerequisites: reactive/wall
 status: ready
 ---
 
-Pick a point ahead of you and steer the arc that would land on it. That is pure pursuit. The point sits a fixed distance ahead of the pose the car believes. The world publishes the path on `sensors.task.path` in the odometry frame. On the oval that path is the centerline.
+Watch the car chase a point riding a few meters ahead on the green line. Every tick it steers the arc that lands there, like riding a bike toward a tree you picked out.
 
-In the sim: the plan, the car, and the odometry trail are all drawn. The green line is the reference path.
+In the sim: the plan, the car, and the odometry trail are all drawn. The green line is the reference path. The point sits `LOOKAHEAD` meters ahead of the pose the car believes, on the path the world publishes as `sensors.task.path` in the odometry frame. On the oval that path is the centerline.
 
-Every tick, the car picks a spot `LOOKAHEAD` meters down the route and steers for it, like a dog chasing a ball you keep throwing. It transforms that point into the body frame of the odometry pose, computes a curvature, and converts curvature to a steering angle with the bicycle model. A small speed controller slows down when the steer is large: throttle follows the speed error (the P), and a little memory of that error (the I) keeps a long straight from winding the command up. That is the PI in PID. The corner is slower than the straight.
+It transforms that point into the body frame of the odometry pose, computes a curvature, and converts curvature to a steering angle with the bicycle model. A small speed controller slows down when the steer is large: throttle follows the speed error (the P), and a little memory of that error (the I) keeps a long straight from winding the command up. That is the PI in PID. The corner is slower than the straight.
 
 The starter draws the path, the lookahead point, and the arc implied by the command. All three are in the odometry frame. While the pose is still good, the arc sits on the real car. As the gyro bias accumulates, the drawn lookahead walks off the car even though the math is the same.
 

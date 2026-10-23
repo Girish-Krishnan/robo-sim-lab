@@ -3,7 +3,7 @@ import RAPIER from "@dimforge/rapier3d-compat";
 import { describe, expect, it } from "vitest";
 import { clamp } from "../src/api";
 import { buildCourseSolids, solidQuaternion, type Solid } from "../src/sim/course";
-import { AckermannBuggy, type SpawnPose } from "../src/sim/vehicle";
+import { AckermannBuggy, DEFAULT_SPAWN, type SpawnPose } from "../src/sim/vehicle";
 import { wallSpawn } from "../src/eval/scenarios";
 import { buildForestSolids, FOREST_SPAWN } from "../src/sim/worlds/forest";
 import { buildTrackSolids, TRACK_SPAWN } from "../src/sim/worlds/track";
@@ -199,7 +199,7 @@ async function drive(
 describe("environments", () => {
   it("keeps every yard's spawn clear and its obstacles tall enough for the lidar", () => {
     const yards: [string, Solid[], SpawnPose][] = [
-      ["city", buildCourseSolids(), { x: 5.4, y: 0.84, z: 0, yaw: 0 }],
+      ["city", buildCourseSolids(), DEFAULT_SPAWN],
       ["track", buildTrackSolids(), TRACK_SPAWN],
       ["forest", buildForestSolids(), FOREST_SPAWN],
       ["warehouse", buildWarehouseSolids(), WAREHOUSE_SPAWN],

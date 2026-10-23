@@ -10,13 +10,13 @@ prerequisites: reactive/avoid
 status: ready
 ---
 
-Stay with the wall. Wall following steers to hold a distance from whatever is on the driver's right. On the oval that wall is the inner wall of the east straight. The same program then has to survive the corner, where the wall ends for a moment and comes back on the next straight. It is the same habit as walking a corridor with your shoulder a constant distance from the wall: you feel the gap now, and you also feel whether you are aimed into the plaster.
+Watch the car hug the wall down the straight, holding the same gap off its right side. At the corner the wall vanishes; the car turns and picks it up again. Two lidar beams do all of it.
 
 In the sim: the east straight, inner wall on the right, with the trails on so a lap is easy to see.
 
-Two beams do most of the work. The beam near $-90^\circ$ measures the side distance. The beam near $-45^\circ$ sees the wall ahead of the rear axle, so the car can start turning before the side beam falls off the end. The target distance is 3.2 m, which puts the car in the lane.
+The beam near $-90^\circ$ measures the side distance. The beam near $-45^\circ$ sees the wall ahead of the rear axle, so the car can start turning before the side beam falls off the end. The target distance is 3.2 m, which puts the car in the lane.
 
-Outside a corner the car creeps, then turns, then picks the wall up again. If the bumper is in the wall, it reverses. Positive steer while going backward yaws the nose right, because yaw rate flips with the sign of speed. The starter's backup uses that.
+If the bumper is in the wall, the car reverses. Positive steer while going backward yaws the nose right, because yaw rate flips with the sign of speed. The starter's backup uses that.
 
 Open road? Go. Wall closing in? Ease off. On a long straight with the wall parallel and nothing close in front, the car runs. Into a bend, or when the forward range drops, it slows. A fast car that waits until the side beam loses the wall has already missed the turn.
 

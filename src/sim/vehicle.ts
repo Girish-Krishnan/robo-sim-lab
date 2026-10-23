@@ -16,7 +16,8 @@ export interface SpawnPose {
   yaw: number;
 }
 
-export const DEFAULT_SPAWN: SpawnPose = { x: 5.4, y: 0.84, z: 0, yaw: 0 };
+/** A meter south of the painted START, so the chevron sits ahead of the nose. */
+export const DEFAULT_SPAWN: SpawnPose = { x: 5.4, y: 0.84, z: -1, yaw: 0 };
 const HALF = { x: 0.64, y: 0.34, z: 1.14 };
 const WHEEL_RADIUS = 0.3;
 const WHEEL_WIDTH = 0.2;

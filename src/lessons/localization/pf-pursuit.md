@@ -9,13 +9,13 @@ prerequisites: localization/particles, tracking/pursuit
 status: ready
 ---
 
-This is the payoff. The same pure pursuit law as the path-tracking lesson, with one input changed. The lookahead is computed from the particle-filter mean. Wheel speed is still the wheel speed. The gyro still lives inside the motion model. The heading you steer by is the filter's heading. Three poses are in the picture at once: truth, the estimate, and raw odometry. The key on the view names them.
+This is the payoff: the car drives the oval on its own best guess. The car and the red estimate hug the centerline while the blue odometry trail wanders off.
+
+The lookahead is computed from the particle-filter mean, the same pure pursuit law as the path-tracking lesson. Wheel speed is still the wheel speed. The gyro still lives inside the motion model. The heading you steer by is the filter's heading. The key on the view names the three trails.
 
 In the sim: the oval, with the path trails and the particle cloud drawn.
 
 On the oval, pursuit that trusts odometry lets cross-track grow from about 0.18 m in the first 15 seconds to about 2.23 m after 45 seconds. The same minute with this filter has late cross-track of about **0.34 m**. The estimate ends about **0.38 m** from the car. Those are different numbers: 0.34 m is how far the car sits from the centerline late in the minute, and 0.38 m is how far the red estimate sits from the car at the end. The car stays clear of the walls. The estimate is what the lidar and the map agree on, so a slow gyro bias stops steering the car off the centerline.
-
-The colored trail is where the car went. The red trail is the filter's estimate. The blue trail is raw odometry. You want truth on the centerline, the red estimate on the car, and the blue trail leaving.
 
 A tight roundabout still has some cross-track, because the body slides even with a good pose. A long aisle of parallel walls is a weak place to ask a lidar how far along the corridor you are, until a crate or a pillar breaks the pattern. A cone or a trunk changes the scan when the pose slides, which is the idea from the Bayes lesson.
 

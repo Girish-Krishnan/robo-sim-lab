@@ -9,9 +9,9 @@ prerequisites: localization/bayes
 status: ready
 ---
 
-A cloud of guesses, and the scan gets to vote. Each dot is a guess. Guesses that match the lidar survive. On the oval the starter begins in a tight neighborhood of the car, so the first frame already agrees. Press **Scatter guesses** to throw that cloud out about 7 m. Watch the pink cloud shrink around the red dot. That's the car figuring out where it is. Open the **Key** on the view for the color names: pink dots, yellow ring, red trail, and blue odometry. The red trail is the filter's mean, drawn on top of the dots.
+Press **Scatter guesses** and watch pink dots fly 7 m out, then pull back onto the car. Dots whose predicted scan matches the real lidar survive; the red dot is where the car thinks it is.
 
-In the sim, the tracking cloud runs on the oval. The Key on the map uses the same names.
+In the sim, the tracking cloud starts in a tight neighborhood of the car, so the first frame already agrees. Scatter guesses is what throws it wide. The Key on the map names the pink dots, the yellow ring, the red trail, and the blue odometry. The red trail is the filter's mean, drawn on top of the dots.
 
 The yellow ring is two standard deviations of the cloud, how far the guesses sit from their mean. A small ring means the guesses agree.
 

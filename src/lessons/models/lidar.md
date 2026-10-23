@@ -10,13 +10,13 @@ prerequisites: getting-started/sensors
 status: ready
 ---
 
-This is how the car sees. A spinning range finder, about a meter off the ground, sweeps a plane and hands you the distances. Each control tick you get one full scan: 270 beams across a 270° field of view, so the beams are about 1° apart. On the oval the inner wall and the cones give that fan something solid to hit, and the first time you watch it is a little bit magic.
+This is how the car sees. A spinning range finder, about a meter off the ground, sweeps a plane and hands you the distances. Each control tick you get one full scan: 270 beams across a 270° field of view, so the beams are about 1° apart. Enough to spot every cone on the track, and the first time you watch that fan hit the inner wall it is a little bit magic.
 
 In the sim: the oval, with the avoid program running and the scan drawn. The corner inset is the same scan from above. Amber dots are the close hits.
 
 Angle 0 points forward. Positive angles point to the driver's left. The rear 90° is a blank wedge, so something directly behind the car stays invisible until you yaw.
 
-A beam that hits nothing is reported as `max_range`, 12 m. Treat "equal to max range" as empty air. Every real controller in this course does. Range noise is about 2 cm, one sigma, in the band of a small outdoor lidar such as a Hokuyo UST-10LX. 270 beams: enough to spot every cone on the track.
+A beam that hits nothing is reported as `max_range`, 12 m. Treat "equal to max range" as empty air. Every real controller in this course does. Range noise is about 2 cm, one sigma, in the band of a small outdoor lidar such as a Hokuyo UST-10LX.
 
 The ray starts at the roof puck. The nose of the body is about 0.7 m in front of that puck, so a program that drives until the forward range is 0.2 m has already arrived.
 
