@@ -374,7 +374,14 @@ export async function mountApp(): Promise<void> {
       runBanner.hidden = true;
     };
     const parkAtCodedStart = (source?: string) => {
-      activeSpawn = placeFromCode(source);
+      // Drive mode ignores the lesson program still sitting in the editor.
+      // R returns to this world's start, the city START on the avenue.
+      if (mode === "drive") {
+        poseWarning = null;
+        activeSpawn = yard.spawn;
+      } else {
+        activeSpawn = placeFromCode(source);
+      }
       paths.clear();
       driftGraph.reset();
       drawOps = [];

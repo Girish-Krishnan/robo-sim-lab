@@ -14,7 +14,7 @@ Watch the car lean into a left turn and trace the same circle, lap after lap. Th
 
 In the sim: the same fixed command, with the camera far enough back to see the whole lap. The car is placed on a pad checked to be clear of that circle: the south lawn in the city, the oval infield, the meadow south of the trees, and the open bay in the warehouse. Move the steer or the throttle a lot and that clearance ends.
 
-When the lap goes wrong, the car itself is the story: tires, steering, and inertia. Slip, a tight steer, or the wrong pad shows up there. There is no feedback to debug, because you never asked the sensors what they saw. Later controllers close the loop because a wall that curves, or a path that drifts, needs a command that can change.
+When the lap goes wrong, watch the car: it shows you which number is wrong. Slip, a tight steer, or the wrong pad shows up there. There is no feedback to debug, because you never asked the sensors what they saw. Later controllers close the loop because a wall that curves, or a path that drifts, needs a command that can change.
 
 {{code:control}}
 

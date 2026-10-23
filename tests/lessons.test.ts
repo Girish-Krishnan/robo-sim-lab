@@ -245,8 +245,13 @@ describe("course catalog", () => {
     expect(bicycle.match(/draw a circle/g)?.length ?? 0).toBe(1);
     const lidar = lessonById("models/lidar")?.markdown ?? "";
     expect(lidar.match(/270 beams/g)?.length ?? 0).toBe(1);
-    expect(programPreamble("circle")).toContain("90 faces east");
-    expect(lessonById("getting-started/sensors")?.markdown).toContain("90 faces east");
+    expect(programPreamble("circle")).toContain("90 faces west (positive turns left)");
+    expect(lessonById("getting-started/sensors")?.markdown).toContain("90 faces west (positive turns left)");
+    expect(lessonById("reactive/circle")?.markdown).toContain("watch the car: it shows you which number is wrong");
+    expect(lessonById("reactive/circle")?.markdown).not.toContain("the car itself is the story");
+    expect(css).toContain("#app.mode-lessons.lesson-has-code.lab-open #lesson");
+    expect(css).toMatch(/lab-open #lesson \{\s*flex: 1 1 0;/);
+    expect(css).toMatch(/lab-open #lesson-chrome,[\s\S]*?display: none !important;/);
     expect(DEFAULT_SPAWN.z).toBeCloseTo(-1);
     expect(spawnFor("city", "avoid", "scenario").z).toBeCloseTo(0);
   });

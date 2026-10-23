@@ -220,7 +220,7 @@ export async function mountCourse(host: CourseHost): Promise<void> {
       // Progress still works if storage is blocked.
     }
     host.setLessonWorlds(lesson.worlds);
-    renderNav(lesson);
+    renderNav(lesson, true);
     parkDrive();
     article.innerHTML = lessonHtml(lesson);
     article.scrollTop = 0;
@@ -252,9 +252,10 @@ export async function mountCourse(host: CourseHost): Promise<void> {
     host.relayout();
   };
 
-  const renderNav = (lesson: Lesson) => {
+  const renderNav = (lesson: Lesson, closeToc = false) => {
     const toggleNow = nav.querySelector("#toc-toggle");
-    if (toggleNow) {
+    if (closeToc) tocOpen = false;
+    else if (toggleNow) {
       tocOpen = toggleNow.getAttribute("aria-expanded") === "true";
       openModules.clear();
       for (const details of nav.querySelectorAll<HTMLDetailsElement>("details.toc-module")) {

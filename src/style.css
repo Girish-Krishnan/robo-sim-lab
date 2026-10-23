@@ -748,12 +748,16 @@ body.splitter-drag iframe { pointer-events: none; }
 #app.mode-code #lab-split { display: none !important; }
 #app.mode-lessons:not(.lesson-has-code) #try-bar,
 #app.mode-lessons:not(.lesson-has-code) #python-status { display: none !important; }
+#app.mode-lessons.lesson-has-code.lab-open #lesson {
+  flex: 1 1 0;
+  min-height: 120px;
+}
 #app.mode-lessons.lesson-has-code.lab-open #lab-split { display: block !important; }
 #app.mode-lessons.lesson-has-code.lab-open #editor {
   display: block !important;
-  flex: 1 4 140px;
+  flex: 1 1 0;
   height: auto;
-  min-height: 72px;
+  min-height: 120px;
   max-height: none;
 }
 #app.mode-lessons.lesson-has-code.console-open .console-wrap {
@@ -1092,22 +1096,29 @@ body.splitter-drag iframe { pointer-events: none; }
   #app.mode-lessons #lesson { min-height: 240px; }
   #app.mode-lessons #lesson-chrome { max-height: 168px; overflow: auto; }
   #app.mode-lessons #toc-panel { max-height: 112px; }
+  /* The editor fills the column. Prev, Next, and Mark done leave the layout
+     so they cannot peek above the program. */
+  #app.mode-lessons.lesson-has-code.lab-open #lesson-chrome,
+  #app.mode-lessons.lesson-has-code.lab-open #lesson,
+  #app.mode-lessons.lesson-has-code.lab-open #python-status,
   #app.mode-lessons.lesson-has-code.lab-open #lab-split { display: none !important; }
   #app.mode-lessons.lesson-has-code.lab-open #editor {
-    display: block !important;
-    position: absolute;
-    left: 8px;
-    right: 8px;
-    top: 8px;
-    bottom: 52px;
+    display: flex !important;
+    flex-direction: column;
+    position: static;
+    flex: 1 1 0;
     height: auto;
     min-height: 0;
     max-height: none;
-    flex: none;
-    z-index: 6;
+    z-index: 1;
     background: #0c1012;
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  #app.mode-lessons.lesson-has-code.lab-open #editor .cm-editor {
+    flex: 1 1 auto;
+    height: auto;
+    min-height: 0;
   }
 }
