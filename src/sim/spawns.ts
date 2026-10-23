@@ -56,8 +56,12 @@ const WALL_SPAWN: Record<SpawnWorld, SpawnPose> = {
   warehouse: { x: -5, y: 0.84, z: -4.6, yaw: -Math.PI / 2 },
 };
 
-/** Forest avoid starts on the trail. Warehouse avoid starts up the aisle. */
+/**
+ * City avoid stays on the painted START. The drive spawn sits a meter
+ * south of that paint so the chevron is ahead of the nose.
+ */
 const AVOID_SPAWN: Partial<Record<SpawnWorld, SpawnPose>> = {
+  city: { x: 5.4, y: 0.84, z: 0, yaw: 0 },
   forest: { x: 0.2, y: 0.84, z: -2, yaw: 0 },
   warehouse: { x: 0, y: 0.84, z: 17.4, yaw: 0 },
 };

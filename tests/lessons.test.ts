@@ -248,6 +248,7 @@ describe("course catalog", () => {
     expect(programPreamble("circle")).toContain("90 faces east");
     expect(lessonById("getting-started/sensors")?.markdown).toContain("90 faces east");
     expect(DEFAULT_SPAWN.z).toBeCloseTo(-1);
+    expect(spawnFor("city", "avoid", "scenario").z).toBeCloseTo(0);
   });
 
   it("accepts every example start, and keeps the filter free of placeholder functions", () => {
