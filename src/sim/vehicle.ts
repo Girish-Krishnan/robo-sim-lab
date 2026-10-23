@@ -158,8 +158,8 @@ export class AckermannBuggy implements SimRobot {
 
   /**
    * Arm a noise seed. The next `reset` (and every reset after it) replays
-   * the same lidar, odometry, and IMU noise. Evaluation and the Reset seed
-   * button both use this. It does not change the sensor fields themselves.
+   * the same lidar, odometry, and IMU noise. Evaluation and a program's
+   * SEED both use this. It does not change the sensor fields themselves.
    */
   setNoiseSeed(seed: number): void {
     this.noiseSeed = seed >>> 0;

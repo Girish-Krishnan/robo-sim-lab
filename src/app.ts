@@ -2,7 +2,9 @@ import RAPIER from "@dimforge/rapier3d-compat";
 import { ACKERMANN_BUGGY, CONTROL_DT, PHYSICS_DT, clampCommand, odomToWorld, worldToOdom, type DrawOp } from "./api";
 import { chunkOpenLine } from "./editor/chunks";
 import { formatStudentError } from "./editor/errors";
-import { spawnFor } from "./sim/spawns";
+import { spawnFor, worldSpawn } from "./sim/spawns";
+import { poseProblem, readProgramSeed, readStartPose, formatPoseNumber } from "./editor/program-header";
+import { BlockedAreas } from "./sim/blocked-areas";
 import { EXAMPLES } from "./editor/examples";
 import { BLANK_SOURCE, loadScratch, saveScratch } from "./editor/blank";
 import { createEditor, type CodeEditor } from "./editor/editor";
@@ -33,6 +35,7 @@ import { mountCourse } from "./course/shell";
 import { CodeSandbox, type SandboxState } from "./sandbox/controller";
 import { ConsolePanel } from "./ui/console-panel";
 import { Hud, type AppMode } from "./ui/hud";
+import { DriftGraph } from "./ui/drift-graph";
 import { mountLegend } from "./ui/legend";
 import { mountLabSplitter, mountSplitter } from "./ui/splitter";
 
@@ -113,13 +116,15 @@ export async function mountApp(): Promise<void> {
     view.setAtmosphere(yard.atmosphere);
     const robot = new AckermannBuggy(RAPIER, world, view.scene);
     const paths = new PathOverlay(view.scene);
+    const blocked = new BlockedAreas(view.scene);
+    const driftGraph = new DriftGraph(viewport);
+    let showGraph = false;
     const drawings = new DebugDraw(view.overlay);
     let drawOps: DrawOp[] = [];
     let heldPrior: DrawOp[] | null = null;
     let priorHoldUntil = -1;
     let studentPose = { x: 0, y: 0, yaw: 0 };
-    const seedInput = mustGet<HTMLInputElement>("seed");
-    let noiseSeed = readSeed(seedInput);
+    let noiseSeed = 1;
     robot.setNoiseSeed(noiseSeed);
     let activeSpawn: SpawnPose = yard.spawn;
     robot.reset(activeSpawn);
@@ -322,6 +327,22 @@ export async function mountApp(): Promise<void> {
       return yard.spawn;
     };
 
+    const placeFromCode = (): SpawnPose => {
+      const source = codeEditor.getValue();
+      noiseSeed = readProgramSeed(source);
+      robot.setNoiseSeed(noiseSeed);
+      const parsed = readStartPose(source, yard.id);
+      if (!parsed) return currentSpawn();
+      const problem = poseProblem(solidsReady?.(yard.id) ?? [], parsed.x, parsed.y);
+      if (!problem) return { x: parsed.x, y: 0.84, z: parsed.y, yaw: (parsed.heading * Math.PI) / 180 };
+      consolePanel.log(
+        `START_POSE (${formatPoseNumber(parsed.x)}, ${formatPoseNumber(parsed.y)}) is ${problem}. Using this world's default start.`,
+        "error",
+      );
+      openConsole();
+      return worldSpawn(yard.id);
+    };
+
     let trackCloud = false;
     const frameKidnappedCloud = (force = false) => {
       if (!trackCloud) {
@@ -339,7 +360,7 @@ export async function mountApp(): Promise<void> {
       const wide = Math.min(190, Math.max(48, span / 0.55));
       const ellipse = [...drawOps].reverse().find((op) => op.kind === "ellipse");
       const spread = ellipse ? Math.max(ellipse.rx, ellipse.ry) : 1e9;
-      // A free-space prior is tens of metres. A collapsed 2-sigma ring is about a metre,
+      // A free-space prior is tens of meters. A collapsed 2-sigma ring is about a meter,
       // and the swarm is only readable if the camera comes back in.
       const distance = spread > 6 ? wide : Math.min(26, Math.max(14, spread * 8 + 12));
       const fogDistance = spread > 6 ? wide : null;
@@ -360,8 +381,9 @@ export async function mountApp(): Promise<void> {
     const resetWorld = (rerun = false, source?: string) => {
       const wasRunning = code.current === "running" || code.current === "loading";
       if (wasRunning) stopProgram();
-      activeSpawn = currentSpawn();
+      activeSpawn = placeFromCode();
       paths.clear();
+      driftGraph.reset();
       drawOps = [];
       heldPrior = null;
       priorHoldUntil = -1;
@@ -379,10 +401,7 @@ export async function mountApp(): Promise<void> {
       else if (wasRunning && (codeControls() || driveSelf)) showStopped();
     };
 
-    const resetToSeed = (seed = readSeed(seedInput)) => {
-      noiseSeed = seed >>> 0;
-      seedInput.value = String(noiseSeed);
-      robot.setNoiseSeed(noiseSeed);
+    const resetToSeed = () => {
       resetWorld(true);
     };
 
@@ -486,8 +505,10 @@ export async function mountApp(): Promise<void> {
         yard = await mountWorld(id, RAPIER, world, view.scene, graphics);
         view.setAtmosphere(yard.atmosphere);
         worldSelect.value = id;
-        activeSpawn = currentSpawn();
+        activeSpawn = placeFromCode();
         paths.clear();
+        driftGraph.reset();
+        if (blocked.visible) blocked.rebuild(RAPIER, world);
         drawOps = [];
         heldPrior = null;
         priorHoldUntil = -1;
@@ -710,13 +731,15 @@ export async function mountApp(): Promise<void> {
     };
     setPaths(false);
     pathsButton.addEventListener("click", () => setPaths(!paths.visible));
-    mustGet("reset-seed").addEventListener("click", () => resetToSeed());
-    seedInput.addEventListener("change", () => resetToSeed());
-    seedInput.addEventListener("keydown", (event) => {
-      if (event.key !== "Enter") return;
-      event.preventDefault();
-      resetToSeed();
-    });
+    const blockedButton = mustGet<HTMLButtonElement>("blocked-toggle");
+    const setBlocked = (on: boolean) => {
+      if (on) blocked.rebuild(RAPIER, world);
+      blocked.setVisible(on);
+      blockedButton.setAttribute("aria-pressed", String(on));
+      blockedButton.classList.toggle("is-on", on);
+      blockedButton.textContent = on ? "Blocked on" : "Blocked off";
+    };
+    blockedButton.addEventListener("click", () => setBlocked(!blocked.visible));
     const pauseButton = mustGet<HTMLButtonElement>("pause");
     const setPaused = (next: boolean) => {
       if (next && !paused) {
@@ -791,6 +814,8 @@ export async function mountApp(): Promise<void> {
           driveButton.hidden = true;
           driveHint.hidden = true;
           legend.show(null);
+          showGraph = false;
+          driftGraph.setVisible(false);
           setHint();
           return;
         }
@@ -809,9 +834,9 @@ export async function mountApp(): Promise<void> {
         });
         setLidarButton(scene.lidar);
         setPaths(scene.paths);
-        noiseSeed = scene.seed >>> 0;
-        seedInput.value = String(noiseSeed);
-        robot.setNoiseSeed(noiseSeed);
+        showGraph = scene.graph;
+        driftGraph.setVisible(scene.graph);
+        driftGraph.reset();
         applyLessonCamera();
         if (scene.run) code.warmup();
         setHint();
@@ -820,6 +845,16 @@ export async function mountApp(): Promise<void> {
         lessonSpawn = spawn;
         lessonWorld = worldId;
         lessonSpawnKind = kind;
+      },
+      setLessonWorlds: (ids) => {
+        const labels = (ids ?? []).map((id) => WORLDS.find((item) => item.id === id)?.label ?? id);
+        const why = labels.length ? `This lesson is written for ${labels.join(" and ")}.` : "";
+        for (const option of worldSelect.options) {
+          const allowed = !ids || ids.includes(option.value as WorldId);
+          option.disabled = !allowed;
+          option.title = allowed ? "" : why;
+        }
+        worldSelect.title = ids && ids.length === 1 ? why : "Switch the yard. A running program starts again.";
       },
       clearConsole: () => consolePanel.clear(),
       resetWorld,
@@ -925,7 +960,9 @@ export async function mountApp(): Promise<void> {
                 codeControls() ? { ops: insetOps, pose: studentPose } : undefined,
               );
               const focusNow = robot.focus();
-              paths.push(focusNow, robot.telemetry().trueSpeed, odomToWorld(activeSpawn, sensors.odometry.pose));
+              const odomPoint = odomToWorld(activeSpawn, sensors.odometry.pose);
+              paths.push(focusNow, robot.telemetry().trueSpeed, odomPoint);
+              if (showGraph) driftGraph.push(simTime, Math.hypot(focusNow.x - odomPoint.x, focusNow.z - odomPoint.z));
             }
           }
         }
@@ -965,11 +1002,6 @@ function bootWorld(): WorldId {
   if (!path) return "city";
   const saved = localStorage.getItem(WORLD_STORAGE_KEY);
   return isWorldId(saved) ? saved : "city";
-}
-
-function readSeed(input: HTMLInputElement): number {
-  const value = Number(input.value);
-  return Number.isFinite(value) ? value >>> 0 : 1;
 }
 
 const DRIVE_KEYS = new Set([

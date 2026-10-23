@@ -2,7 +2,7 @@ import { dedent, indentBody, readChunks, writeChunk } from "../editor/chunks";
 import { createSliceEditor, type SliceEditor } from "../editor/slice-editor";
 import type { StudentError } from "../editor/errors";
 import { EXAMPLES } from "../editor/examples";
-import type { WorldId } from "../sim/worlds";
+import { WORLDS, type WorldId } from "../sim/worlds";
 import type { SpawnPose } from "../sim/vehicle";
 import { LESSONS, MODULES, lessonById, lessonIndex, moduleLessons, resolveSpawn, sceneFor, type Lesson } from "./catalog";
 import { renderMarkdown } from "./markdown";
@@ -24,6 +24,7 @@ export interface CourseHost {
   setMode: (mode: AppMode) => void;
   applyScene: (scene: ReturnType<typeof sceneFor> | null) => void;
   setLessonSpawn: (spawn: SpawnPose | null, world: string | null, kind: string | null) => void;
+  setLessonWorlds: (ids: WorldId[] | null) => void;
   clearConsole: () => void;
   resetWorld: () => void;
   setCode: (source: string) => void;
@@ -65,7 +66,9 @@ export async function mountCourse(host: CourseHost): Promise<void> {
   let labId: string | null = null;
   let saveTimer = 0;
   let opening = 0;
-  let indexScroll = 0;
+  let tocOpen = true;
+  const openModules = new Set<string>();
+  let tocReady = false;
   const slices = new Map<string, SliceEditor>();
 
   const clearSlices = () => {
@@ -144,6 +147,7 @@ export async function mountCourse(host: CourseHost): Promise<void> {
   document.getElementById("reset-starter")?.addEventListener("click", () => {
     const lesson = labId ? lessonById(labId) : undefined;
     if (!lesson?.starter) return;
+    if (!window.confirm("Reset this lesson's code? Your edits will be discarded.")) return;
     clearLessonCode(lesson.id);
     applying = true;
     host.setCode(starterOf(lesson));
@@ -202,6 +206,7 @@ export async function mountCourse(host: CourseHost): Promise<void> {
       if (parked) parked.hidden = true;
       article.innerHTML = "";
       host.setLessonSpawn(null, null, null);
+      host.setLessonWorlds(null);
       host.applyScene(null);
       host.setMode(route.mode);
       host.relayout();
@@ -214,6 +219,7 @@ export async function mountCourse(host: CourseHost): Promise<void> {
     } catch {
       // Progress still works if storage is blocked.
     }
+    host.setLessonWorlds(lesson.worlds);
     renderNav(lesson);
     parkDrive();
     article.innerHTML = lessonHtml(lesson);
@@ -247,9 +253,19 @@ export async function mountCourse(host: CourseHost): Promise<void> {
   };
 
   const renderNav = (lesson: Lesson) => {
-    const scroller = nav.querySelector<HTMLElement>(".lesson-index-body");
-    if (scroller) indexScroll = scroller.scrollTop;
-    const indexOpen = nav.querySelector("#lesson-index")?.hasAttribute("open") ?? false;
+    const toggleNow = nav.querySelector("#toc-toggle");
+    if (toggleNow) {
+      tocOpen = toggleNow.getAttribute("aria-expanded") === "true";
+      openModules.clear();
+      for (const details of nav.querySelectorAll<HTMLDetailsElement>("details.toc-module")) {
+        if (details.open && details.dataset.module) openModules.add(details.dataset.module);
+      }
+    }
+    if (!tocReady) {
+      openModules.add(lesson.moduleId);
+      tocReady = true;
+    }
+    openModules.add(lesson.moduleId);
     const progress = loadProgress();
     const ready = LESSONS.filter((item) => item.status === "ready");
     const doneCount = ready.filter((item) => progress.completed.includes(item.id)).length;
@@ -259,63 +275,120 @@ export async function mountCourse(host: CourseHost): Promise<void> {
     const nextReady = index >= 0 ? LESSONS.slice(index + 1).find((item) => item.status === "ready") : undefined;
     const done = isCompleted(lesson.id);
 
-    nav.innerHTML = `
-      <div class="lesson-nav-row">
-        <select id="lesson-module" aria-label="Module"></select>
-        <select id="lesson-pick" aria-label="Lesson"></select>
-      </div>
-      <div class="lesson-nav-row">
-        <button type="button" id="lesson-prev" ${prev ? "" : "disabled"}>Prev</button>
-        <button type="button" id="lesson-next" ${soon || !nextReady ? "disabled" : ""}>Next</button>
-        <button type="button" id="lesson-complete" class="${done ? "is-on" : ""}" ${soon ? "disabled" : ""}>${done ? "Completed" : "Mark complete"}</button>
-        <span class="lesson-progress" title="Ready lessons you have marked complete">${doneCount} of ${ready.length} lessons done</span>
-      </div>
-      <details id="lesson-index" ${indexOpen ? "open" : ""}>
-        <summary>All lessons</summary>
-        <div class="lesson-index-body"></div>
-      </details>
-    `;
-
-    const moduleSelect = nav.querySelector<HTMLSelectElement>("#lesson-module");
-    const lessonSelect = nav.querySelector<HTMLSelectElement>("#lesson-pick");
-    if (!moduleSelect || !lessonSelect) return;
+    nav.replaceChildren();
+    const bar = document.createElement("div");
+    bar.className = "toc-bar";
+    const toggle = document.createElement("button");
+    toggle.id = "toc-toggle";
+    toggle.type = "button";
+    toggle.setAttribute("aria-expanded", String(tocOpen));
+    toggle.setAttribute("aria-controls", "toc-panel");
+    toggle.textContent = tocOpen ? "Hide lessons" : "Lessons";
+    toggle.title = "Show or hide the table of contents";
+    const current = document.createElement("span");
+    current.className = "toc-current";
+    current.textContent = lesson.title;
+    const count = document.createElement("span");
+    count.className = "lesson-progress";
+    count.textContent = `${doneCount} of ${ready.length}`;
+    count.title = `${doneCount} of ${ready.length} lessons done`;
+    const prevBtn = document.createElement("button");
+    prevBtn.id = "lesson-prev";
+    prevBtn.type = "button";
+    prevBtn.textContent = "Prev";
+    prevBtn.disabled = !prev;
+    const nextBtn = document.createElement("button");
+    nextBtn.id = "lesson-next";
+    nextBtn.type = "button";
+    nextBtn.textContent = "Next";
+    nextBtn.disabled = soon || !nextReady;
+    const completeBtn = document.createElement("button");
+    completeBtn.id = "lesson-complete";
+    completeBtn.type = "button";
+    completeBtn.className = done ? "toc-done" : "";
+    completeBtn.textContent = done ? "Done" : "Mark done";
+    completeBtn.setAttribute("aria-pressed", String(done));
+    completeBtn.disabled = soon;
+    bar.append(toggle, current, count, prevBtn, nextBtn, completeBtn);
+    const panel = document.createElement("nav");
+    panel.id = "toc-panel";
+    panel.setAttribute("aria-label", "Lessons");
+    panel.hidden = !tocOpen;
     for (const module of MODULES) {
-      const option = document.createElement("option");
-      option.value = module.id;
-      option.textContent = module.soon ? `${module.title} (soon)` : module.title;
-      option.disabled = Boolean(module.soon) && module.id !== lesson.moduleId;
-      moduleSelect.append(option);
-    }
-    moduleSelect.value = lesson.moduleId;
-    const fillLessons = (moduleId: string) => {
-      lessonSelect.replaceChildren();
-      for (const item of moduleLessons(moduleId)) {
-        const option = document.createElement("option");
-        option.value = item.id;
-        option.textContent = item.status === "soon" ? `${item.title} (soon)` : item.title;
-        option.disabled = item.status === "soon" && item.id !== lesson.id;
-        lessonSelect.append(option);
+      const details = document.createElement("details");
+      details.className = "toc-module";
+      details.dataset.module = module.id;
+      details.open = openModules.has(module.id);
+      const summary = document.createElement("summary");
+      const summaryText = document.createElement("span");
+      summaryText.textContent = module.soon ? `${module.title}` : module.title;
+      const summaryMeta = document.createElement("span");
+      summaryMeta.className = "toc-meta";
+      const lessons = moduleLessons(module.id);
+      const moduleDone = lessons.filter((item) => progress.completed.includes(item.id)).length;
+      summaryMeta.textContent = module.soon ? "soon" : `${moduleDone}/${lessons.length}`;
+      summary.append(summaryText, summaryMeta);
+      details.append(summary);
+      const list = document.createElement("ol");
+      for (const item of lessons) {
+        const li = document.createElement("li");
+        const link = document.createElement("a");
+        link.href = `#/lesson/${item.id}`;
+        if (progress.completed.includes(item.id)) {
+          const mark = document.createElement("span");
+          mark.className = "toc-check";
+          mark.textContent = "✓";
+          mark.setAttribute("aria-hidden", "true");
+          link.append(mark);
+          link.setAttribute("aria-label", `${item.title}, done`);
+        }
+        link.append(document.createTextNode(item.title));
+        if (item.id === lesson.id) {
+          link.classList.add("is-current");
+          link.setAttribute("aria-current", "page");
+        }
+        if (progress.completed.includes(item.id)) link.classList.add("is-done");
+        else if (progress.visited.includes(item.id)) link.classList.add("is-visited");
+        if (item.status === "soon") {
+          link.classList.add("is-soon");
+          link.setAttribute("aria-disabled", "true");
+          const badge = document.createElement("span");
+          badge.className = "toc-soon";
+          badge.textContent = "soon";
+          link.append(badge);
+          link.addEventListener("click", (event) => event.preventDefault());
+        }
+        li.append(link);
+        list.append(li);
       }
-    };
-    fillLessons(lesson.moduleId);
-    lessonSelect.value = lesson.id;
+      details.append(list);
+      details.addEventListener("toggle", () => {
+        if (details.open) openModules.add(module.id);
+        else openModules.delete(module.id);
+      });
+      panel.append(details);
+    }
+    const note = document.createElement("p");
+    note.className = "lesson-world-note";
+    note.textContent = worldNote(lesson);
+    note.hidden = lesson.worlds.length < 2;
+    nav.append(bar, panel, note);
 
-    moduleSelect.addEventListener("change", () => {
-      const first = moduleLessons(moduleSelect.value)[0];
-      if (first) navigate({ mode: "lessons", id: first.id });
+    toggle.addEventListener("click", () => {
+      tocOpen = !tocOpen;
+      toggle.setAttribute("aria-expanded", String(tocOpen));
+      toggle.textContent = tocOpen ? "Hide lessons" : "Lessons";
+      panel.hidden = !tocOpen;
     });
-    lessonSelect.addEventListener("change", () => {
-      if (lessonSelect.value) navigate({ mode: "lessons", id: lessonSelect.value });
-    });
-    nav.querySelector("#lesson-prev")?.addEventListener("click", () => {
+    prevBtn.addEventListener("click", () => {
       if (prev) navigate({ mode: "lessons", id: prev.id });
     });
-    nav.querySelector("#lesson-next")?.addEventListener("click", () => {
+    nextBtn.addEventListener("click", () => {
       if (lesson.status === "soon" || !nextReady) return;
       if (lesson.status === "ready") markCompleted(lesson.id);
       navigate({ mode: "lessons", id: nextReady.id });
     });
-    nav.querySelector("#lesson-complete")?.addEventListener("click", () => {
+    completeBtn.addEventListener("click", () => {
       if (lesson.status === "soon") return;
       toggleCompleted(lesson.id);
       renderNav(lesson);
@@ -328,33 +401,16 @@ export async function mountCourse(host: CourseHost): Promise<void> {
         article.scrollTop += delta - 8;
       }
     });
-
-    const body = nav.querySelector(".lesson-index-body");
-    if (!body) return;
-    for (const module of MODULES) {
-      const block = document.createElement("section");
-      const heading = document.createElement("h2");
-      heading.textContent = module.title;
-      block.append(heading);
-      const list = document.createElement("ol");
-      for (const item of moduleLessons(module.id)) {
-        const li = document.createElement("li");
-        const link = document.createElement("a");
-        link.href = `#/lesson/${item.id}`;
-        link.textContent = item.title;
-        if (item.id === lesson.id) link.classList.add("is-current");
-        if (progress.completed.includes(item.id)) link.classList.add("is-done");
-        else if (progress.visited.includes(item.id)) link.classList.add("is-visited");
-        if (item.status === "soon") link.classList.add("is-soon");
-        li.append(link);
-        list.append(li);
-      }
-      block.append(list);
-      body.append(block);
-    }
-    body.scrollTop = indexScroll;
-    body.addEventListener("scroll", () => {
-      indexScroll = body.scrollTop;
+    panel.addEventListener("keydown", (event) => {
+      if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+      const items = [...panel.querySelectorAll<HTMLElement>("summary, a")].filter((item) => {
+        if (item.tagName === "SUMMARY") return true;
+        return item.closest("details")?.open === true;
+      });
+      const index = items.indexOf(document.activeElement as HTMLElement);
+      if (index < 0) return;
+      event.preventDefault();
+      items[index + (event.key === "ArrowDown" ? 1 : -1)]?.focus();
     });
   };
 
@@ -372,6 +428,14 @@ export async function mountCourse(host: CourseHost): Promise<void> {
   }
   const pending = show(parseRoute(location.hash));
   if (pending) await pending;
+}
+
+function worldNote(lesson: Lesson): string {
+  const label = (id: string) => WORLDS.find((world) => world.id === id)?.label ?? id;
+  const home = label(lesson.world);
+  const others = lesson.worlds.filter((id) => id !== lesson.world).map(label);
+  if (others.length === 0) return "";
+  return `This lesson also runs in ${others.join(", ")}. Pick one from World. The numbers in the text are for ${home}.`;
 }
 
 function lastLessonId(): string {
@@ -419,7 +483,7 @@ export function progressCard(lesson: Lesson, completed: readonly string[]): stri
     return `
     <aside class="course-complete">
       <h2>Course complete</h2>
-      <p>You drove the car, read the sensors, and ran a particle filter from a kidnapped start. Mapping, planning, and the later controllers are still being written. Those modules stay grey in the menu until they have a lesson.</p>
+      <p>You drove the car, read the sensors, and ran a particle filter from a kidnapped start. Mapping, planning, and the later controllers are still being written. Those modules stay gray in the menu until they have a lesson.</p>
     </aside>
   `;
   }

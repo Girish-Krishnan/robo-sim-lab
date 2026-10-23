@@ -39,6 +39,8 @@ export interface LessonScene {
   seed: number;
   /** Load and run the starter (or the saved edit). */
   run: boolean;
+  /** Live true-versus-odometry error graph. */
+  graph: boolean;
 }
 
 export interface Lesson {
@@ -49,6 +51,8 @@ export interface Lesson {
   order: number;
   status: "ready" | "soon";
   world: WorldId;
+  /** Worlds this lesson is written for. The picker locks the rest. */
+  worlds: WorldId[];
   spawn: LessonSpawn;
   starter: string | null;
   action: LessonAction;
@@ -100,7 +104,7 @@ export function resolveSpawnIn(lesson: Lesson, world: WorldId): SpawnPose {
  */
 export function sceneFor(lesson: Lesson): LessonScene {
   if (lesson.status === "soon") {
-    return { lidar: true, paths: false, particles: false, route: false, manual: false, camera: "chase", seed: 1, run: false };
+    return { lidar: true, paths: false, particles: false, route: false, manual: false, camera: "chase", seed: 1, run: false, graph: false };
   }
   const kidnapped = lesson.spawn === "mcl-global" || lesson.starter === "mcl-global";
   const particles =
@@ -137,6 +141,7 @@ export function sceneFor(lesson: Lesson): LessonScene {
     camera,
     seed: 1,
     run: Boolean(lesson.starter),
+    graph: lesson.slug === "odometry" || lesson.slug === "noise",
   };
 }
 
@@ -166,6 +171,7 @@ function parseLesson(path: string, source: string): Lesson | null {
     order: Number(fields.order ?? 0) || 0,
     status,
     world,
+    worlds: parseWorlds(fields.worlds, world),
     spawn: parseSpawn(fields.spawn),
     starter,
     action,
@@ -185,6 +191,15 @@ function parseFields(block: string): Record<string, string> {
     fields[match[1]!] = match[2]!.trim();
   }
   return fields;
+}
+
+function parseWorlds(value: string | undefined, home: WorldId): WorldId[] {
+  const listed = (value ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter((item): item is WorldId => isWorldId(item));
+  if (!listed.includes(home)) listed.unshift(home);
+  return listed;
 }
 
 function parseSpawn(value: string | undefined): LessonSpawn {
