@@ -144,11 +144,14 @@ function parkOffTheLanes(x: number, z: number): { x: number; z: number } {
     if (x > -38 && x < 32 && z < -15.4 && z > -24) z = -28;
   };
   clear();
+  // A noisy pursuit lap wanders a few meters off the waypoints. Keep the
+  // extra trunks and logs outside that band, then run the lane clear again
+  // so the push cannot drop one onto the wall lap.
   for (const point of referenceRoute("forest")) {
     const dx = x - point.x;
     const dz = z - point.z;
-    if (dx * dx + dz * dz >= 3.2 * 3.2) continue;
-    x = point.x >= 0 ? point.x + 3.6 : point.x - 3.6;
+    if (dx * dx + dz * dz >= 4.8 * 4.8) continue;
+    x = point.x >= 0 ? point.x + 5.4 : point.x - 5.4;
   }
   clear();
   return { x, z };
