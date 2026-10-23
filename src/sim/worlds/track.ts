@@ -84,13 +84,16 @@ export async function mountTrack(
   group.name = "world-track";
   scene.add(group);
 
-  const grassMat = kit?.grass ?? new THREE.MeshStandardMaterial({ color: 0x3f6b45, roughness: 1 });
-  const asphaltMat = kit?.asphalt ?? new THREE.MeshStandardMaterial({ color: 0x3a4148, roughness: 0.92, metalness: 0.04 });
+  const grassMat = new THREE.MeshStandardMaterial({ color: 0x3c7a48, roughness: 1, metalness: 0 });
+  const infieldMat = new THREE.MeshStandardMaterial({ color: 0x2f6a3e, roughness: 1, metalness: 0 });
+  const asphaltMat = (kit?.asphalt ?? new THREE.MeshStandardMaterial({ color: 0x3a4148, roughness: 0.92, metalness: 0.04 })).clone();
+  asphaltMat.polygonOffset = true;
+  asphaltMat.polygonOffsetFactor = -2;
+  asphaltMat.polygonOffsetUnits = -2;
   const yard = new THREE.PlaneGeometry(130, 150);
-  tileUvs(yard, 130 * 1.15, 150 * 1.15);
   const floor = new THREE.Mesh(yard, grassMat);
   floor.rotation.x = -Math.PI / 2;
-  floor.position.y = 0.008;
+  floor.position.y = 0.01;
   floor.receiveShadow = true;
   group.add(floor);
 
@@ -104,15 +107,14 @@ export async function mountTrack(
     group.add(mesh);
   };
   const lane = OUTER - INNER + 1.6;
-  band((INNER + OUTER) / 2, 0, lane, Z_OUT * 2 + 2, 0.012);
-  band(-(INNER + OUTER) / 2, 0, lane, Z_OUT * 2 + 2, 0.012);
+  band((INNER + OUTER) / 2, 0, lane, Z_OUT * 2 + 2, 0.05);
+  band(-(INNER + OUTER) / 2, 0, lane, Z_OUT * 2 + 2, 0.05);
   const cap = Z_OUT - Z_IN + 2.4;
-  band(0, (Z_IN + Z_OUT) / 2, OUTER * 2 + 2, cap, 0.013);
-  band(0, -(Z_IN + Z_OUT) / 2, OUTER * 2 + 2, cap, 0.013);
+  band(0, (Z_IN + Z_OUT) / 2, OUTER * 2 + 2, cap, 0.05);
+  band(0, -(Z_IN + Z_OUT) / 2, OUTER * 2 + 2, cap, 0.05);
 
   const infieldGeo = new THREE.PlaneGeometry(INNER * 2 - 1.4, Z_IN * 2 - 1.4);
-  tileUvs(infieldGeo, (INNER * 2) * TILES_PER_METER, (Z_IN * 2) * TILES_PER_METER);
-  const infield = new THREE.Mesh(infieldGeo, grassMat);
+  const infield = new THREE.Mesh(infieldGeo, infieldMat);
   infield.rotation.x = -Math.PI / 2;
   infield.position.y = 0.02;
   infield.receiveShadow = true;
@@ -125,7 +127,7 @@ export async function mountTrack(
     for (const x of [INNER + 0.7, OUTER - 0.7, -INNER - 0.7, -OUTER + 0.7]) {
       const a = new THREE.Mesh(new THREE.PlaneGeometry(0.55, 1.05), (Math.round(z / 2.2) % 2 === 0 ? kerb : kerb2));
       a.rotation.x = -Math.PI / 2;
-      a.position.set(x, 0.025, z);
+      a.position.set(x, 0.07, z);
       group.add(a);
     }
   }
@@ -133,7 +135,7 @@ export async function mountTrack(
   for (let i = 0; i < 8; i++) {
     const band = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 0.55), i % 2 === 0 ? paint : kerb);
     band.rotation.x = -Math.PI / 2;
-    band.position.set(10.2 + i * 1.35, 0.03, TRACK_SPAWN.z);
+    band.position.set(10.2 + i * 1.35, 0.08, TRACK_SPAWN.z);
     group.add(band);
   }
 

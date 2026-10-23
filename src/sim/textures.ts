@@ -62,23 +62,25 @@ export function padTexture(): THREE.CanvasTexture {
     y: ((24 - z) / 48) * size,
   });
 
-  // Start chevron at the spawn point, pointing +Z (up the canvas).
-  // The old circle around the origin sat on the opposite side of a left-hand
-  // constant-radius turn, so it is not painted.
+  // The pad plane is rotated -90° on X and the canvas texture flips Y,
+  // so a mark drawn toward larger canvas y lands on world +Z (north).
+  // Unrotated canvas text then reads left to right for a driver heading north,
+  // with the arrow tip ahead of the word.
   const spawn = worldToPx(5.4, 0);
   ctx.strokeStyle = "rgba(227, 162, 58, 0.95)";
   ctx.lineWidth = 6;
   ctx.lineJoin = "round";
   ctx.beginPath();
-  ctx.moveTo(spawn.x - 18, spawn.y + 16);
-  ctx.lineTo(spawn.x, spawn.y - 14);
-  ctx.lineTo(spawn.x + 18, spawn.y + 16);
+  ctx.moveTo(spawn.x - 18, spawn.y - 16);
+  ctx.lineTo(spawn.x, spawn.y + 14);
+  ctx.lineTo(spawn.x + 18, spawn.y - 16);
   ctx.stroke();
 
-  ctx.fillStyle = "rgba(232, 236, 230, 0.7)";
+  ctx.fillStyle = "rgba(232, 236, 230, 0.92)";
   ctx.font = "600 28px sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText("START", spawn.x, spawn.y + 42);
+  ctx.textBaseline = "middle";
+  ctx.fillText("START", spawn.x, spawn.y - 36);
 
   return canvasTexture(canvas);
 }

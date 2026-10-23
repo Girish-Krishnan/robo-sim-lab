@@ -6,6 +6,7 @@ import type { Atmosphere, GraphicsQuality } from "../scene";
 import { forestGroundMaterial, loadPropKit, tileUvs } from "../surfaces";
 import { hashYaw, loadProps, scatter, type PropTemplate, type ScatterSolid } from "../props";
 import { bladeTexture } from "../textures";
+import { referenceRoute } from "../routes";
 import { ballSolid, cuboid, logSolid, pillar } from "./factory";
 
 export { FOREST_SPAWN } from "../spawns";
@@ -92,7 +93,57 @@ export function buildForestSolids(): Solid[] {
   solids.push(cuboid(0, -48, 78, 1.45, 0.25, "fence"));
   solids.push(cuboid(40, 1, 0.25, 1.45, 98, "fence"));
   solids.push(cuboid(-40, 1, 0.25, 1.45, 98, "fence"));
+
+  for (const tree of forestBackground(mulberry32(19))) {
+    const radius = tree.kind === "pine" ? 0.34 : 0.5;
+    solids.push(pillar(tree.x, tree.z, radius, Math.max(3.2, tree.height), tree.kind, tree.kind === "pine" ? 0x2a4a34 : 0x6a4b32));
+  }
+  for (let i = 0; i < 6; i++) {
+    const z = 6 + i * 9;
+    const side = i % 2 === 0 ? 1 : -1;
+    const x = parkOffTheLanes(Math.sin(z * 0.09) * 1.2 + side * 3.4, z);
+    solids.push(logSolid(x, z, 0.72, 2.6, side * 0.7));
+  }
   return solids;
+}
+
+/**
+ * The 42 trees that used to be painted with no collider. x is nudged off
+ * the trail, the west return lane, and the outside wall-follow line so a
+ * scripted lap still has a gap. The same draw is burned again while
+ * dressing ferns, which keeps those plants where they were.
+ */
+function forestBackground(rand: () => number): { kind: "tree" | "pine"; x: number; z: number; height: number }[] {
+  const trees: { kind: "tree" | "pine"; x: number; z: number; height: number }[] = [];
+  for (let i = 0; i < 42; i++) {
+    const z = -16 + rand() * 96;
+    const side = rand() > 0.5 ? 1 : -1;
+    let x = side * (12 + rand() * 24);
+    const pick = Math.floor(rand() * 3);
+    rand();
+    const jitter = 0.75 + rand() * 0.45;
+    const specScale = pick === 1 ? 7.5 : pick === 2 ? 5.5 : 8;
+    x = parkOffTheLanes(x, z);
+    const height = (specScale * jitter) / (pick === 1 ? 2.4 : 2.15);
+    trees.push({ kind: pick === 1 ? "pine" : "tree", x, z, height });
+  }
+  return trees;
+}
+
+function parkOffTheLanes(x: number, z: number): number {
+  const trail = Math.sin(z * 0.09) * 1.2;
+  if (Math.abs(x - trail) < 2.3) x = x >= trail ? trail + 2.5 : trail - 2.5;
+  if (z > -16 && z < 38 && Math.abs(x + 20.1) < 2) x = -22.8;
+  if (x > 16.7 && x < 23.2) x = 17.05;
+  for (const point of referenceRoute("forest")) {
+    const dx = x - point.x;
+    const dz = z - point.z;
+    if (dx * dx + dz * dz >= 3.2 * 3.2) continue;
+    x = point.x >= 0 ? point.x + 3.4 : point.x - 3.4;
+  }
+  if (x > 16.7 && x < 23.2) x = 26;
+  if (z > -16 && z < 38 && Math.abs(x + 20.1) < 2.2) x = -26;
+  return x;
 }
 
 function forestHeight(x: number, z: number): number {
@@ -285,43 +336,7 @@ function dressForest(
   );
 
   const rand = mulberry32(19);
-  const background: { template: PropTemplate; scale: number }[] = [
-    { template: props.broadleaf!, scale: 8 },
-    { template: props.pine!, scale: 7.5 },
-    { template: props.bushy!, scale: 5.5 },
-  ];
-  const extras: { template: PropTemplate; items: { x: number; y: number; z: number; yaw: number; scale: number }[] }[] =
-    background.map((entry) => ({ template: entry.template, items: [] }));
-  for (let i = 0; i < 42; i++) {
-    const z = -16 + rand() * 96;
-    const side = rand() > 0.5 ? 1 : -1;
-    const x = side * (12 + rand() * 24);
-    const pick = extras[Math.floor(rand() * extras.length)]!;
-    const spec = background[extras.indexOf(pick)]!;
-    pick.items.push({
-      x,
-      y: forestHeight(x, z),
-      z,
-      yaw: rand() * Math.PI * 2,
-      scale: (spec.scale * (0.75 + rand() * 0.45)) / spec.template.height,
-    });
-  }
-  for (const batch of extras) scatter(group, batch.template, batch.items);
-
-  const edgeLogs: { x: number; y: number; z: number; yaw: number; scale: number }[] = [];
-  for (let i = 0; i < 6; i++) {
-    const z = 6 + i * 9;
-    const side = i % 2 === 0 ? 1 : -1;
-    const x = Math.sin(z * 0.09) * 1.2 + side * 3.4;
-    edgeLogs.push({
-      x,
-      y: forestHeight(x, z),
-      z,
-      yaw: side * 0.7,
-      scale: 2.6 / Math.max(0.2, props.log!.radius * 2),
-    });
-  }
-  scatter(group, props.log!, edgeLogs, { cast: true });
+  forestBackground(rand);
 
   if (quality !== "high") return;
   const ferns: { x: number; y: number; z: number; yaw: number; scale: number }[] = [];
