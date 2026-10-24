@@ -289,7 +289,7 @@ export function buildCourseSolids(): Solid[] {
   cyl(10.2, 32.5, 0.06, 2.1, "sign", 0, 0x44515c);
   box(10.2, 32.5, 0.08, 0.85, 0.85, "sign", 0, 0, 1.35, 0xd23b3b);
 
-  // Fountain in the west lawn.
+  // Fountain in the east lawn (x is negative; +X is west).
   cyl(-22, -6, 1.5, 1.25, "fountain", 0, 0xb7c0c6);
 
   // Closed perimeter. Segments stay short so a long wall does not fail the
@@ -326,7 +326,7 @@ export function buildCourseSolids(): Solid[] {
   cyl(12.4, 34.2, 0.08, 3.5, "signal", 0, 0x2c3338);
   box(12.4, 34.2, 0.55, 0.9, 0.28, "signal", Math.PI, 0, 2.85, 0x1c2126);
 
-  // A free-standing lot on the south-west lawn. The outside is open on
+  // A free-standing lot on the south-east lawn (negative x; +X is west). The outside is open on
   // every side, so a right-hand follower can orbit it. The perimeter wall
   // and the fountain sit outside that path. Tall enough for the lidar.
   box(-18, -25, 0.45, 1.6, 14, "fence");

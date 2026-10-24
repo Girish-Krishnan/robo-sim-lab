@@ -49,7 +49,7 @@ The bicycle model turns curvature into a steering angle with $\kappa = \tan\delt
 
 $$\delta = \arctan\left(L \cdot \frac{2\sin\alpha}{L_d}\right).$$
 
-$L$ is the wheelbase, 1.9 m. The starter clamps $\delta$ to the vehicle limit. In code, $\alpha = \operatorname{atan2}(y_{\mathrm{left}}, x_{\mathrm{forward}})$ after rotating the lookahead offset by the odometry yaw. The camera's heading grows the other way (a left turn decreases it) and is not in the sample. Mixing it with odometry yaw steers the wrong way, so stay with `pose.yaw`.
+$L$ is the wheelbase, 1.9 m. The starter clamps $\delta$ to the vehicle limit. In code, $\alpha = \operatorname{atan2}(y_{\mathrm{left}}, x_{\mathrm{forward}})$ after rotating the lookahead offset by the odometry yaw. The `START_POSE` heading grows the other way (a left turn decreases it; see Frames and angles). Mixing it with odometry yaw steers the wrong way, so stay with `pose.yaw`.
 
 `LOOKAHEAD` is the distance, in meters, from the car to the point it steers toward. It sits at the top of the program with the wheelbase.
 

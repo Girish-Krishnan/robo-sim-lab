@@ -14,7 +14,7 @@ This is how the car sees. A spinning range finder, about a meter off the ground,
 
 In the sim: the oval, with the avoid program running and the scan drawn. The corner inset is the same scan from above. Amber dots are the close hits.
 
-Angle 0 points forward. Positive angles point to the driver's left. The rear 90° is a blank wedge, so something directly behind the car stays invisible until you turn (yaw).
+Angle 0 points forward. Positive angles point to the driver's left. The rear 90° is a blank wedge, so something directly behind the car stays invisible until you turn.
 
 A beam that hits nothing is reported as `max_range`, 12 m. Treat "equal to max range" as empty air. Every real controller in this course does. Range noise is about 2 cm (one standard deviation, "one sigma": most readings land within 2 cm of the truth), in the band of a small outdoor lidar such as a Hokuyo UST-10LX.
 

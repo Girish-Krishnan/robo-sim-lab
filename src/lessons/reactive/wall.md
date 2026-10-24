@@ -12,7 +12,7 @@ status: ready
 
 Watch the car hug the wall down the straight, holding the same gap off its right side. At the corner the wall vanishes; the car turns and picks it up again. Two lidar beams do all of it.
 
-In the sim: the east straight, inner wall on the right, with the trails on so a lap is easy to see.
+In the sim: the start straight, inner wall on the right, with the trails on so a lap is easy to see.
 
 The beam near $-90^\circ$ ($-\pi/2$ rad in `sensors.lidar.angles`) measures the side distance. The beam near $-45^\circ$ sees the wall ahead of the rear axle, so the car can start turning before the side beam falls off the end. The target distance is 3.2 m, which puts the car in the lane.
 
@@ -40,9 +40,9 @@ The side beam and the diagonal beam come from one small helper. `beam` takes the
 
 ## Distance now, and distance a step ahead
 
-Let $d$ be the side range and $d^\star = 3.2$ m. Here $\alpha$ is the angle between the car's heading and the wall, worked out from the two ranges (if the diagonal reads longer than a parallel wall would give, the wall is angling away). It is not the $45^\circ$ between the beams, and it is not a lidar beam angle. $L_{\mathrm{look}}$ is how far ahead you peek, in meters, not the wheelbase $L$. A lookahead correction gives a predicted distance
+Let $d^\star = 3.2$ m. Here $\alpha$ is the angle between the car's heading and the wall, worked out from the two ranges (if the diagonal reads longer than a parallel wall would give, the wall is angling away). It is not the $45^\circ$ between the beams, and it is not a lidar beam angle. $L_{\mathrm{look}}$ is how far ahead you peek, in meters, not the wheelbase $L$. The lookahead does not add the raw side beam. It adds `dist`, the side range after the tilt correction in the block below:
 
-$$d_{\mathrm{future}} = d + L_{\mathrm{look}}\sin\alpha.$$
+$$d_{\mathrm{future}} = \mathrm{dist} + L_{\mathrm{look}}\sin\alpha.$$
 
 $K_p$ and $K_d$ are *gains*, knobs that set how many radians of steer you get per meter of distance error ($K_p$) and per radian of wall angle ($K_d$). The steering law in the starter is
 

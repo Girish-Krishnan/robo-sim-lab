@@ -28,4 +28,4 @@ The colored trail is where the car went. The blue trail is where dead reckoning 
 
 1. Drive a slow lap of the city block clear of the planters, and watch the inset as you pass a lamp post.
 2. Drive straight for about twenty seconds. See whether the blue trail stays under the car. Reset run and do it again. The peel should come back the same way.
-3. Switch to the oval and drive the east straight with the wall on your right. That is the pose the wall-follow lesson starts from.
+3. Switch to the oval and drive the start straight with the wall on your right. That is the pose the wall-follow lesson starts from.

@@ -131,7 +131,7 @@ export async function mountTrack(
       group.add(a);
     }
   }
-  // Start/finish across the east straight.
+  // Start/finish across the west straight (+X is west).
   for (let i = 0; i < 8; i++) {
     const band = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 0.55), i % 2 === 0 ? paint : curb);
     band.rotation.x = -Math.PI / 2;

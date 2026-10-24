@@ -87,7 +87,7 @@ export function buildForestSolids(): Solid[] {
   // Corridor around the trail. The outer yard fence is far enough that a
   // gap follower leaves the trees and laps empty grass. This one keeps
   // that run among the trunks, and gives wall follow a continuous edge.
-  // The west fence sits out from the return lane (x=-20.1). A noisy lap
+  // The east fence sits out from the return lane (x=-20.1; −X is east). A noisy lap
   // drifts about 2 m off that line, and the body still has to clear the
   // boards. North and south fences reach the same corner.
   solids.push(cuboid(16.5, 11, 0.45, 1.6, 54, "fence"));
@@ -288,7 +288,7 @@ export function forestDressing(
 
 /**
  * The 42 trees that used to be painted with no collider. They are nudged
- * off the trail, the west return, and the lap wall follow drives around
+ * off the trail, the east return (x ≈ −20), and the lap wall follow drives around
  * the outside of the corridor fence. The same draw is burned again while
  * dressing ferns, which keeps those plants where they were.
  */
@@ -313,10 +313,10 @@ function parkOffTheLanes(x: number, z: number): { x: number; z: number } {
   const clear = () => {
     const trail = Math.sin(z * 0.09) * 1.2;
     if (Math.abs(x - trail) < 2.3) x = x >= trail ? trail + 2.5 : trail - 2.5;
-    // Pursuit returns on x=-20.1, inside the west fence.
+    // Pursuit returns on x=-20.1, inside the east fence (−X is east).
     if (z > -16 && z < 38 && Math.abs(x + 20.1) < 2.4) x = -26;
     // Wall follow holds about 3.2 m off the outside of the corridor fence
-    // (east face x≈16.7, west x≈-24.4, north z≈38.2, south z≈-16.2).
+    // (west face x≈16.7, east x≈-24.4, north z≈38.2, south z≈-16.2; +X is west).
     if (z > -22 && z < 46 && x > 16.2 && x < 25) x = 29;
     if (z > -22 && z < 46 && x < -23.8 && x > -34) x = -37;
     if (x > -38 && x < 32 && z > 37.4 && z < 46) z = 47;

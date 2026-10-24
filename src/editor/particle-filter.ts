@@ -36,7 +36,7 @@ export function particleFilterSource(mode: "track" | "global"): string {
 # start the pose we steer with is the weighted mean.
 #
 # UNKNOWN_START is a kidnapped robot. Most particles start in empty space
-# with random headings. A minority sit on the route at twelve headings, because
+# with random yaw. A minority sit on the route at twelve yaws, every 30 degrees, because
 # a few hundred uniform poses do not cover x, y, and yaw. The car creeps
 # with the right-wall follower (same gains as the wall lesson, throttle
 # capped) until one particle holds about a tenth of the weight. The cloud
@@ -304,7 +304,7 @@ def kidnapped_cloud(m, field, path):
     # Free cells first, so the drawn cloud (and a truncated draw) is a
     # scatter across the world. A route lattice sits behind them: a few
     # hundred uniform poses will not land on the car, and the route is
-    # task info. Twelve headings, both ways around the loop included.
+    # task info. Twelve yaws, every 30 degrees, both ways around the loop included.
     cloud = free_cloud(N, field, m)
     headings = np.linspace(-math.pi, math.pi, 12, endpoint=False)
     slots = min(N // 2, max(12, (N * 2) // 5))

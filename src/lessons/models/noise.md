@@ -77,6 +77,6 @@ Note: smoothing the gyro to "take the bias out" also takes the turn out, until a
 
 ## Try it
 
-1. Drive the east straight, then keep going. At about 10 s the blue trail is still subtle. Late in the minute it should be obvious, and the graph should say so. Pause if you want to look.
+1. Drive the start straight, then keep going. At about 10 s the blue trail is still subtle. Late in the minute it should be obvious, and the graph should say so. Pause if you want to look.
 2. Press Reset run and drive the same way. The peel should come back on the same side. That is seed 1 again.
 3. Creep toward a wall and watch the lidar inset. The ranges jitter by centimeters. The heading does not jitter itself back onto the truth. That is the contrast.

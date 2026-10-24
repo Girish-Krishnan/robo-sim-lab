@@ -35,16 +35,16 @@ In the sim, the camera stays overhead and the view holds that first cloud for 2 
   <circle cx="178" cy="52" r="3.2" fill="#ff2bd6"/>
   <circle cx="186" cy="44" r="3.2" fill="#ff2bd6"/>
   <circle cx="174" cy="56" r="3.2" fill="#ff2bd6"/>
-  <text x="24" y="28" fill="#f4f7f4" font-size="18" font-family="sans-serif">Prior shown for 2 s, then the car</text>
+  <text x="24" y="28" fill="#f4f7f4" font-size="18" font-family="sans-serif">Prior first, then the car</text>
   <text x="24" y="222" fill="#d5ddd8" font-size="15" font-family="sans-serif">Faint dots are the wide prior. The car is the light body on the straight.</text>
   <text x="24" y="244" fill="#d5ddd8" font-size="15" font-family="sans-serif">After the hold the guesses sit on the car, and the car drives.</text>
 </svg>
 
-`UNKNOWN_START` is true here. Most of the 720 particles start in empty space, each with a random heading. A few sit on the route at twelve headings, so one of them can land on the car. The camera stays overhead while that cloud fills the world.
+`UNKNOWN_START` is true here. Most of the 720 particles start in empty space, each with a random yaw. A few sit on the route at twelve yaws (every 30°), so one of them can land on the car. The camera stays overhead while that cloud fills the world.
 
 {{code:settings}}
 
-On a roundabout or in the forest, one guess matches the walls and the others fade. On the oval, the two long straights look the same to the lidar, so the best guess is only a modest favorite and a second clump can linger. On other seeds the cloud can lock onto the wrong straight for a while; a corner usually settles it. The warehouse keeps several guesses alive until the car moves. The hold is the same 2 s either way, and the cloud can stay broad after it.
+On a roundabout or in the forest, one guess matches the walls and the others fade. On the oval, the two long straights look the same to the lidar, so the best guess is only a modest favorite and a second clump can linger. On other seeds the cloud can lock onto the wrong straight for a while; a corner usually settles it. The warehouse keeps several guesses alive until the car moves. The hold is the same either way, and the cloud can stay broad after it.
 
 <details class="going-further">
 <summary>Going further</summary>
@@ -63,6 +63,6 @@ The view freezes the first wide drawing for 2 s so you can see the prior, while 
 
 ## Try it
 
-1. Run the kidnapped starter and watch the Time row. For 2 s the speed stays 0, the camera stays overhead, and the pink dots cover the world. That hold is the prior, shown for 2 s.
-2. At 2 s the dots sit on the car and the ring tightens. By about 4 s the car is cruising.
-3. Turn on Drive it yourself. Drive-it-yourself speed is capped near 3 m/s. The cloud keeps scoring the scan. In the warehouse the weight can stay shared for longer after the same 2 s hold.
+1. Run the kidnapped starter and watch the Time row. For the hold, the speed stays 0, the camera stays overhead, and the pink dots cover the world. That hold is the prior.
+2. When the hold ends, the dots sit on the car and the ring tightens. By about 4 s the car is cruising.
+3. Turn on Drive it yourself. Drive-it-yourself speed is capped near 3 m/s. The cloud keeps scoring the scan. In the warehouse the weight can stay shared for longer.

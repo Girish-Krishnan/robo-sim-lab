@@ -10,7 +10,7 @@ prerequisites: getting-started/robot
 status: ready
 ---
 
-Twenty times a second, your program gets a fresh look at the world. You write one function, `control(sensors)`. Twenty times a second the lab calls it with a fresh `sensors` sample, and whatever you return (steering, throttle) drives the car. That call is the whole contract between your program and the car.
+Twenty times a second, your program gets a fresh look at the world. You write one function, `control(sensors)`. The lab calls it with a fresh `sensors` sample, and whatever you return (steering, throttle) drives the car. That call is the whole contract between your program and the car.
 
 You get lidar (a laser range scanner), wheel odometry (the wheels' own estimate of where you've gone), an IMU (a gyro plus an accelerometer), the time, and a task (the route, and later a map, the world hands you). The true pose (position x, y plus heading), the true velocity, and the physics body stay with the simulator. The HUD speed, on the readout strip under the 3D view, is for the person watching.
 
@@ -22,31 +22,33 @@ Note: Your car remembers things between ticks in one object called `run`. `class
 
 The circle program below counts ticks in `run`, and every other example keeps its memory between ticks the same way.
 
-Open **Full program** once. The first lines are `SEED` and `START_POSE`. `SEED` draws the sensor bias once (each sensor's small built-in error, held for the run), and the same number replays the same noise. Use it for your own random numbers too: `np.random.default_rng(SEED)`. `START_POSE` is where the car is placed on Run and Reset. `x` and `y` are meters on the map (`y` runs north, `x` runs west), and the third number is heading in degrees. 0 faces north, and 90 faces east (a left turn decreases the heading). That chooses a start. It is not a sensor, and it is not the true pose (position x, y plus heading). A dict with one pose per world lets the same program travel. A bare tuple is the one-world form. A pose inside a wall, or off the map, is refused in the console, and this lesson's start is used instead.
-
-## Frames and angles
-
-Four ways of naming a direction show up in this lab. They are not the same number, and later lessons point back here.
-
-**Map, `START_POSE`.** `x` and `y` are meters on the ground. `y` runs north. `x` runs west, because facing north the driver's left is west, and the car's left is the world's +X. Heading is degrees measured from north. 0 faces north, and 90 faces east (a left turn decreases the heading). West is −90. This only places the car. It is not a sensor.
-
-**Odometry frame.** The origin is wherever the car started this run. +x points the way it faced then, and +y is its left. `pose.x` and `pose.y` are meters. `pose.yaw` is radians, 0 at the start, and a left turn increases it. Your pose, the path, and the map all share this frame. A left turn increases this yaw and decreases the map heading. Do not add those two numbers.
-
-**Robot frame.** x is forward, y is left, and z is up. A lidar angle of 0 is forward, positive is left, and the unit is radians. A hit at range $r$ and angle $\alpha$ sits at $(r\cos\alpha,\ r\sin\alpha)$ from the puck: forward, then left.
-
-**World axes.** +Z is north, +X is west, and +Y is up. The program never reads them. The lab uses them to drop odometry drawings onto the map.
-
-Degrees are only for `START_POSE`. Sensor angles and the steering you return are radians. −90° is $-\pi/2$ rad, straight out the right side. The camera's heading is not in the sample, and you never need it.
-
 {{code:Run}}
 
 {{code:init}}
+
+## The program
 
 In the sim: the circle program on the south lawn, so the sample is changing and the car has room. The same program is happy on the oval infield, the south meadow, and the warehouse bay. The World menu lists them.
 
 The block below is the part that runs every tick. It prints one sample and returns `0.34, 0.5`: a steady left steer (radians) at half throttle.
 
 {{code:control}}
+
+Open **Full program** once. The first lines are `SEED` and `START_POSE`. `SEED` draws the sensor bias once (each sensor's small built-in error, held for the run), and the same number replays the same noise. Use it for your own random numbers too: `np.random.default_rng(SEED)`. `START_POSE` is where the car is placed on Run and Reset: map x, y in meters and a heading in degrees (Frames and angles, below, spells it out). That chooses a start. It is not a sensor, and it is not the true pose (position x, y plus heading). A dict with one pose per world lets the same program travel. A bare tuple is the one-world form. A pose inside a wall, or off the map, is refused in the console, and this lesson's start is used instead.
+
+## Frames and angles
+
+Four ways of naming a direction show up in this lab. They are not the same number, and later lessons point back here.
+
+**Map, `START_POSE`.** `x` and `y` are meters on the ground. `y` runs north. `x` runs west, because facing north the driver's left is west, and the car's left is the world's +X. On a north-up map, +x points to the left, the mirror of graph paper. Heading is degrees measured from north, clockwise like a compass. 0 faces north, and 90 faces east (a left turn decreases the heading). West is −90. This only places the car. It is not a sensor.
+
+**Odometry frame.** The origin is wherever the car started this run. +x points the way it faced then, and +y is its left. `pose.x` and `pose.y` are meters. `pose.yaw` is radians, 0 at the start, and a left turn increases it. Your pose, the path, and the map all share this frame. A left turn increases this yaw and decreases the map heading. Do not add those two numbers. Example: start facing north. Turn left a quarter circle, so you now face west. The map heading went 0 → −90, the way a compass counts (clockwise is positive). `pose.yaw` went 0 → about +1.57, the way math class counts (counter-clockwise is positive). Same turn, opposite signs.
+
+**Robot frame.** x is forward, y is left, and z is up. A lidar angle of 0 is forward, positive is left, and the unit is radians. A hit at range $r$ and angle $\alpha$ sits at $(r\cos\alpha,\ r\sin\alpha)$ from the puck: forward, then left.
+
+**World axes.** +Z is north, +X is west, and +Y is up. The program never reads them. The lab uses them to drop odometry drawings onto the map.
+
+Degrees are only for `START_POSE`. Sensor angles and the steering you return are radians. −90° is $-\pi/2$ rad, straight out the right side.
 
 ## What is on the sample
 
@@ -56,7 +58,7 @@ The block below is the part that runs every tick. It prints one sample and retur
 - `sensors.imu.yaw_rate` is rad/s around the car's vertical axis (positive means turning left). `sensors.imu.accel` (`.x`, `.y`, `.z`, m/s²) is specific force, acceleration with gravity left in. Standing still on flat ground, z is about $+9.81$, because the accelerometer feels the ground pushing up. Here z is that up axis, not a range.
 - `sensors.time` and `sensors.dt` are seconds. At 20 calls a second, `dt` is about 0.05 s.
 - `sensors.task.path` is a list of waypoints in the odometry frame: origin wherever the car started, +x the way it faced. `sensors.task.map` is a known floor plan in that same frame. Both are given to you. A measurement of the car is the lidar, the wheels, and the IMU.
-- `sensors.camera.available` is false. The field is reserved so a later lesson can add an image without changing the call. The camera's heading is not in the sample.
+- `sensors.camera.available` is false. The field is reserved so a later lesson can add an image without changing the call.
 
 The noise on these sensors has a written model. Lidar range jitters by about 2 cm (a Gaussian with 2 cm standard deviation: a bell curve of random error). Wheel speed reads about 1.2% high or low for the whole run (a scale bias). The gyro carries a 0.0012 rad/s bias. The noise lesson writes each of those as an equation. The biases become odometry drift. The white noise, a fresh random wiggle every sample, mostly averages away.
 

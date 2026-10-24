@@ -17,7 +17,7 @@ On reset, the known pose is the origin of the odometry frame, which really is wh
 
 Localization puts landmarks back in the problem. This module gives you a map the way a surveyed floor plan gives a robot its walls: edges in the same frame as the odometry. The lidar is the measurement. A *filter* (an algorithm that blends a guess with new measurements) has one job: produce a pose you can hand to pure pursuit in place of the raw integral.
 
-The program sees the map, the scan, and the odometry delta. The true pose stays with the simulator.
+The program sees the map, the scan, and the odometry change since the last tick. The true pose stays with the simulator.
 
 The pursuit block below is still steering from the raw integral. The next lessons replace the pose it reads.
 

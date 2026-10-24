@@ -32,7 +32,7 @@ Each hit blocks a wedge about as wide as the car, a single ray thickened until t
 
 If the car is boxed in, or if it has barely moved for a couple of seconds, it backs up a short way and yaws toward the clearer side, then tries again. That escape is part of the starter. The rear scan is a thin wedge, so the backup stays short.
 
-In the forest the starter also prefers a heading that keeps it in the corridor. Lots of range jumps bigger than about 1.5 m, with a mean range under 10 m, means trunks rather than one flat wall, and then the preferred heading wanders slowly so the car weaves. It is still reactive. `sensors.task.path` stays unread.
+In the forest the starter also prefers a direction (a beam angle) that keeps it in the corridor. Lots of range jumps bigger than about 1.5 m, with a mean range under 10 m, means trunks rather than one flat wall, and then the preferred direction wanders slowly so the car weaves. It is still reactive. `sensors.task.path` stays unread.
 
 ## A gap is an interval of angles
 

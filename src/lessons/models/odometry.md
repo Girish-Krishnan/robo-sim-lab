@@ -49,6 +49,6 @@ This page has no program, so you are on seed 1. Reset run replays that same draw
 
 ## Try it
 
-1. Drive up the east-side straight you start on, then round the north bend. The blue trail should leave the colored one, and the graph should climb.
+1. Drive up the start straight, then round the north bend. The blue trail should leave the colored one, and the graph should climb.
 2. Stop and read the graph. The number is the distance, in meters, between where you are and where the wheels say you are.
 3. Press Reset run and drive the same bend again. The peel should come back in the same direction. That is the bias, replayed.
