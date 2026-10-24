@@ -3,7 +3,19 @@ import RAPIER from "@dimforge/rapier3d-compat";
 import { describe, expect, it } from "vitest";
 import { buildCourseSolids, cityTrunkScale, solidQuaternion, type Solid } from "../src/sim/course";
 import { BLOCKED_SLAB, BlockedAreas, type BlockedFootprint } from "../src/sim/blocked-areas";
-import { SCANNED_TRUNK, worldAnchorShift, type PropTemplate } from "../src/sim/props";
+import { readFileSync } from "node:fs";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
+import {
+  SCANNED_TRUNK,
+  anchoredInstance,
+  bakeObject,
+  hashYaw,
+  solidFoot,
+  worldAnchorShift,
+  type PropInstance,
+  type PropTemplate,
+} from "../src/sim/props";
 import { buildForestSolids, forestDressing, forestTreeDress } from "../src/sim/worlds/forest";
 import { buildTrackSolids } from "../src/sim/worlds/track";
 import { buildWarehouseSolids } from "../src/sim/worlds/warehouse";
@@ -145,6 +157,197 @@ function pointInHull(hull: readonly { x: number; z: number }[], point: { x: numb
   return true;
 }
 
+(globalThis as { self?: typeof globalThis }).self ??= globalThis;
+
+const gltfLoader = new GLTFLoader();
+gltfLoader.setMeshoptDecoder(MeshoptDecoder);
+gltfLoader.setKTX2Loader({
+  load(_url: string, onLoad: (texture: THREE.Texture) => void) {
+    const texture = new THREE.DataTexture(new Uint8Array([180, 160, 120, 255]), 1, 1);
+    texture.needsUpdate = true;
+    onLoad(texture);
+  },
+} as unknown as THREE.Loader);
+
+async function loadBaked(file: string): Promise<PropTemplate> {
+  const buf = readFileSync(`public/assets/models/${file}`);
+  const bytes = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+  const gltf = await gltfLoader.parseAsync(bytes, "");
+  return bakeObject(gltf.scene);
+}
+
+interface MeshCandidate {
+  minX: number;
+  maxX: number;
+  minZ: number;
+  maxZ: number;
+  radius: number;
+  /** Surface area over the disc of `radius`. Sparse needles stay well under 1. */
+  density: number;
+}
+
+function footprintReach(solid: Solid): number {
+  if (Math.abs(solid.pitch) > 0.4) return Math.max(solid.hx, solid.hy, solid.hz);
+  if (solid.shape === "cuboid") {
+    const cos = Math.abs(Math.cos(solid.yaw));
+    const sin = Math.abs(Math.sin(solid.yaw));
+    return Math.max(solid.hx * cos + solid.hz * sin, solid.hx * sin + solid.hz * cos);
+  }
+  return Math.max(solid.hx, solid.hz);
+}
+
+function meshCandidates(template: PropTemplate, item: PropInstance): MeshCandidate[] {
+  const found: MeshCandidate[] = [];
+  for (const part of template.parts) {
+    const candidate = candidateFrom(part.geometry, item, template.height);
+    if (candidate) found.push(candidate);
+  }
+  const contact = contactCandidate(template, item);
+  if (contact) found.push(contact);
+  return found;
+}
+
+function candidateFrom(geometry: THREE.BufferGeometry, item: PropInstance, _height: number): MeshCandidate | null {
+  return measureGeometry(geometry, item, Number.POSITIVE_INFINITY);
+}
+
+function contactCandidate(template: PropTemplate, item: PropInstance): MeshCandidate | null {
+  let merged: MeshCandidate | null = null;
+  for (const part of template.parts) {
+    const band = measureGeometry(part.geometry, item, template.height * 0.22);
+    if (!band) continue;
+    if (!merged) {
+      merged = band;
+      continue;
+    }
+    merged = {
+      minX: Math.min(merged.minX, band.minX),
+      maxX: Math.max(merged.maxX, band.maxX),
+      minZ: Math.min(merged.minZ, band.minZ),
+      maxZ: Math.max(merged.maxZ, band.maxZ),
+      radius: Math.max(merged.radius, band.radius),
+      density: merged.density + band.density,
+    };
+  }
+  return merged;
+}
+
+function measureGeometry(geometry: THREE.BufferGeometry, item: PropInstance, yMax: number): MeshCandidate | null {
+  const pos = geometry.getAttribute("position");
+  if (!pos) return null;
+  const index = geometry.getIndex();
+  const sx = item.scale3?.x ?? item.scale;
+  const sy = item.scale3?.y ?? item.scale;
+  const sz = item.scale3?.z ?? item.scale;
+  const yaw = item.yaw ?? 0;
+  const cos = Math.cos(yaw);
+  const sin = Math.sin(yaw);
+  const count = index ? index.count : pos.count;
+  const at = (i: number) => (index ? index.getX(i) : i);
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minZ = Infinity;
+  let maxZ = -Infinity;
+  let area = 0;
+  let tris = 0;
+  for (let i = 0; i + 2 < count; i += 3) {
+    const ia = at(i);
+    const ib = at(i + 1);
+    const ic = at(i + 2);
+    const ay = pos.getY(ia) * sy;
+    const by = pos.getY(ib) * sy;
+    const cy = pos.getY(ic) * sy;
+    if ((ay + by + cy) / 3 > yMax) continue;
+    const ax = pos.getX(ia) * sx;
+    const az = pos.getZ(ia) * sz;
+    const bx = pos.getX(ib) * sx;
+    const bz = pos.getZ(ib) * sz;
+    const cx = pos.getX(ic) * sx;
+    const cz = pos.getZ(ic) * sz;
+    const abx = bx - ax;
+    const aby = by - ay;
+    const abz = bz - az;
+    const acx = cx - ax;
+    const acy = cy - ay;
+    const acz = cz - az;
+    const tri = Math.hypot(aby * acz - abz * acy, abz * acx - abx * acz, abx * acy - aby * acx) * 0.5;
+    if (tri < 1e-8) continue;
+    area += tri;
+    tris += 1;
+    for (const [lx, lz] of [
+      [ax, az],
+      [bx, bz],
+      [cx, cz],
+    ] as const) {
+      const x = item.x + lx * cos + lz * sin;
+      const z = item.z - lx * sin + lz * cos;
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x);
+      minZ = Math.min(minZ, z);
+      maxZ = Math.max(maxZ, z);
+    }
+  }
+  if (tris < 4) return null;
+  const radius = Math.max((maxX - minX) / 2, (maxZ - minZ) / 2);
+  if (radius < 0.02) return null;
+  return { minX, maxX, minZ, maxZ, radius, density: area / (Math.PI * radius * radius) };
+}
+
+function footprintMatches(candidate: MeshCandidate, x: number, z: number, reach: number, loose: boolean): boolean {
+  const nearestX = Math.min(Math.max(x, candidate.minX), candidate.maxX);
+  const nearestZ = Math.min(Math.max(z, candidate.minZ), candidate.maxZ);
+  if (Math.hypot(nearestX - x, nearestZ - z) > 0.35) return false;
+  const ratio = candidate.radius / reach;
+  // Round trunks, stones, and logs have to land on a part about the same
+  // size. A cuboid crate is scaled to its height, so its base can differ
+  // a little more. Canopy bounds are wider than either and do not count.
+  return ratio >= 0.4 && ratio <= (loose ? 2.9 : 1.85);
+}
+
+function cityProp(
+  solid: Solid,
+  props: Record<string, PropTemplate>,
+): { template: PropTemplate; item: PropInstance } | null {
+  if (solid.look === "tree" || solid.look === "pine") {
+    const template = solid.look === "pine" ? props.pine : props.broadleaf;
+    const scale = cityTrunkScale(solid);
+    if (!template || scale == null) return null;
+    const yaw = hashYaw(solid.x, solid.z);
+    return { template, item: anchoredInstance(template, solid.x, solid.z, solidFoot(solid), yaw, scale) };
+  }
+  if (solid.look === "bush" && props.shrub) {
+    const scale = solid.hx / Math.max(0.05, props.shrub.radius);
+    return { template: props.shrub, item: anchoredInstance(props.shrub, solid.x, solid.z, solidFoot(solid), hashYaw(solid.x, solid.z), scale) };
+  }
+  if (solid.look === "rock" && props.boulder) {
+    const scale = solid.hx / Math.max(0.05, props.boulder.radius);
+    return { template: props.boulder, item: anchoredInstance(props.boulder, solid.x, solid.z, solidFoot(solid), hashYaw(solid.x, solid.z), scale) };
+  }
+  if (solid.look === "bench" && props.bench) {
+    const scale = (Math.max(solid.hx, solid.hz) * 2) / (props.bench.radius * 2);
+    return { template: props.bench, item: anchoredInstance(props.bench, solid.x, solid.z, solidFoot(solid), solid.yaw, scale) };
+  }
+  if (solid.look === "light" && props.lamp) {
+    const scale = (solid.hy * 2) / props.lamp.height;
+    return { template: props.lamp, item: anchoredInstance(props.lamp, solid.x, solid.z, solidFoot(solid), solid.yaw, scale) };
+  }
+  return cargoProp(solid, props);
+}
+
+function cargoProp(
+  solid: Solid,
+  props: Record<string, PropTemplate>,
+  heightMul = 1,
+): { template: PropTemplate; item: PropInstance } | null {
+  if (solid.look === "crate" && solid.hy < 0.35) return null;
+  if (solid.look !== "barrel" && solid.look !== "crate" && solid.look !== "pallet") return null;
+  const template = solid.look === "barrel" ? props.barrel : props.crate;
+  if (!template) return null;
+  const yaw = solid.look === "barrel" ? hashYaw(solid.x, solid.z) : solid.yaw;
+  const scale = (solid.hy * 2 * heightMul) / template.height;
+  return { template, item: anchoredInstance(template, solid.x, solid.z, solidFoot(solid), yaw, scale) };
+}
+
 function fake(anchor: { x: number; z: number; radius: number }, radius = 1, size = { x: 1, y: 1, z: 1 }): PropTemplate {
   return { parts: [], height: 1, radius, size, anchor };
 }
@@ -171,7 +374,7 @@ describe("blocked footprints", () => {
     const props = {
       broadleaf: fake({ x: -0.11, z: -0.74, radius: 0.291 }, 2.1),
       bushy: fake({ x: 0.19, z: -0.11, radius: 0.495 }, 1),
-      pine: fake({ x: -0.02, z: 0.05, radius: 0.213 }, 0.42),
+      pine: fake({ x: 0, z: 0, radius: 0.065 }, 0.42),
       boulder: fake({ x: 0.13, z: -0.05, radius: 0.68 }, 0.91),
       rock: fake({ x: 0, z: 0, radius: 0.12 }, 0.16),
       shrub: fake({ x: -0.02, z: 0.08, radius: 0.24 }, 0.82),
@@ -209,6 +412,111 @@ describe("blocked footprints", () => {
       expect(solid).toBeTruthy();
       expect(template.radius * item.scale).toBeCloseTo(solid!.hx, 4);
     }
+  });
+
+  it("gives every forest collider a rendered mesh on that footprint", async () => {
+    const props = {
+      broadleaf: await loadBaked("broadleaf.glb"),
+      pine: await loadBaked("pine.glb"),
+      bushy: await loadBaked("bushy.glb"),
+      shrub: await loadBaked("shrub.glb"),
+      boulder: await loadBaked("boulder.glb"),
+      rock: await loadBaked("rock.glb"),
+      log: await loadBaked("log.glb"),
+    };
+    const solids = buildForestSolids();
+    const dressed = forestDressing(solids, props);
+    expect(props.pine.parts.some((part) => part.geometry.userData.trunk === true)).toBe(true);
+    expect(props.pine.anchor.radius).toBeLessThan(props.pine.radius * 0.3);
+    expect(props.broadleaf.parts.some((part) => part.geometry.userData.trunk === true)).toBe(false);
+    const trunk = props.pine.parts.find((part) => part.geometry.userData.trunk === true)!;
+    trunk.geometry.computeBoundingBox();
+    const trunkBox = trunk.geometry.boundingBox!;
+    const trunkRadius = Math.max(trunkBox.max.x - trunkBox.min.x, trunkBox.max.z - trunkBox.min.z) / 2;
+    expect(trunkRadius).toBeCloseTo(props.pine.anchor.radius, 2);
+
+    const covered = new Set(dressed.map((entry) => entry.solid));
+    const misses: string[] = [];
+    for (const solid of solids) {
+      const where = `${solid.look} (${solid.x.toFixed(1)},${solid.z.toFixed(1)})`;
+      const entry = dressed.find((candidate) => candidate.solid === solid);
+      if (!entry) {
+        if (solid.look !== "fence") misses.push(`${where} has no mesh`);
+        continue;
+      }
+      const reach = footprintReach(solid);
+      const candidates = meshCandidates(entry.template, entry.item);
+      const hit = candidates.some((candidate) => footprintMatches(candidate, solid.x, solid.z, reach, solid.shape === "cuboid"));
+      if (!hit) {
+        misses.push(
+          `${where} reach ${reach.toFixed(2)} ${candidates.map((c) => `${c.radius.toFixed(2)}/${c.density.toFixed(2)}`).join(" ")}`,
+        );
+      }
+    }
+    expect(covered.size).toBe(dressed.length);
+    expect(misses).toEqual([]);
+  });
+
+  it("gives city, track, and warehouse colliders a rendered mesh on that footprint", async () => {
+    const props = {
+      broadleaf: await loadBaked("broadleaf.glb"),
+      pine: await loadBaked("pine.glb"),
+      shrub: await loadBaked("shrub.glb"),
+      boulder: await loadBaked("boulder.glb"),
+      barrel: await loadBaked("barrel.glb"),
+      crate: await loadBaked("crate.glb"),
+      bench: await loadBaked("bench.glb"),
+      lamp: await loadBaked("lamp.glb"),
+    };
+    const procedural = new Set([
+      "fence",
+      "foam",
+      "cone",
+      "shelf",
+      "barrier",
+      "building",
+      "silo",
+      "planter",
+      "car",
+      "dumpster",
+      "bollard",
+      "sign",
+      "ramp",
+      "concrete",
+      "shelter",
+      "signal",
+      "fountain",
+      "steel",
+    ]);
+    const misses: string[] = [];
+    const check = (world: string, solid: Solid, template: PropTemplate, item: PropInstance) => {
+      const reach = footprintReach(solid);
+      const candidates = meshCandidates(template, item);
+      const hit = candidates.some((candidate) => footprintMatches(candidate, solid.x, solid.z, reach, solid.shape === "cuboid"));
+      if (!hit) {
+        misses.push(
+          `${world} ${solid.look} (${solid.x.toFixed(1)},${solid.z.toFixed(1)}) reach ${reach.toFixed(2)} ${candidates.map((c) => c.radius.toFixed(2)).join(",")}`,
+        );
+      }
+    };
+    for (const solid of buildCourseSolids()) {
+      const item = cityProp(solid, props);
+      if (item) check("city", solid, item.template, item.item);
+      else if (solid.look === "crate" && solid.hy < 0.35) {
+        // The deck keeps the box mesh built from the collider.
+      } else if (!procedural.has(solid.look)) misses.push(`city ${solid.look} has no mesh`);
+    }
+    for (const solid of buildTrackSolids()) {
+      const item = cargoProp(solid, props);
+      if (item) check("track", solid, item.template, item.item);
+      else if (!procedural.has(solid.look)) misses.push(`track ${solid.look} has no mesh`);
+    }
+    for (const solid of buildWarehouseSolids()) {
+      const item = cargoProp(solid, props, solid.look === "pallet" ? 0.72 : 1);
+      if (item) check("warehouse", solid, item.template, item.item);
+      else if (!procedural.has(solid.look)) misses.push(`warehouse ${solid.look} has no mesh`);
+    }
+    expect(misses).toEqual([]);
   });
 
   it("fits city pines and broadleaf to the same scanned radius", () => {

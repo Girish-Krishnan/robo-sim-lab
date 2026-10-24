@@ -366,13 +366,15 @@ export function mountSolids(
   parent: THREE.Object3D,
   solids: readonly Solid[],
   kit: PropKit | null = null,
-  skipLooks?: ReadonlySet<string>,
+  skipLooks?: ReadonlySet<string> | ((solid: Solid) => boolean),
 ): WorldMount["bodies"] {
   const mats = createMaterials(kit);
   const bodies: WorldMount["bodies"] = [];
+  const skipped = (solid: Solid) =>
+    typeof skipLooks === "function" ? skipLooks(solid) : Boolean(skipLooks?.has(solid.look));
   for (const solid of solids) {
     const q = solidQuaternion(solid.yaw, solid.pitch);
-    if (!skipLooks?.has(solid.look)) {
+    if (!skipped(solid)) {
       const visual = buildVisual(solid, mats);
       visual.position.set(solid.x, solid.y, solid.z);
       visual.quaternion.set(q.x, q.y, q.z, q.w);
@@ -465,7 +467,23 @@ export async function mountCity(
     group,
     solids,
     kit,
-    props ? new Set(["tree", "pine", "rock", "bush", "barrel", "crate", "bench", "light"]) : undefined,
+    props
+      ? (solid) => {
+          // A flat board is the collider. A height-scaled crate would leave
+          // that deck with no mesh of its own.
+          if (solid.look === "crate" && solid.hy < 0.35) return false;
+          return (
+            solid.look === "tree" ||
+            solid.look === "pine" ||
+            solid.look === "rock" ||
+            solid.look === "bush" ||
+            solid.look === "barrel" ||
+            solid.look === "crate" ||
+            solid.look === "bench" ||
+            solid.look === "light"
+          );
+        }
+      : undefined,
   );
   if (props) dressCity(group, solids, props);
   return { group, bodies };
@@ -693,7 +711,14 @@ function dressCity(parent: THREE.Object3D, solids: readonly Solid[], props: Reco
   placeLook(parent, props.shrub, list, "bush", (solid, template) => solid.hx / Math.max(0.05, template.radius), (solid) => hashYaw(solid.x, solid.z));
   placeLook(parent, props.boulder, list, "rock", (solid, template) => solid.hx / Math.max(0.05, template.radius), (solid) => hashYaw(solid.x, solid.z));
   placeLook(parent, props.barrel, list, "barrel", (solid, template) => (solid.hy * 2) / template.height, (solid) => hashYaw(solid.x, solid.z));
-  placeLook(parent, props.crate, list, "crate", (solid, template) => (solid.hy * 2) / template.height, (solid) => solid.yaw);
+  placeLook(
+    parent,
+    props.crate,
+    list.filter((solid) => solid.hy >= 0.35),
+    "crate",
+    (solid, template) => (solid.hy * 2) / template.height,
+    (solid) => solid.yaw,
+  );
   placeLook(parent, props.bench, list, "bench", (solid, template) => (Math.max(solid.hx, solid.hz) * 2) / (template.radius * 2));
   placeLook(parent, props.lamp, list, "light", (solid, template) => (solid.hy * 2) / template.height);
   const hole = 1.15 / Math.max(0.2, props.manhole.radius * 2);

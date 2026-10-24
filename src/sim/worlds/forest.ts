@@ -227,6 +227,7 @@ function fitAndSeatTrunks(solids: Solid[]): void {
 export interface ForestDressing {
   template: PropTemplate;
   item: PropInstance;
+  solid: Solid;
 }
 
 /** One instanced prop per blocking solid the forest dresses with a scan. */
@@ -243,6 +244,7 @@ export function forestDressing(
       dressed.push({
         template,
         item: anchoredInstance(template, solid.x, solid.z, forestHeight(solid.x, solid.z), tree.yaw, tree.scale),
+        solid,
       });
       continue;
     }
@@ -253,6 +255,7 @@ export function forestDressing(
       dressed.push({
         template,
         item: anchoredInstance(template, solid.x, solid.z, forestHeight(solid.x, solid.z), hashYaw(solid.x, solid.z), scale),
+        solid,
       });
       continue;
     }
@@ -263,6 +266,7 @@ export function forestDressing(
       dressed.push({
         template,
         item: anchoredInstance(template, solid.x, solid.z, forestHeight(solid.x, solid.z), hashYaw(solid.x, solid.z), scale),
+        solid,
       });
       continue;
     }
@@ -275,6 +279,7 @@ export function forestDressing(
           y: (solid.hx * 2) / template.size.y,
           z: (solid.hy * 2) / template.size.z,
         }),
+        solid,
       });
     }
   }

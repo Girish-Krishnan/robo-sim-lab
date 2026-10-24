@@ -38,7 +38,9 @@ export interface PropInstance {
 export const SCANNED_TRUNK = {
   broadleaf: { height: 3.406, radius: 0.291 },
   bushy: { height: 2.313, radius: 0.495 },
-  pine: { height: 1.301, radius: 0.213 },
+  // The fir scan's wood mesh is degenerate, and the needles reach several
+  // times further than the trunk. The collider uses the generated trunk.
+  pine: { height: 1.301, radius: 0.065 },
 } as const;
 
 /** Collider fields the prop dresser needs. Kept structural so this module does not import the world. */
@@ -135,13 +137,130 @@ export function bakeObject(root: THREE.Object3D): PropTemplate {
     part.geometry.userData.keep = true;
   }
   const fitted = box.getSize(new THREE.Vector3());
+  const height = Math.max(fitted.y, 0.01);
+  const anchor = measureAnchor(parts);
+  const trunk = plantSolidTrunk(parts, height);
+  if (trunk != null) {
+    // Needles must not pull the collider out onto open grass.
+    anchor.x = 0;
+    anchor.z = 0;
+    anchor.radius = trunk;
+  }
   return {
     parts,
-    height: Math.max(fitted.y, 0.01),
+    height,
     radius: Math.max(fitted.x, fitted.z) * 0.5,
     size: { x: Math.max(fitted.x, 0.01), y: Math.max(fitted.y, 0.01), z: Math.max(fitted.z, 0.01) },
-    anchor: measureAnchor(parts),
+    anchor,
   };
+}
+
+/**
+ * A fir sapling whose trunk triangles collapsed. The needles still draw,
+ * but they leave the ground disc empty, so a collider fitted to that
+ * cloud is an invisible blocker. Plant a trunk on the baked origin.
+ * Returns the base radius, which is the collider radius.
+ */
+function plantSolidTrunk(parts: PropTemplate["parts"], height: number): number | null {
+  if (height < 0.9) return null;
+  let small = 0;
+  let large = 0;
+  for (const part of parts) {
+    const count = part.geometry.getAttribute("position")?.count ?? 0;
+    const area = surfaceArea(part.geometry);
+    if (count < 800) small += area;
+    else large += area;
+  }
+  // A real trunk lives in the big mesh (broadleaf, bushy). Only a plant
+  // whose wood part vanished and whose base is a sparse needle ring
+  // gets a replacement.
+  if (large < 0.04 || small > 0.02) return null;
+  if (baseCoverage(parts, height) >= 0.85) return null;
+  const base = height * 0.05;
+  const trunkHeight = height * 0.78;
+  const geometry = new THREE.CylinderGeometry(base * 0.84, base, trunkHeight, 12);
+  geometry.translate(0, trunkHeight / 2, 0);
+  geometry.computeBoundingSphere();
+  geometry.userData.keep = true;
+  geometry.userData.trunk = true;
+  const material = new THREE.MeshStandardMaterial({ color: 0x6b4a2d, roughness: 0.92 });
+  material.userData.keep = true;
+  parts.push({ geometry, material });
+  return base;
+}
+
+function surfaceArea(geometry: THREE.BufferGeometry): number {
+  const pos = geometry.getAttribute("position");
+  if (!pos) return 0;
+  const index = geometry.getIndex();
+  const count = index ? index.count : pos.count;
+  const at = (i: number) => (index ? index.getX(i) : i);
+  let area = 0;
+  for (let i = 0; i + 2 < count; i += 3) {
+    const ia = at(i);
+    const ib = at(i + 1);
+    const ic = at(i + 2);
+    const ax = pos.getX(ia);
+    const ay = pos.getY(ia);
+    const az = pos.getZ(ia);
+    const bx = pos.getX(ib);
+    const by = pos.getY(ib);
+    const bz = pos.getZ(ib);
+    const cx = pos.getX(ic);
+    const cy = pos.getY(ic);
+    const cz = pos.getZ(ic);
+    const abx = bx - ax;
+    const aby = by - ay;
+    const abz = bz - az;
+    const acx = cx - ax;
+    const acy = cy - ay;
+    const acz = cz - az;
+    area += Math.hypot(aby * acz - abz * acy, abz * acx - abx * acz, abx * acy - aby * acx) * 0.5;
+  }
+  return area;
+}
+
+/** Triangle area in the bottom band, over the disc those triangles reach. */
+function baseCoverage(parts: PropTemplate["parts"], height: number): number {
+  const yMax = height * 0.22;
+  let area = 0;
+  const radii: number[] = [];
+  for (const part of parts) {
+    const pos = part.geometry.getAttribute("position");
+    if (!pos) continue;
+    const index = part.geometry.getIndex();
+    const count = index ? index.count : pos.count;
+    const at = (i: number) => (index ? index.getX(i) : i);
+    for (let i = 0; i + 2 < count; i += 3) {
+      const ia = at(i);
+      const ib = at(i + 1);
+      const ic = at(i + 2);
+      const ay = pos.getY(ia);
+      const by = pos.getY(ib);
+      const cy = pos.getY(ic);
+      if ((ay + by + cy) / 3 > yMax) continue;
+      const ax = pos.getX(ia);
+      const az = pos.getZ(ia);
+      const bx = pos.getX(ib);
+      const bz = pos.getZ(ib);
+      const cx = pos.getX(ic);
+      const cz = pos.getZ(ic);
+      const abx = bx - ax;
+      const aby = by - ay;
+      const abz = bz - az;
+      const acx = cx - ax;
+      const acy = cy - ay;
+      const acz = cz - az;
+      const tri = Math.hypot(aby * acz - abz * acy, abz * acx - abx * acz, abx * acy - aby * acx) * 0.5;
+      if (tri < 1e-8) continue;
+      area += tri;
+      radii.push(Math.hypot((ax + bx + cx) / 3, (az + bz + cz) / 3));
+    }
+  }
+  if (radii.length < 8 || area < 1e-4) return 0;
+  radii.sort((a, b) => a - b);
+  const radius = Math.max(0.04, radii[Math.floor(radii.length * 0.9)] ?? 0);
+  return area / (Math.PI * radius * radius);
 }
 
 /**
