@@ -239,7 +239,13 @@ export function buildCourseSolids(): Solid[] {
   ball(12.8, -12, 0.84, "bush", 0x3f7a50);
   ball(-6, -16, 0.86, "bush", 0x2c6240);
 
-  cyl(11.6, 46, 0.22, 2.6, "pine", 0, 0x2a4a34);
+  // South of the roundabout. A pine here was fitted to the fir's needle
+  // cloud, about 0.94 m across, while the trunk that actually draws is
+  // about 0.3 m. The shade was empty grass, and both avoidance and the
+  // kidnapped-robot filter were reading that invisible disc. This height
+  // makes the broadleaf's scanned wood the same radius, so the post, the
+  // lidar return, and the shade are one object.
+  cyl(11.6, 46, 0.3, 4.57, "tree", 0, 0x6a4b32);
   cyl(-14, 28, 0.24, 3.1, "pine", 0, 0x234432);
   cyl(32, -8, 0.2, 2.4, "pine", 0, 0x2d5340);
   cyl(-24, -6, 0.34, 2.2, "tree", 0, 0x6d4c34);
