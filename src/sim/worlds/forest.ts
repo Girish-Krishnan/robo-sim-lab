@@ -147,52 +147,77 @@ export function forestTreeDress(solid: Solid): { file: TreeFile; yaw: number; sc
   return { file: choice.file, yaw, scale: choice.scale };
 }
 
+/** Closest point on the forest loop, so a trunk cannot hide between waypoints. */
+function closestOnRoute(x: number, z: number, route: readonly { x: number; z: number }[]): { dist: number; x: number; z: number } {
+  let best = Infinity;
+  let nearX = x;
+  let nearZ = z;
+  for (let i = 0; i < route.length; i++) {
+    const a = route[i]!;
+    const b = route[(i + 1) % route.length]!;
+    const dx = b.x - a.x;
+    const dz = b.z - a.z;
+    const len2 = dx * dx + dz * dz || 1;
+    const t = Math.min(1, Math.max(0, ((x - a.x) * dx + (z - a.z) * dz) / len2));
+    const px = a.x + dx * t;
+    const pz = a.z + dz * t;
+    const dist = Math.hypot(x - px, z - pz);
+    if (dist < best) {
+      best = dist;
+      nearX = px;
+      nearZ = pz;
+    }
+  }
+  return { dist: best, x: nearX, z: nearZ };
+}
+
 /**
- * Widen each trunk to the scanned wood, then step any tree that would
- * stand in the reference lane sideways until the lane clears it.
- * The radius is chosen once, from the pose before the step, so the mesh
- * and the collider keep the same wood.
+ * Widen each trunk to the scanned wood, then step it off the reference
+ * loop until a pursuit lap still clears the bark. If a step would drop
+ * the tree into the return lane, shrink that one tree instead — the
+ * collider and the mesh stay the same size either way.
  */
 function fitAndSeatTrunks(solids: Solid[]): void {
+  const homes = new Map<Solid, { x: number; z: number }>();
   for (const solid of solids) {
     const choice = chooseTree(solid);
     if (!choice) continue;
     treeChoice.set(solid, choice);
+    homes.set(solid, { x: solid.x, z: solid.z });
     const radius = SCANNED_TRUNK[choice.file].radius * choice.scale;
     solid.hx = radius;
     solid.hz = radius;
   }
   const route = referenceRoute("forest");
-  const samples: { x: number; z: number }[] = [];
-  for (let i = 0; i < route.length; i++) {
-    const a = route[i]!;
-    const b = route[(i + 1) % route.length]!;
-    samples.push(a, { x: (a.x + b.x) / 2, z: (a.z + b.z) / 2 });
-  }
-  const keep = 2.25;
-  for (let pass = 0; pass < 12; pass++) {
+  // Surface gap. The body is about 0.7 m wide of center and a noisy
+  // pursuit lap wanders; 3.1 m of bark-to-path kept seed 1 off the trunks.
+  const keep = 3.1;
+  for (let pass = 0; pass < 16; pass++) {
     let moved = false;
     for (const solid of solids) {
-      if (!treeChoice.has(solid)) continue;
-      let best = Infinity;
-      let nearX = solid.x;
-      let nearZ = solid.z;
-      for (const point of samples) {
-        const dist = Math.hypot(solid.x - point.x, solid.z - point.z);
-        if (dist < best) {
-          best = dist;
-          nearX = point.x;
-          nearZ = point.z;
-        }
-      }
-      const gap = best - solid.hx;
+      const choice = treeChoice.get(solid);
+      if (!choice) continue;
+      const near = closestOnRoute(solid.x, solid.z, route);
+      const gap = near.dist - solid.hx;
       if (gap >= keep) continue;
-      const push = keep - gap + 0.02;
-      const dx = solid.x - nearX;
-      const dz = solid.z - nearZ;
+      const push = keep - gap + 0.04;
+      const dx = solid.x - near.x;
+      const dz = solid.z - near.z;
       const len = Math.hypot(dx, dz) || 1;
-      solid.x += (dx / len) * push;
-      solid.z += (dz / len) * push;
+      const nextX = solid.x + (dx / len) * push;
+      const nextZ = solid.z + (dz / len) * push;
+      const home = homes.get(solid)!;
+      const stepped = Math.hypot(nextX - home.x, nextZ - home.z);
+      const intoReturn = nextZ > -16 && nextZ < 38 && Math.abs(nextX + 20.1) < 2.6;
+      if (stepped > 4 || intoReturn) {
+        const cap = Math.max(0.22, near.dist - keep);
+        solid.hx = cap;
+        solid.hz = cap;
+        choice.scale = cap / SCANNED_TRUNK[choice.file].radius;
+        continue;
+      }
+      solid.x = nextX;
+      solid.z = nextZ;
       moved = true;
     }
     if (!moved) break;
