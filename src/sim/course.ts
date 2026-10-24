@@ -5,8 +5,10 @@ import type { GraphicsQuality } from "./scene";
 import { isKept, loadPropKit, tileBox, tileUvs, TILES_PER_METER, type PropKit } from "./surfaces";
 import {
   addBlobShadows,
+  anchoredInstance,
   hashYaw,
   loadProps,
+  SCANNED_TRUNK,
   scatter,
   solidFoot,
   type PropTemplate,
@@ -332,7 +334,25 @@ export function buildCourseSolids(): Solid[] {
   cyl(1.3, 32.2, 0.22, 1.45, "bollard");
   cyl(9.8, 32.2, 0.22, 1.45, "bollard");
 
+  fitCityTrunks(solids);
   return solids;
+}
+
+/** Uniform dress scale for a city pine or broadleaf. The trunk collider uses the same factor. */
+export function cityTrunkScale(solid: { look: string; hy: number }): number | null {
+  if (solid.look === "pine") return (solid.hy * 2 * 2.2) / SCANNED_TRUNK.pine.height;
+  if (solid.look === "tree") return (solid.hy * 2 * 2.4) / SCANNED_TRUNK.broadleaf.height;
+  return null;
+}
+
+function fitCityTrunks(solids: Solid[]): void {
+  for (const solid of solids) {
+    const scale = cityTrunkScale(solid);
+    if (scale == null) continue;
+    const trunk = solid.look === "pine" ? SCANNED_TRUNK.pine : SCANNED_TRUNK.broadleaf;
+    solid.hx = trunk.radius * scale;
+    solid.hz = solid.hx;
+  }
 }
 
 export interface WorldMount {
@@ -668,10 +688,10 @@ function stainTexture(): THREE.DataTexture {
 
 function dressCity(parent: THREE.Object3D, solids: readonly Solid[], props: Record<string, PropTemplate>): void {
   const list = solids as readonly ScatterSolid[];
-  placeLook(parent, props.broadleaf, list, "tree", (solid, template) => (solid.hy * 2 * 2.4) / template.height, (solid) => hashYaw(solid.x, solid.z));
-  placeLook(parent, props.pine, list, "pine", (solid, template) => (solid.hy * 2 * 2.2) / template.height, (solid) => hashYaw(solid.x, solid.z));
-  placeLook(parent, props.shrub, list, "bush", (solid, template) => (solid.hx * 2.2) / template.height, (solid) => hashYaw(solid.x, solid.z));
-  placeLook(parent, props.boulder, list, "rock", (solid, template) => (solid.hx * 1.7) / template.height, (solid) => hashYaw(solid.x, solid.z));
+  placeLook(parent, props.broadleaf, list, "tree", (solid) => cityTrunkScale(solid) ?? 1, (solid) => hashYaw(solid.x, solid.z));
+  placeLook(parent, props.pine, list, "pine", (solid) => cityTrunkScale(solid) ?? 1, (solid) => hashYaw(solid.x, solid.z));
+  placeLook(parent, props.shrub, list, "bush", (solid, template) => solid.hx / Math.max(0.05, template.radius), (solid) => hashYaw(solid.x, solid.z));
+  placeLook(parent, props.boulder, list, "rock", (solid, template) => solid.hx / Math.max(0.05, template.radius), (solid) => hashYaw(solid.x, solid.z));
   placeLook(parent, props.barrel, list, "barrel", (solid, template) => (solid.hy * 2) / template.height, (solid) => hashYaw(solid.x, solid.z));
   placeLook(parent, props.crate, list, "crate", (solid, template) => (solid.hy * 2) / template.height, (solid) => solid.yaw);
   placeLook(parent, props.bench, list, "bench", (solid, template) => (Math.max(solid.hx, solid.hz) * 2) / (template.radius * 2));
@@ -705,13 +725,9 @@ function placeLook(
     template,
     solids
       .filter((solid) => solid.look === look)
-      .map((solid) => ({
-        x: solid.x,
-        y: solidFoot(solid),
-        z: solid.z,
-        yaw: yawOf(solid),
-        scale: scaleOf(solid, template),
-      })),
+      .map((solid) =>
+        anchoredInstance(template, solid.x, solid.z, solidFoot(solid), yawOf(solid), scaleOf(solid, template)),
+      ),
   );
 }
 

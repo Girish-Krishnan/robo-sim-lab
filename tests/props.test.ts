@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
-import { bakeObject } from "../src/sim/props";
+import { anchoredInstance, bakeObject, SCANNED_TRUNK, worldAnchorShift } from "../src/sim/props";
 
 const loader = new GLTFLoader();
 loader.setMeshoptDecoder(MeshoptDecoder);
@@ -43,6 +43,41 @@ const EXPECTED: Record<string, { height: [number, number]; radius: [number, numb
 };
 
 describe("scanned props", () => {
+  it("turns a trunk anchor by the same yaw three.js applies to the instance", () => {
+    const anchor = { x: -0.11, z: -0.74 };
+    const yaw = 1.7;
+    const scale = 2.4;
+    const object = new THREE.Object3D();
+    object.scale.set(scale, scale, scale);
+    object.rotation.y = yaw;
+    object.updateMatrix();
+    const moved = new THREE.Vector3(anchor.x, 0, anchor.z).applyMatrix4(object.matrix);
+    const shift = worldAnchorShift(anchor, yaw, scale, scale);
+    expect(moved.x).toBeCloseTo(shift.x, 5);
+    expect(moved.z).toBeCloseTo(shift.z, 5);
+    const placed = anchoredInstance(
+      { parts: [], height: 1, radius: 1, size: { x: 1, y: 1, z: 1 }, anchor: { ...anchor, radius: 0.3 } },
+      5,
+      -2,
+      0.1,
+      yaw,
+      scale,
+    );
+    expect(placed.x + shift.x).toBeCloseTo(5, 5);
+    expect(placed.z + shift.z).toBeCloseTo(-2, 5);
+    expect(Math.hypot(shift.x, shift.z)).toBeGreaterThan(1);
+  });
+
+  it("locks the trunk size the forest and city colliders are fitted to", async () => {
+    for (const file of ["broadleaf", "bushy", "pine"] as const) {
+      const template = await loadTemplate(`${file}.glb`);
+      expect(template.height, file).toBeCloseTo(SCANNED_TRUNK[file].height, 2);
+      expect(template.anchor.radius, file).toBeCloseTo(SCANNED_TRUNK[file].radius, 2);
+    }
+    const broadleaf = await loadTemplate("broadleaf.glb");
+    expect(broadleaf.anchor.z).toBeLessThan(-0.6);
+  });
+
   it("keeps a scaled normalized mesh in meters instead of wrapping it", () => {
     const box = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2));
     const position = box.geometry.getAttribute("position");

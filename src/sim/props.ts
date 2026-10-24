@@ -7,6 +7,14 @@ export interface PropTemplate {
   parts: { geometry: THREE.BufferGeometry; material: THREE.Material | THREE.Material[] }[];
   height: number;
   radius: number;
+  /** Fitted size. Length of a log is the long horizontal axis. */
+  size: { x: number; y: number; z: number };
+  /**
+   * Where the wood or stone actually is, relative to the baked origin.
+   * Photogrammetry trunks are not at the bounding-box center, and a yaw
+   * around that center swings the trunk off the collider.
+   */
+  anchor: { x: number; z: number; radius: number };
 }
 
 export interface PropInstance {
@@ -15,7 +23,23 @@ export interface PropInstance {
   z: number;
   yaw?: number;
   scale: number;
+  /** Per-axis scale. Used when a log's thickness and length need different factors. */
+  scale3?: { x: number; y: number; z: number };
+  /** Ground-shadow center. Defaults to the instance origin. */
+  shadeX?: number;
+  shadeZ?: number;
 }
+
+/**
+ * Baked height and wood radius of the scanned trees. Colliders use these so
+ * a trunk's radius matches the mesh after the dress scale. The prop test
+ * checks them against the glTF; if a model changes, update both together.
+ */
+export const SCANNED_TRUNK = {
+  broadleaf: { height: 3.406, radius: 0.291 },
+  bushy: { height: 2.313, radius: 0.495 },
+  pine: { height: 1.301, radius: 0.213 },
+} as const;
 
 /** Collider fields the prop dresser needs. Kept structural so this module does not import the world. */
 export interface ScatterSolid {
@@ -115,6 +139,111 @@ export function bakeObject(root: THREE.Object3D): PropTemplate {
     parts,
     height: Math.max(fitted.y, 0.01),
     radius: Math.max(fitted.x, fitted.z) * 0.5,
+    size: { x: Math.max(fitted.x, 0.01), y: Math.max(fitted.y, 0.01), z: Math.max(fitted.z, 0.01) },
+    anchor: measureAnchor(parts),
+  };
+}
+
+/**
+ * Centroid and radius of the solid base: the narrow lower band of a trunk,
+ * or the whole stone when it never narrows. Radius is the 60th percentile,
+ * so foliage around the bark does not inflate the collider.
+ */
+function measureAnchor(parts: PropTemplate["parts"]): PropTemplate["anchor"] {
+  const points: { x: number; y: number; z: number }[] = [];
+  for (const part of parts) {
+    const pos = part.geometry.getAttribute("position");
+    if (!pos) continue;
+    const stride = Math.max(1, Math.floor(pos.count / 6000));
+    for (let i = 0; i < pos.count; i += stride) points.push({ x: pos.getX(i), y: pos.getY(i), z: pos.getZ(i) });
+  }
+  if (points.length < 8) return { x: 0, z: 0, radius: 0.2 };
+  let height = 0;
+  for (const point of points) height = Math.max(height, point.y);
+  const slices = 8;
+  const bands: { y: number; n: number; cx: number; cz: number; p90: number }[] = [];
+  for (let i = 0; i < slices; i++) {
+    const y0 = (height * i) / slices;
+    const y1 = (height * (i + 1)) / slices;
+    const slice = points.filter((point) => point.y >= y0 && point.y < y1 + (i === slices - 1 ? 1e-4 : 0));
+    if (slice.length < 8) continue;
+    const center = centroid(slice);
+    const dists = slice.map((point) => Math.hypot(point.x - center.x, point.z - center.z)).sort((a, b) => a - b);
+    bands.push({
+      y: y0,
+      n: slice.length,
+      cx: center.x,
+      cz: center.z,
+      p90: dists[Math.floor(dists.length * 0.9)] ?? 0,
+    });
+  }
+  const base = bands[0];
+  if (!base) return { x: 0, z: 0, radius: 0.2 };
+  const limit = Math.max(base.p90 * 1.8, 0.05);
+  const trunk = [];
+  for (const band of bands) {
+    if (band.y > height * 0.5) break;
+    if (trunk.length > 0 && band.p90 > limit) break;
+    trunk.push(band);
+  }
+  const yMax = (trunk.length ? trunk[trunk.length - 1]! : base).y + height / slices;
+  const used = points.filter((point) => point.y <= yMax);
+  const center = centroid(used.length ? used : points);
+  const dists = (used.length ? used : points).map((point) => Math.hypot(point.x - center.x, point.z - center.z)).sort((a, b) => a - b);
+  const radius = dists[Math.floor(dists.length * 0.6)] ?? base.p90;
+  return { x: center.x, z: center.z, radius: Math.max(radius, 0.04) };
+}
+
+function centroid(points: readonly { x: number; z: number }[]): { x: number; z: number } {
+  let x = 0;
+  let z = 0;
+  for (const point of points) {
+    x += point.x;
+    z += point.z;
+  }
+  return { x: x / points.length, z: z / points.length };
+}
+
+/**
+ * World offset of the anchor after yaw and scale. Subtract it from the
+ * instance position so the trunk lands on the collider.
+ * Matches THREE.Object3D rotation.y (x' = x cos θ + z sin θ, z' = -x sin θ + z cos θ).
+ */
+export function worldAnchorShift(
+  anchor: { x: number; z: number },
+  yaw: number,
+  scaleX: number,
+  scaleZ: number,
+): { x: number; z: number } {
+  const ox = anchor.x * scaleX;
+  const oz = anchor.z * scaleZ;
+  const cos = Math.cos(yaw);
+  const sin = Math.sin(yaw);
+  return { x: ox * cos + oz * sin, z: -ox * sin + oz * cos };
+}
+
+/** Instance whose anchor sits on (x, z), on the ground at y. */
+export function anchoredInstance(
+  template: PropTemplate,
+  x: number,
+  z: number,
+  y: number,
+  yaw: number,
+  scale: number | { x: number; y: number; z: number },
+): PropInstance {
+  const scaleX = typeof scale === "number" ? scale : scale.x;
+  const scaleZ = typeof scale === "number" ? scale : scale.z;
+  const scale3 = typeof scale === "number" ? undefined : scale;
+  const shift = worldAnchorShift(template.anchor, yaw, scaleX, scaleZ);
+  return {
+    x: x - shift.x,
+    y,
+    z: z - shift.z,
+    yaw,
+    scale: typeof scale === "number" ? scale : 1,
+    scale3,
+    shadeX: x,
+    shadeZ: z,
   };
 }
 
@@ -215,7 +344,8 @@ export function scatter(
     items.forEach((item, index) => {
       dummy.position.set(item.x, item.y, item.z);
       dummy.rotation.set(0, item.yaw ?? 0, 0);
-      dummy.scale.setScalar(item.scale);
+      if (item.scale3) dummy.scale.set(item.scale3.x, item.scale3.y, item.scale3.z);
+      else dummy.scale.setScalar(item.scale);
       dummy.updateMatrix();
       mesh.setMatrixAt(index, dummy.matrix);
     });
@@ -224,12 +354,17 @@ export function scatter(
     parent.add(mesh);
   }
   if (options?.shadow !== false) {
-    const blobs = items.map((item) => ({
-      x: item.x,
-      z: item.z,
-      y: item.y + 0.03,
-      radius: Math.max(0.4, template.radius * item.scale * 1.35),
-    }));
+    const blobs = items.map((item) => {
+      const span = item.scale3
+        ? Math.max(template.size.x * item.scale3.x, template.size.z * item.scale3.z) * 0.55
+        : template.radius * item.scale * 1.35;
+      return {
+        x: item.shadeX ?? item.x,
+        z: item.shadeZ ?? item.z,
+        y: item.y + 0.03,
+        radius: Math.max(0.4, span),
+      };
+    });
     addBlobShadows(parent, blobs);
   }
 }
@@ -270,13 +405,9 @@ export function placeCargo(
       template,
       solids
         .filter((solid) => solid.look === look)
-        .map((solid) => ({
-          x: solid.x,
-          y: solidFoot(solid),
-          z: solid.z,
-          yaw: solid.yaw,
-          scale: (solid.hy * 2 * heightMul) / template.height,
-        })),
+        .map((solid) =>
+          anchoredInstance(template, solid.x, solid.z, solidFoot(solid), solid.yaw, (solid.hy * 2 * heightMul) / template.height),
+        ),
     );
   };
   place("crate", props.crate);

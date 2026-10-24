@@ -4,7 +4,15 @@ import type { Solid } from "../course";
 import { mountSolids, type WorldMount } from "../course";
 import type { Atmosphere, GraphicsQuality } from "../scene";
 import { forestGroundMaterial, loadPropKit, tileUvs } from "../surfaces";
-import { hashYaw, loadProps, scatter, type PropTemplate, type ScatterSolid } from "../props";
+import {
+  anchoredInstance,
+  hashYaw,
+  loadProps,
+  SCANNED_TRUNK,
+  scatter,
+  type PropInstance,
+  type PropTemplate,
+} from "../props";
 import { bladeTexture } from "../textures";
 import { referenceRoute } from "../routes";
 import { ballSolid, cuboid, logSolid, pillar } from "./factory";
@@ -104,7 +112,148 @@ export function buildForestSolids(): Solid[] {
     const parked = parkOffTheLanes(Math.sin(z * 0.09) * 1.2 + side * 3.4, z);
     solids.push(logSolid(parked.x, parked.z, 0.72, 2.6, side * 0.7));
   }
+  fitAndSeatTrunks(solids);
   return solids;
+}
+
+type TreeFile = "broadleaf" | "bushy" | "pine";
+
+interface TreeChoice {
+  file: TreeFile;
+  scale: number;
+}
+
+/** Which scanned tree a solid wears. Remembered before a clearance nudge, which can move the hash. */
+const treeChoice = new WeakMap<Solid, TreeChoice>();
+
+function chooseTree(solid: { look: string; x: number; z: number; hy: number }): TreeChoice | null {
+  if (solid.look === "pine") {
+    return { file: "pine", scale: (solid.hy * 2 * 2.4) / SCANNED_TRUNK.pine.height };
+  }
+  if (solid.look === "tree") {
+    if (hashYaw(solid.x, solid.z) < Math.PI) {
+      return { file: "broadleaf", scale: (solid.hy * 2 * 2.15) / SCANNED_TRUNK.broadleaf.height };
+    }
+    return { file: "bushy", scale: (solid.hy * 2 * 1.7) / SCANNED_TRUNK.bushy.height };
+  }
+  return null;
+}
+
+/** Dress choice for one trunk. Scale is the uniform factor applied to the scanned model. */
+export function forestTreeDress(solid: Solid): { file: TreeFile; yaw: number; scale: number } | null {
+  const choice = treeChoice.get(solid) ?? chooseTree(solid);
+  if (!choice) return null;
+  const yaw = choice.file === "bushy" ? hashYaw(solid.z, solid.x) : hashYaw(solid.x, solid.z);
+  return { file: choice.file, yaw, scale: choice.scale };
+}
+
+/**
+ * Widen each trunk to the scanned wood, then step any tree that would
+ * stand in the reference lane sideways until the lane clears it.
+ * The radius is chosen once, from the pose before the step, so the mesh
+ * and the collider keep the same wood.
+ */
+function fitAndSeatTrunks(solids: Solid[]): void {
+  for (const solid of solids) {
+    const choice = chooseTree(solid);
+    if (!choice) continue;
+    treeChoice.set(solid, choice);
+    const radius = SCANNED_TRUNK[choice.file].radius * choice.scale;
+    solid.hx = radius;
+    solid.hz = radius;
+  }
+  const route = referenceRoute("forest");
+  const samples: { x: number; z: number }[] = [];
+  for (let i = 0; i < route.length; i++) {
+    const a = route[i]!;
+    const b = route[(i + 1) % route.length]!;
+    samples.push(a, { x: (a.x + b.x) / 2, z: (a.z + b.z) / 2 });
+  }
+  const keep = 2.25;
+  for (let pass = 0; pass < 12; pass++) {
+    let moved = false;
+    for (const solid of solids) {
+      if (!treeChoice.has(solid)) continue;
+      let best = Infinity;
+      let nearX = solid.x;
+      let nearZ = solid.z;
+      for (const point of samples) {
+        const dist = Math.hypot(solid.x - point.x, solid.z - point.z);
+        if (dist < best) {
+          best = dist;
+          nearX = point.x;
+          nearZ = point.z;
+        }
+      }
+      const gap = best - solid.hx;
+      if (gap >= keep) continue;
+      const push = keep - gap + 0.02;
+      const dx = solid.x - nearX;
+      const dz = solid.z - nearZ;
+      const len = Math.hypot(dx, dz) || 1;
+      solid.x += (dx / len) * push;
+      solid.z += (dz / len) * push;
+      moved = true;
+    }
+    if (!moved) break;
+  }
+}
+
+export interface ForestDressing {
+  template: PropTemplate;
+  item: PropInstance;
+}
+
+/** One instanced prop per blocking solid the forest dresses with a scan. */
+export function forestDressing(
+  solids: readonly Solid[],
+  props: Partial<Record<TreeFile | "boulder" | "rock" | "shrub" | "log", PropTemplate>>,
+): ForestDressing[] {
+  const dressed: ForestDressing[] = [];
+  for (const solid of solids) {
+    const tree = forestTreeDress(solid);
+    if (tree) {
+      const template = props[tree.file];
+      if (!template) continue;
+      dressed.push({
+        template,
+        item: anchoredInstance(template, solid.x, solid.z, forestHeight(solid.x, solid.z), tree.yaw, tree.scale),
+      });
+      continue;
+    }
+    if (solid.look === "rock") {
+      const template = solid.hx > 0.9 ? props.boulder : props.rock;
+      if (!template) continue;
+      const scale = solid.hx / Math.max(0.05, template.radius);
+      dressed.push({
+        template,
+        item: anchoredInstance(template, solid.x, solid.z, forestHeight(solid.x, solid.z), hashYaw(solid.x, solid.z), scale),
+      });
+      continue;
+    }
+    if (solid.look === "bush") {
+      const template = props.shrub;
+      if (!template) continue;
+      const scale = solid.hx / Math.max(0.05, template.radius);
+      dressed.push({
+        template,
+        item: anchoredInstance(template, solid.x, solid.z, forestHeight(solid.x, solid.z), hashYaw(solid.x, solid.z), scale),
+      });
+      continue;
+    }
+    if (solid.look === "log" && props.log) {
+      const template = props.log;
+      dressed.push({
+        template,
+        item: anchoredInstance(template, solid.x, solid.z, forestHeight(solid.x, solid.z), solid.yaw, {
+          x: (solid.hx * 2) / template.size.x,
+          y: (solid.hx * 2) / template.size.y,
+          z: (solid.hy * 2) / template.size.z,
+        }),
+      });
+    }
+  }
+  return dressed;
 }
 
 /**
@@ -267,84 +416,13 @@ function dressForest(
   props: Record<string, PropTemplate>,
   quality: GraphicsQuality,
 ): void {
-  const list = solids as readonly ScatterSolid[];
-  const trees = list.filter((solid) => solid.look === "tree");
-  const broad = trees.filter((solid) => hashYaw(solid.x, solid.z) < Math.PI);
-  const leafy = trees.filter((solid) => hashYaw(solid.x, solid.z) >= Math.PI);
-  scatter(
-    group,
-    props.broadleaf!,
-    broad.map((solid) => ({
-      x: solid.x,
-      y: forestHeight(solid.x, solid.z),
-      z: solid.z,
-      yaw: hashYaw(solid.x, solid.z),
-      scale: (solid.hy * 2 * 2.15) / props.broadleaf!.height,
-    })),
-  );
-  scatter(
-    group,
-    props.bushy!,
-    leafy.map((solid) => ({
-      x: solid.x,
-      y: forestHeight(solid.x, solid.z),
-      z: solid.z,
-      yaw: hashYaw(solid.z, solid.x),
-      scale: (solid.hy * 2 * 1.7) / props.bushy!.height,
-    })),
-  );
-  scatter(
-    group,
-    props.pine!,
-    list
-      .filter((solid) => solid.look === "pine")
-      .map((solid) => ({
-        x: solid.x,
-        y: forestHeight(solid.x, solid.z),
-        z: solid.z,
-        yaw: hashYaw(solid.x, solid.z),
-        scale: (solid.hy * 2 * 2.4) / props.pine!.height,
-      })),
-  );
-  for (const solid of list.filter((item) => item.look === "rock")) {
-    const template = solid.hx > 0.9 ? props.boulder! : props.rock!;
-    scatter(group, template, [
-      {
-        x: solid.x,
-        y: forestHeight(solid.x, solid.z),
-        z: solid.z,
-        yaw: hashYaw(solid.x, solid.z),
-        scale: (solid.hx * 1.8) / template.height,
-      },
-    ]);
+  const groups = new Map<PropTemplate, PropInstance[]>();
+  for (const { template, item } of forestDressing(solids, props)) {
+    const items = groups.get(template) ?? [];
+    items.push(item);
+    groups.set(template, items);
   }
-  scatter(
-    group,
-    props.shrub!,
-    list
-      .filter((solid) => solid.look === "bush")
-      .map((solid) => ({
-        x: solid.x,
-        y: forestHeight(solid.x, solid.z),
-        z: solid.z,
-        yaw: hashYaw(solid.x, solid.z),
-        scale: (solid.hx * 2.4) / props.shrub!.height,
-      })),
-  );
-  scatter(
-    group,
-    props.log!,
-    list
-      .filter((solid) => solid.look === "log")
-      .map((solid) => ({
-        x: solid.x,
-        y: forestHeight(solid.x, solid.z),
-        z: solid.z,
-        yaw: solid.yaw,
-        scale: (solid.hy * 2) / Math.max(0.2, props.log!.radius * 2),
-      })),
-    { cast: true },
-  );
+  for (const [template, items] of groups) scatter(group, template, items);
 
   const rand = mulberry32(19);
   forestBackground(rand);
