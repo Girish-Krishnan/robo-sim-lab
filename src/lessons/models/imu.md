@@ -10,9 +10,9 @@ prerequisites: models/odometry
 status: ready
 ---
 
-Spin an office chair and try to say which way the door is. The IMU in this sandbox is a yaw gyro and a three-axis accelerometer, and it has the same problem. There is no magnetometer, so nothing here measures absolute heading. Yaw is the integral of the gyro: you can say how far you have turned, and you have lost the door. On a steady circle that rate sits near $(v/L)\tan\delta$, plus a bias that stays put.
+Spin an office chair and try to say which way the door is. The IMU in this sandbox is a yaw gyro and a three-axis accelerometer, and it has the same problem. There is no magnetometer, so nothing here measures absolute heading. Yaw is the integral of the gyro: you can say how far you have turned, and you have lost the door. On a steady circle that rate sits near $(v/L)\tan\delta$ (the bicycle model's yaw rate), plus a bias that stays put.
 
-In the sim: the circle program on an open pad, so the yaw rate has a steady value to compare.
+In the sim: the circle program on an open pad, so the yaw rate has a steady value to compare. The fan below shows a true heading and the integrated gyro walking off it by $b \cdot t$.
 
 <svg viewBox="0 0 520 252" role="img" aria-label="A gyro bias adds a little yaw every second, so heading walks off in a fan.">
   <rect width="520" height="252" rx="12" fill="#0e1418"/>
@@ -40,11 +40,11 @@ A constant bias $b$ on the yaw gyro, integrated for $T$ seconds, is a heading er
 
 $$\Delta\theta = b\,T.$$
 
-With $b = 0.0012$ rad/s and $T = 60$ s, $\Delta\theta = 0.072$ rad, about 4.1°. After traveling a distance $s$, the cross-track contribution of a heading error is roughly $s\,\Delta\theta$ while the error is still small and growing. On an oval lap of about 200 m that is meters. The noise around the bias averages down. The bias stays.
+With $b = 0.0012$ rad/s and $T = 60$ s, $\Delta\theta = 0.072$ rad, about 4.1°. After traveling a distance $s$, the sideways miss from that heading error (cross-track error: how far you are from the line you meant to hold) is roughly $s\,\Delta\theta$ while the error is still small and growing. On an oval lap of about 200 m that is meters. The noise around the bias averages down. The bias stays.
 
-Specific force $f$ and acceleration $a$ differ by gravity. In the world, $f = a - g$ with $g$ pointing down. On flat ground at rest, $a = 0$ and $f_z = +9.81$ in the body. A tilt $\phi$ leaks that into the horizontal axes. This course keeps the worlds flat, so the accelerometer is here to make the sample look like a real IMU. Wheel speed remains the speed sensor. Integrating `accel.x` for a minute, with a bias of 0.02 m/s², invents tens of meters per second of fake speed.
+Specific force $f$ and acceleration $a$ differ by gravity. In the world, $f = a - g$ with $g$ pointing down. On flat ground at rest, $a = 0$ and $f_z = +9.81$ in the body. Tilting the car leaks that into the horizontal axes. This course keeps the worlds flat, so the accelerometer is here to make the sample look like a real IMU. Wheel speed remains the speed sensor. Integrating `accel.x` for a minute, with a bias of 0.02 m/s², invents tens of meters per second of fake speed.
 
-The gyro bias and the speed bias are drawn in a fixed order from `SEED` at the top of the program. When the console numbers disagree with the lesson, check that number before changing a gain. Reset run replays the draw you already have.
+The gyro bias and the speed bias are drawn in a fixed order from `SEED` at the top of the program. When the console numbers disagree with the lesson, check that number before changing a gain (how hard the program reacts to an error). Reset run replays the draw you already have.
 
 Note: a free-body diagram draws weight as $(0, 0, -g)$. The accelerometer reports the opposite while you are standing on the floor, because it feels the floor's push.
 

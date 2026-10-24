@@ -621,8 +621,8 @@ def follow_wall(sensors):
     diag = wall_beam(ranges, angles, -math.pi / 4, 0.14)
     preview = wall_beam(ranges, angles, -0.35, 0.1)
     front = wall_beam(ranges, angles, 0.0, 0.32)
-    delta = math.pi / 4
-    alpha = math.atan2(diag * math.cos(delta) - side, diag * math.sin(delta))
+    beam_gap = math.pi / 4
+    alpha = math.atan2(diag * math.cos(beam_gap) - side, diag * math.sin(beam_gap))
     dist = max(0.3, side * math.cos(min(0.8, max(-0.8, alpha))))
     future = dist + look * math.sin(alpha)
     if (

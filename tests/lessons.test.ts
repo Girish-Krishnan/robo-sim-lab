@@ -245,8 +245,8 @@ describe("course catalog", () => {
     expect(bicycle.match(/draw a circle/g)?.length ?? 0).toBe(1);
     const lidar = lessonById("models/lidar")?.markdown ?? "";
     expect(lidar.match(/270 beams/g)?.length ?? 0).toBe(1);
-    expect(programPreamble("circle")).toContain("90 faces west (positive turns left)");
-    expect(lessonById("getting-started/sensors")?.markdown).toContain("90 faces west (positive turns left)");
+    expect(programPreamble("circle")).toContain("90 faces east (a left turn decreases the heading)");
+    expect(lessonById("getting-started/sensors")?.markdown).toContain("90 faces east (a left turn decreases the heading)");
     expect(lessonById("reactive/circle")?.markdown).toContain("watch the car: it shows you which number is wrong");
     expect(lessonById("reactive/circle")?.markdown).not.toContain("the car itself is the story");
     expect(css).toContain("#app.mode-lessons.lesson-has-code.lab-open #lesson");

@@ -10,7 +10,7 @@ prerequisites: models/bicycle
 status: ready
 ---
 
-Watch the car lean into a left turn and trace the same circle, lap after lap. The program sends one command, 0.34 rad of left steer and a medium throttle, every tick, and never checks where it is. That's open loop.
+Watch the car lean into a left turn and trace the same circle, lap after lap. The program sends one command, 0.34 rad of left steer and a medium throttle, every tick, and never checks where it is. That's open loop. You met this circle in the bicycle lesson. Here it's the baseline that the reactive controllers improve on.
 
 In the sim: the same fixed command, with the camera far enough back to see the whole lap. The car is placed on a pad checked to be clear of that circle: the south lawn in the city, the oval infield, the meadow south of the trees, and the open bay in the warehouse. Move the steer or the throttle a lot and that clearance ends.
 
@@ -28,12 +28,12 @@ One lap takes time $T = 2\pi R / v$ when the car actually holds speed $v$ and ra
 
 The discrete command is held for $\Delta t = 0.05$ s. Returning $(0.34,\ 0.5)$ is the whole controller.
 
-A circle that meets something is a pad, a steer, or a speed. The avoid lesson is the one that reacts. A positive steer is left. A circle that goes right is a negative number in the return.
+If the circle hits something, the cause is one of three: the pad, the steer, or the speed. The avoid lesson is the one that reacts. A positive steer is left. A circle that goes right is a negative number in the return.
 
-Open loop leaves the gyro bias alone, and the geometric circle in the world is still the circle. Odometry is a passenger. Paths will show the blue trail leaving a perfectly good lap.
+Open loop leaves the gyro bias alone, and the geometric circle in the world is still the circle. Odometry is a passenger. The trails will show the blue odometry line leaving a perfectly good lap.
 
 ## Try it
 
 1. Run the starter on the oval infield and on the city lawn. Both should stay clear and keep turning left.
 2. Replace the steer with `-0.34`. The circle should reverse direction and may leave the pad. Put it back.
-3. After ten seconds of a clean circle, print the distance of `odometry.pose` from the origin. Write down the gap between that distance and the geometric radius.
+3. Print `odometry.pose.yaw` once a second next to `sensors.time`. Every lap it should grow by about $2\pi$. Compare the lap time with $2\pi R / v$.

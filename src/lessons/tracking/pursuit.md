@@ -12,9 +12,9 @@ status: ready
 
 Watch the car chase a point riding a few meters ahead on the green line. Every tick it steers the arc that lands there, like riding a bike toward a tree you picked out.
 
-In the sim: the plan, the car, and the odometry trail are all drawn. The green line is the reference path. The point sits `LOOKAHEAD` meters ahead of the pose the car believes, on the path the world publishes as `sensors.task.path` in the odometry frame. On the oval that path is the centerline.
+In the sim: the plan, the car, and the odometry trail are all drawn. The green line is the reference path. The point sits `LOOKAHEAD` meters ahead of the pose the car believes (a setting, 3.2 m), on the path the world publishes as `sensors.task.path` in the odometry frame. On the oval that path is the centerline.
 
-It transforms that point into the body frame of the odometry pose, computes a curvature, and converts curvature to a steering angle with the bicycle model. A small speed controller slows down when the steer is large: throttle follows the speed error (the P), and a little memory of that error (the I) keeps a long straight from winding the command up. That is the PI in PID. The corner is slower than the straight.
+The starter transforms that point into the body frame of the odometry pose (x forward, y left), computes a curvature, and converts curvature to a steering angle with the bicycle model. A small speed controller slows down when the steer is large. Throttle follows the speed error (P, proportional) plus a little memory of past error (I, integral). That memory is what would wind the command up on a long straight; the starter clamps it so the corner does not get an overshoot. That's PI, the first two letters of PID (proportional-integral-derivative). The D is the derivative term you met in wall following. The corner is slower than the straight.
 
 The starter draws the path, the lookahead point, and the arc implied by the command. All three are in the odometry frame. While the pose is still good, the arc sits on the real car. As the gyro bias accumulates, the drawn lookahead walks off the car even though the math is the same.
 
@@ -39,21 +39,23 @@ A short reverse runs if the bumper is in an obstacle and the speed is already ne
 
 ## The arc that passes through the lookahead point
 
-Let the lookahead point be a distance $L_d$ ahead, and let $\alpha$ be the angle between the car's heading and the line to that point. Positive $\alpha$ means the point is to the left. The arc that passes through the point has curvature
+Let the lookahead point be a distance $L_d$ ahead ($L_d$ is that lookahead, not the wheelbase $L$), and let $\alpha$ be the angle between the car's heading and the line to that point. Here $\alpha$ is that bearing, not a lidar beam. Positive $\alpha$ means the point is to the left. The arc that passes through the point has curvature
 
 $$\kappa = \frac{2\sin\alpha}{L_d}.$$
+
+That $\kappa$ is the circle through the car and the point, tangent to the heading. The diagram shows it.
 
 The bicycle model turns curvature into a steering angle with $\kappa = \tan\delta / L$, so
 
 $$\delta = \arctan\left(L \cdot \frac{2\sin\alpha}{L_d}\right).$$
 
-$L$ is the wheelbase, 1.9 m. The starter clamps $\delta$ to the vehicle limit. In code, $\alpha = \operatorname{atan2}(y_{\mathrm{left}}, x_{\mathrm{forward}})$ after rotating the lookahead offset by the odometry yaw.
+$L$ is the wheelbase, 1.9 m. The starter clamps $\delta$ to the vehicle limit. In code, $\alpha = \operatorname{atan2}(y_{\mathrm{left}}, x_{\mathrm{forward}})$ after rotating the lookahead offset by the odometry yaw. The camera's heading grows the other way (a left turn decreases it) and is not in the sample. Mixing it with odometry yaw steers the wrong way, so stay with `pose.yaw`.
 
 `LOOKAHEAD` is the distance, in meters, from the car to the point it steers toward. It sits at the top of the program with the wheelbase.
 
 {{code:settings}}
 
-The loop that walks out to `LOOKAHEAD` and turns it into a steer command:
+The loop that walks out to `LOOKAHEAD` and turns it into a steer command. `best` is the index of the nearest waypoint (see below).
 
 {{code:pursuit_steer}}
 

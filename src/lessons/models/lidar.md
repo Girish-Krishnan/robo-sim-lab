@@ -14,11 +14,11 @@ This is how the car sees. A spinning range finder, about a meter off the ground,
 
 In the sim: the oval, with the avoid program running and the scan drawn. The corner inset is the same scan from above. Amber dots are the close hits.
 
-Angle 0 points forward. Positive angles point to the driver's left. The rear 90° is a blank wedge, so something directly behind the car stays invisible until you yaw.
+Angle 0 points forward. Positive angles point to the driver's left. The rear 90° is a blank wedge, so something directly behind the car stays invisible until you turn (yaw).
 
-A beam that hits nothing is reported as `max_range`, 12 m. Treat "equal to max range" as empty air. Every real controller in this course does. Range noise is about 2 cm, one sigma, in the band of a small outdoor lidar such as a Hokuyo UST-10LX.
+A beam that hits nothing is reported as `max_range`, 12 m. Treat "equal to max range" as empty air. Every real controller in this course does. Range noise is about 2 cm (one standard deviation, "one sigma": most readings land within 2 cm of the truth), in the band of a small outdoor lidar such as a Hokuyo UST-10LX.
 
-The ray starts at the roof puck. The nose of the body is about 0.7 m in front of that puck, so a program that drives until the forward range is 0.2 m has already arrived.
+The ray starts at the roof puck. The nose of the body is about 0.7 m in front of that puck, so a program that drives until the forward range is 0.2 m has already arrived. The fan below is that scan: 0 straight ahead, positive to the left, and a gray arc where the rear has no beams.
 
 <svg viewBox="0 0 480 250" role="img" aria-label="Lidar beam angles, forward zero and a blank rear wedge">
   <rect width="480" height="250" rx="12" fill="#10161a"/>
@@ -37,19 +37,17 @@ The ray starts at the roof puck. The nose of the body is about 0.7 m in front of
 
 ## From a beam to a point on the ground
 
-Beam $i$ has angle $\alpha_i$ in the robot frame. Its direction is
+Beam $i$ has angle $\alpha_i$ in the robot frame (x forward, y left, the same frame as the bicycle lesson; $\alpha_i$ here is that beam's angle). If the measured range is $r$, the hit is at $(r\cos\alpha_i,\ r\sin\alpha_i)$ from the puck: $r\cos\alpha_i$ meters forward and $r\sin\alpha_i$ meters to the left.
 
-$$d_x = \sin\alpha_i,\quad d_y = 0,\quad d_z = \cos\alpha_i$$
-
-in the body, with x left, y up, z forward. If the measured range is $r$, the hit relative to the puck is $r\,(\sin\alpha_i,\, 0,\, \cos\alpha_i)$. In the odometry plane, with the car at $(x, y)$ and yaw $\theta$,
+The puck sits 0.46 m forward of the body origin. In the odometry frame, with the car at $(x, y)$ and yaw $\theta$,
 
 $$x_{\mathrm{hit}} = x + (0.46 + r\cos\alpha_i)\cos\theta - r\sin\alpha_i\sin\theta$$
 
 $$y_{\mathrm{hit}} = y + (0.46 + r\cos\alpha_i)\sin\theta + r\sin\alpha_i\cos\theta$$
 
-The 0.46 m is the puck's forward offset from the body origin. The localization lessons use this endpoint. A beam at `max_range` has no endpoint worth trusting.
+The localization lessons use this endpoint. A beam at `max_range` has no endpoint worth trusting.
 
-The right-hand wall in the wall-follow lesson is the beam near $-\pi/2$. Positive is left. A controller that flips that sign orbits the other way.
+The right-hand wall in the wall-follow lesson is the beam near $-\pi/2$ rad (−90°, straight out the right side). Positive is left. A controller that flips that sign orbits the other way.
 
 Trees are thinner than the gap the car needs. One long beam between two trunks can be a crack the bumper will never fit. The avoid program paints a wedge about as wide as the car around each hit, then looks for an opening in what remains. The warehouse stays off this page: those aisles are tighter than this starter, and the oval and the forest are where it stays clean.
 

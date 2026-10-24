@@ -84,9 +84,10 @@ const avoid = `${programPreamble("avoid")}# Lidar avoid
 # steering uses the same sign, so a positive number also turns left.
 # A range of ${maxRange} m means no return.
 #
-# Follow the widest opening the buggy actually fits through. Each return
-# blocks a wedge about the width of the car, so a one-beam gap between
-# two cones does not look open. Speed follows the nearest return in the
+# Follow the deepest opening in front of the car, nudged toward straight
+# ahead. Each return blocks a wedge about the width of the car, so a
+# one-beam gap between two cones does not look open. Speed follows the
+# nearest return in the
 # forward half, not only the dead-ahead beam: a cone off to one side is
 # still in the bumper's path at speed.
 #
@@ -95,8 +96,9 @@ const avoid = `${programPreamble("avoid")}# Lidar avoid
 # toward the clearer side.
 #
 # A corner is different from a close cone. If the car has barely moved
-# for a couple of seconds, the way out is the widest gap in the whole
-# scan, often beside the nose rather than ahead of it. Reverse with the
+# for a couple of seconds, the way out is the most open beam in the whole
+# scan (the longest inflated range), often beside the nose rather than
+# ahead of it. Reverse with the
 # opposite steer (yaw rate flips with speed) so the nose swings toward
 # that gap, then drive into it. Twitching in place is not exploring.
 #
@@ -172,8 +174,9 @@ def control(sensors):
     score = np.where(forward, wide * pref, -1.0)
     gap = float(angles[int(np.argmax(score))])
     run.aim = 0.6 * run.aim + 0.4 * gap
-    # Widest opening anywhere in the scan. A corner's exit is often beside
-    # the nose, outside the forward window the gap follower uses.
+    # Most open beam anywhere in the scan (longest inflated range). A
+    # corner's exit is often beside the nose, outside the forward window
+    # the gap follower uses.
     exit_angle = float(angles[int(np.argmax(wide))])
 
     left = (angles > 0.15) & (angles < 1.2)
@@ -196,7 +199,7 @@ def control(sensors):
     if run.cooldown > 0:
         run.cooldown -= 1
 
-    # Back out of a stall, yaw toward the widest gap while still reversing
+    # Back out of a stall, yaw toward that open beam while still reversing
     # (steer sign flips with speed), then drive into that gap. The gap is
     # re-read each tick because a body angle goes stale as the car yaws.
     if run.phase == "back":
@@ -329,8 +332,9 @@ def beam(ranges, angles, center, width):
 
 def wall_error(side, diag, look):
     # alpha < 0 means the nose is aimed into the right-hand wall.
-    delta = math.pi / 4
-    alpha = math.atan2(diag * math.cos(delta) - side, diag * math.sin(delta))
+    # beam_gap is the 45 degrees between the side beam and the diagonal, not steering.
+    beam_gap = math.pi / 4
+    alpha = math.atan2(diag * math.cos(beam_gap) - side, diag * math.sin(beam_gap))
     dist = max(0.3, side * math.cos(min(0.8, max(-0.8, alpha))))
     future = dist + look * math.sin(alpha)
     return alpha, dist, future
@@ -488,6 +492,7 @@ const pursuit = `${programPreamble("pursuit")}# Pure pursuit
 # draw.* posts shapes back to the view. It does not return information.
 
 import math
+import numpy as np
 
 WHEELBASE = ${wheelbase}
 MAX_STEER = ${maxSteer}
@@ -607,7 +612,7 @@ def command_arc(pose, curvature, length):
 
 export const EXAMPLES: CodeExample[] = [
   { id: "circle", label: "Circle drive", blurb: "Hold a fixed steer and draw a circle on an open pad.", source: circle },
-  { id: "avoid", label: "Lidar avoid", blurb: "Steer toward the widest gap the car can fit through.", source: avoid },
+  { id: "avoid", label: "Lidar avoid", blurb: "Steer toward the deepest opening the car can fit through, nudged toward straight ahead.", source: avoid },
   { id: "wall", label: "Wall follow", blurb: "Hold a distance from the wall on the driver's right.", source: wall },
   { id: "pursuit", label: "Pure pursuit", blurb: "Steer an arc toward a point a few meters along the path.", source: pursuit },
   { id: "mcl", label: "PF pursuit", blurb: "Follow the path using a particle-filter pose instead of raw odometry.", source: particleFilterSource("track") },

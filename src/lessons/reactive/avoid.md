@@ -28,21 +28,21 @@ In the sim: the forest, aimed into the trees, with the lidar drawn.
   <text x="20" y="232" fill="#d5ddd8" font-size="16" font-family="sans-serif">A hit paints a wedge of half-width HALF. The car steers into what is left.</text>
 </svg>
 
-Each hit blocks a wedge about as wide as the car, a single ray thickened until the bumper would fit. Among the openings that remain in front of the car, the starter aims at the widest one, and it slows down when the nearest forward return is close. Speed follows that nearest return, because a cone off to the side is still on the bumper's path.
+Each hit blocks a wedge about as wide as the car, a single ray thickened until the bumper would fit. Among the openings that remain in front of the car, the starter aims at the most open beam, with a nudge toward straight ahead, and it slows down when the nearest forward return is close. Speed follows that nearest return, because a cone off to the side is still on the bumper's path.
 
 If the car is boxed in, or if it has barely moved for a couple of seconds, it backs up a short way and yaws toward the clearer side, then tries again. That escape is part of the starter. The rear scan is a thin wedge, so the backup stays short.
 
-In the forest the starter also prefers a heading that keeps it in the corridor, using the pattern of ranges. It is still reactive. `sensors.task.path` stays unread.
+In the forest the starter also prefers a heading that keeps it in the corridor. Lots of range jumps bigger than about 1.5 m, with a mean range under 10 m, means trunks rather than one flat wall, and then the preferred heading wanders slowly so the car weaves. It is still reactive. `sensors.task.path` stays unread.
 
 ## A gap is an interval of angles
 
-Let the forward beams be those with $|\alpha| < \alpha_{\max}$. The longest single range is often a crack between two trunks. A better rule treats a return $r$ at angle $\alpha$ as occupying
+Here $\alpha$ is a beam angle, the same sign as in the lidar lesson. Let the forward beams be those with $|\alpha| < \alpha_{\max}$. In the code that limit is `window`: about $\pm 1.25$ rad when the scan is chopped up by trees, $\pm 1.15$ rad (about $\pm 66^\circ$) when something is within 6 m, and $\pm 0.5$ rad (about $\pm 29^\circ$) on an open road. The longest single range is often a crack between two trunks. A better rule treats a return $r$ at angle $\alpha$ as blocking every beam angle $\phi$ in
 
-$$\alpha \in \big[\alpha - \arctan(w / r),\; \alpha + \arctan(w / r)\big]$$
+$$\phi \in \big[\alpha - \arctan(w / r),\; \alpha + \arctan(w / r)\big]$$
 
-for a half-width $w$ a bit larger than the car, and then picks the opening with the best score. The starter writes that idea as a pass over the beams.
+where $\phi$ is any beam this hit blocks, for a half-width $w$ a bit larger than the car. The starter then picks the opening with the best score: the deepest inflated range inside that forward window, times a preference for straight ahead.
 
-The half-width of each wedge, in meters. `HALF` is how wide a hit is painted. It is a plain name at the top of the program.
+`HALF` in the code is $w$: 1.35 m, the car's half-width (about 0.7 m) plus a safety margin. It is a plain name at the top of the program.
 
 {{code:settings}}
 
@@ -54,7 +54,7 @@ Throttle is a function of the nearest forward range $r_{\min}$. Far away, thrott
 
 Reactive avoidance decides from this scan alone. This lesson runs in the forest, where the car threads trunks and keeps moving. The same program on the oval treats cones as blockers and stays off them. The warehouse stays locked: those aisles are tighter than this reactive rule, and the forest and the oval are the worlds where it stays clean.
 
-A gap on the left has positive angle, and positive steering turns left. Negating the command "to match the camera" turns into the obstacle.
+A gap on the left has positive angle, and positive steering turns left.
 
 ## Try it
 

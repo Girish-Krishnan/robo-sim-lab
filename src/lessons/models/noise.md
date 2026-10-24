@@ -35,17 +35,17 @@ This page has no program, so the draw stays seed 1. Reset run replays that same 
 
 Each sensor has a white-noise term, redrawn every sample, and some have a bias drawn once per reset from the seed. The camera is reserved: `sensors.camera.available` is false, and there is no image model yet.
 
-**Lidar.** A hit at true range $r$ is reported as
+**Lidar.** $\mathcal{N}(0, \sigma^2)$ means a fresh Gaussian random number with mean 0 and spread $\sigma$ (like `rng.normal(0, sigma)`). A hit at true range $r$ is reported as $z$, the reported range (not the up axis):
 
 $$z = \mathrm{clip}(r + \mathcal{N}(0, \sigma_r^2),\; 0.05,\; r_{\max}),\quad \sigma_r = 0.02\,\mathrm{m}.$$
 
-That is a 2 cm Gaussian. Beams that miss stay at $r_{\max} = 12$ m. The noise stays the same size at every range in this model.
+Clip keeps it between 5 cm and max range. That is a 2 cm Gaussian. Beams that miss stay at $r_{\max} = 12$ m. The noise stays the same size at every range in this model.
 
 **Wheel speed.** The true rear-wheel speed $v$ is published as
 
 $$v_{\mathrm{odom}} = v(1 + b_v) + \mathcal{N}(0, \sigma_v^2)$$
 
-with $\sigma_v = 0.02$ m/s and $b_v \sim \mathcal{N}(0, 0.012^2)$. The 0.012 is a 1.2% scale bias, drawn once and then held, so it stretches every meter by the same fraction.
+with $\sigma_v = 0.02$ m/s and $b_v \sim \mathcal{N}(0, 0.012^2)$ ($\sim$ means "is drawn from"). The 0.012 is a 1.2% scale bias, drawn once and then held, so it stretches every meter by the same fraction.
 
 **Gyro.** The true yaw rate $\omega$ is published as
 
@@ -61,17 +61,17 @@ Steering noise ($\sigma = 0.003$ rad, bias standard deviation 0.004 rad) is adde
 
 ## Why the fraction stays, and the square root shrinks
 
-A speed bias $b_v$ on a true distance $s$ reports about $s(1+b_v)$. The end error along the path is about $s b_v$, a fixed fraction. White speed noise averages down as $1/\sqrt{N}$ samples. The bias stays, so after a long run the fraction is $b_v$, usually under a couple of percent on a straight line.
+A speed bias $b_v$ on a true distance $s$ reports about $s(1+b_v)$. The end error along the path is about $s b_v$, a fixed fraction. White speed noise averages down as $1/\sqrt{N}$ over $N$ samples. The bias stays, so after a long run the fraction is $b_v$, usually under a couple of percent on a straight line.
 
 A gyro bias $b_\omega$ shifts every sample by the same amount. Integrated, that is a ramp:
 
 $$\theta(t) = \theta_{\mathrm{true}}(t) + b_\omega t + \text{averaged noise}.$$
 
-A heading error then grows with time even when your hands are steady. Drive a long straight and watch the graph: the early gap is small, and the late gap is the bias, integrated. The drift lesson puts a path tracker on this same guess and measures what that costs. On the oval that controller's cross-track against the true centerline is about 0.18 m in the first 15 seconds and about 2.23 m after 45 seconds. Same gains. The late number is this bias.
+A heading error then grows with time even when your hands are steady. Drive a long straight and watch the graph: the early gap is small, and the late gap is the bias, integrated. The drift lesson puts a path tracker on this same guess and measures what that costs. On the oval that controller's cross-track against the true centerline is about 0.18 m in the first 15 seconds and about 2.23 m after 45 seconds. Same controller tuning (its gains: how hard it reacts). The late number is this bias.
 
 Lidar noise stays local. A wall that was 3.20 m away is still about 3.20 m away a minute later, plus or minus 2 cm. A map plus a lidar can therefore correct a pose that odometry has walked away.
 
-On the view, the colored line is where the car went and the blue line is odometry. The key on the view uses the same colors. The graph is that gap, live, in meters.
+The key on the view uses the same colors. The graph is that gap, live, in meters.
 
 Note: smoothing the gyro to "take the bias out" also takes the turn out, until another sensor says which part was the turn. The particle filter later in the course is that other sensor.
 

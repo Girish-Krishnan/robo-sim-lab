@@ -12,7 +12,7 @@ status: ready
 
 Hold the wheel and watch it draw a circle. That is the whole model, and it is a beautiful one. The rear axle rolls straight ahead in its own frame. The front axle is steered by an angle $\delta$. A constant $\delta$ is that circle, the way a shopping cart with the front wheels locked traces one radius around a parking lot.
 
-Positive $\delta$ is a left turn, and the car starts on that circle so the lap stays on the open pad.
+Positive $\delta$ is a left turn, and the car starts on that circle so the lap stays on the open pad. In the diagram, the turn center is the yellow dot. The white bar is the wheelbase $L$, and the teal bar is the radius $R$.
 
 <svg viewBox="0 0 560 340" role="img" aria-label="Top view: turn center, radius R, wheelbase L perpendicular to R, and steer angle delta">
   <rect width="560" height="340" rx="12" fill="#0e1418"/>
@@ -42,7 +42,7 @@ Positive $\delta$ is a left turn, and the car starts on that circle so the lap s
 
 ## Why the rear axle is the reference point
 
-The rear axle only rolls. Its velocity lies along the heading, and the yaw rate is whatever the front wheels demand. With rear-axle speed $v$ and yaw $\theta$ measured from the x axis:
+The rear axle only rolls. Its velocity lies along the heading, and the yaw rate is whatever the front wheels demand. A dot means "rate of change per second", so $\dot x$ is how fast $x$ is changing. $L$ is the wheelbase, 1.9 m. With rear-axle speed $v$ and yaw $\theta$ (radians) measured from the odometry +x axis, the direction the car faced at reset (Frames and angles, in Sensors, spells the frames out):
 
 $$\dot{x} = v\cos\theta,\quad \dot{y} = v\sin\theta,\quad \dot{\theta} = \frac{v}{L}\tan\delta$$
 
@@ -50,7 +50,7 @@ The curvature is $\kappa = \tan\delta / L$, and the radius is $R = 1/|\kappa|$. 
 
 $$R = \frac{1.9}{\tan 0.34} \approx 5.4\,\mathrm{m}.$$
 
-A larger $|\delta|$ is a tighter circle, until the steering hits its stop. Speed leaves the radius alone in this kinematic model. On this car, speed does change the path, because the tires run out of lateral force and the body slides. The circle starter uses a modest throttle so the trail stays close to that 5.4 m.
+A larger $|\delta|$ is a tighter circle, until the steering hits its stop. Speed leaves the radius alone in this kinematic model (pure geometry: no tire forces, no slipping). On this car, speed does change the path, because the tires run out of lateral force and the body slides. The circle starter uses a modest throttle so the trail stays close to that 5.4 m.
 
 The running program is that constant command. Change the first number and the radius changes with it.
 
@@ -62,11 +62,13 @@ Over a short time $\Delta t$ a discrete step is
 
 $$x \leftarrow x + v\cos\theta\,\Delta t,\quad y \leftarrow y + v\sin\theta\,\Delta t,\quad \theta \leftarrow \theta + \frac{v}{L}\tan\delta\,\Delta t.$$
 
+Read $\leftarrow$ as "becomes", just like `x = x + …` in Python.
+
 Later lessons call this a motion model. The real car adds three small effects the formula leaves out: the command is held between 20 Hz ticks, the steering slews, and the tires slip. The body can sit a few tenths of a meter inside or outside the kinematic circle.
 
-The blue odometry trail is a different integral. Its heading comes from the gyro. A steering bias is reported on `steering_angle` and stays out of the pose. Folding that bias into the heading would walk one lap of the oval tens of meters off the car.
+The blue odometry trail is built a different way: it adds up the gyro's turn rate instead of using $\tan\delta$. The measured steering angle has its own small error (a bias, one draw held for the whole run). If odometry used it, that error would walk one lap of the oval tens of meters off the car.
 
-Three frames show up from here on. The **robot frame** has x forward, y left, and z up. Positive steering is a left turn. The **world** is the ground plane: at yaw 0 the nose points along +Z and the driver's left is +X. **Odometry** starts at the origin on reset, with +x along the heading the car had then. `sensors.task.path` and `draw` live there. The host places those drawings with the spawn transform, the shift from that origin onto the map. Stay in the odometry frame when you write a controller.
+Three frames show up from here on, and Sensors has the full write-up under Frames and angles. The **robot frame** has x forward, y left, and z up. Positive steering is a left turn. The **world** ground plane has +Z north and +X west, so at yaw 0 the nose points north and the driver's left is west. **Odometry** starts at the origin on reset, with +x along the heading the car had then, and its yaw grows on a left turn. `sensors.task.path` and `draw` live there. The lab places those drawings with the spawn transform, the shift from that origin onto the map. Stay in the odometry frame when you write a controller. A left turn decreases the `START_POSE` heading and increases odometry yaw. Do not add those two numbers.
 
 Ackermann geometry splits the one bicycle angle across the two front wheels so both roll around the same center. The inner wheel takes the larger angle. The number you return is the bicycle angle. The simulator does the split. The track width is 1.42 m.
 

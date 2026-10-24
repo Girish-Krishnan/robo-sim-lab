@@ -11,9 +11,9 @@ status: ready
 
 Watch the pink cloud swell as the car moves and snap tight when the lidar sees a wall. Motion smears the belief like a retold rumor; each scan pulls it back.
 
-In the sim: the filter on the oval, pulled back so the cloud fits once it is running. The key names the pink guesses, the yellow ring, and the trails.
+In the sim: the filter on the oval, pulled back so the cloud fits once it is running. The key names the pink guesses, the yellow ring (how spread out the guesses are), and the trails.
 
-The belief $\mathrm{bel}(x_t)$ is a probability distribution over the car's pose at time $t$. You keep either a grid (too big here) or a cloud of weighted samples (the next lesson). The shape of the update is the same either way.
+The belief $\mathrm{bel}(x_t)$ is a probability distribution over the car's pose at time $t$. Here $x_t$ is the whole pose $(x, y, \theta)$, as in the last lesson, not the x coordinate. You keep either a grid (too big here) or a cloud of weighted samples (the next lesson). The shape of the update is the same either way.
 
 Predict with the motion you commanded, or with the odometry you measured. Then correct with the lidar, using the map. The map is what turns a range into a statement about pose. A range of 4 m, read against the floor plan, rules out every pose where the nearest wall in that direction sits somewhere else.
 
@@ -37,13 +37,13 @@ Predict with the motion you commanded, or with the odometry you measured. Then c
 
 ## Predict, then correct
 
-The continuous Bayes filter is
+$p(a \mid b)$ reads "probability of $a$, given $b$". $\overline{\mathrm{bel}}$ (with a bar) is the belief after moving but before looking. $z_t$ is the scan, not the up axis. The continuous Bayes filter is
 
 $$\overline{\mathrm{bel}}(x_t) = \int p(x_t \mid x_{t-1}, u_t)\, \mathrm{bel}(x_{t-1})\, dx_{t-1}$$
 
 $$\mathrm{bel}(x_t) = \eta\, p(z_t \mid x_t)\, \overline{\mathrm{bel}}(x_t)$$
 
-$\eta$ makes the belief integrate to 1. $u_t$ is the motion. $z_t$ is the scan. $\eta$ is "divide by the sum." The predict step uses the odometry **delta**. Replacing every particle with the odometry pose each tick would throw the filter away and leave you with dead reckoning again.
+$\eta$ just rescales so everything adds to 1. $u_t$ is the motion, the pose change from the last lesson. The predict step uses the odometry **delta**. Replacing every guess with the odometry pose each tick would throw the filter away and leave you with dead reckoning again.
 
 The motion model in the running program turns that delta into three noisy numbers and adds them to every guess.
 
@@ -51,7 +51,7 @@ The motion model in the running program turns that delta into three noisy number
 
 ## A motion model in three numbers
 
-Take the odometry pose before and after the tick, and turn the difference into a rotate-translate-rotate:
+Let $(\Delta x, \Delta y, \Delta\theta)$ be how much the odometry pose changed this tick and $\theta_0$ its yaw before the tick. (These $\delta$'s are turn and move amounts, not the steering angle.) Take that difference and turn it into a rotate-translate-rotate:
 
 $$\delta_{\mathrm{rot1}} = \operatorname{atan2}(\Delta y, \Delta x) - \theta_0,\quad \delta_{\mathrm{trans}} = \sqrt{\Delta x^2 + \Delta y^2},\quad \delta_{\mathrm{rot2}} = \Delta\theta - \delta_{\mathrm{rot1}}.$$
 
@@ -63,7 +63,7 @@ A likelihood field asks a simple question of each beam. Take the endpoint, place
 
 $$p(z \mid x) \propto \exp\left(-\frac{d^2}{2\sigma^2}\right) + \lambda$$
 
-The $\lambda$ floor keeps one bad beam from zeroing the particle. $\sigma$ is a few tens of centimeters, larger than the lidar's 2 cm, because the grid is 0.5 m and the car slips. Beams at `max_range` are skipped. They missed the map.
+$\propto$ means "proportional to": the same shape, scaled so the weights add to 1. The $\lambda$ floor keeps one bad beam from zeroing the guess. In the block below that floor is 0.09. $\sigma$ is a few tens of centimeters, larger than the lidar's 2 cm, because the grid is 0.5 m and the car slips. Beams at `max_range` are skipped. They missed the map.
 
 <svg viewBox="0 0 480 220" role="img" aria-label="Likelihood field: a beam endpoint scored by its distance to the wall">
   <rect width="480" height="220" rx="12" fill="#10161a"/>
@@ -78,9 +78,9 @@ The $\lambda$ floor keeps one bad beam from zeroing the particle. $\sigma$ is a 
   <text x="16" y="200" fill="#8e9b94" font-size="13" font-family="sans-serif">Bright band: cells on the wall. The score falls off with d, the gap from the endpoint to that band.</text>
 </svg>
 
-The starter's `map.field` is that lookup, precomputed, in centimeters, so the 20 Hz tick reads a table. A 0 is an occupied cell. `map.segments` is the wall list the grid came from: packed edges $x_0, y_0, x_1, y_1$. The true pose stays off the sample.
+The starter's `map.field` is that lookup, precomputed, in centimeters, so the 20 Hz tick reads a table. A 0 is an occupied cell. `map.segments` is the wall list the grid came from: packed edges $x_0, y_0, x_1, y_1$. The program never sees the true pose.
 
-The field scores the endpoint. A beam that passed through one wall and hit a second one still contributes its endpoint. These worlds have few thin false openings at scan height, so that shortcut holds. A beam model would raycast. It is the stricter question, and it is too slow here if you ask it for every particle and every beam.
+The field scores the endpoint. A beam that passed through one wall and hit a second one still contributes its endpoint. These worlds have few thin false openings at scan height, so that shortcut holds. A beam model would trace each beam through the map (a raycast) and ask what it hit along the way. It is the stricter question, and it is too slow here if you ask it for every guess and every beam.
 
 The scoring function in the program:
 
@@ -90,7 +90,7 @@ The scoring function in the program:
 
 Slide along a long straight wall and the scan barely changes. Every beam that hit the wall still hits it, at the same range, so many poses along that wall explain the scan equally well. The cloud stays where the motion step left it.
 
-A cone, a crate, or a corner breaks that tie. Roll past it and the endpoint that used to land on the object now lands in empty space. The filter scores those short edges a little more tightly than a flat wall, which is what lets the estimate move along the corridor. The blocks above are the part of the running filter this page is about. The oval demo keeps the rest of the program loaded so the car still drives while you read.
+A cone, a crate, or a corner breaks that tie. Roll past it and the endpoint that used to land on the object now lands in empty space. The filter scores those short edges a little more tightly than a flat wall: `LAND_SIGMA` is 0.35 m against `SIGMA` of 0.5 m for a wall. That tighter score is what lets the estimate move along the corridor. The blocks above are the part of the running filter this page is about. The oval demo keeps the rest of the program loaded so the car still drives while you read.
 
 ## Try it
 

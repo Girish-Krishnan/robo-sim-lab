@@ -12,7 +12,7 @@ status: ready
 
 Watch the car slide off the centerline while the blue trail swears it's dead on. Pursuit steers by the odometry guess, gyro bias twists that guess, and the real car follows the ghost.
 
-Cross-track here is the distance from the true position to the reference path, a chain of short straight segments (a polyline). The odometry pose stays close to the path by construction, because pursuit is tracking that pose. The car is what leaves.
+Cross-track here is the distance from the true position to the reference path, a chain of short straight segments (a polyline). The diagram below is that gap: green stays put, blue dashes stay with it, and the white trail peels away. The odometry pose stays close to the path by construction, because pursuit is tracking that pose. The car is what leaves.
 
 <svg viewBox="0 0 520 240" role="img" aria-label="The reference path stays put. Odometry follows it. The car peels away. Cross-track is the gap.">
   <rect width="520" height="240" rx="12" fill="#0e1418"/>
@@ -32,7 +32,7 @@ On seed 1, for a 60 second run, the oval numbers are:
 - about **2.23 m** mean cross-track after 45 seconds
 - one lap, the car clear of the walls, odometry drift of a few meters by the end
 
-The city roundabout tells a different story. There the body slides sideways while the wheels still point along the turn. That slide is sideslip, also called crabbing. Cross-track sits near 0.6 m the whole minute, and the slide dominates the gyro. When you want to see drift, use the oval.
+The city roundabout tells a different story. There the body slides sideways while the wheels still point along the turn. That slide is sideslip, also called crabbing. Cross-track sits near 0.6 m the whole minute, and the slide swamps the gyro-bias effect. When you want to see drift, use the oval.
 
 The forest and the warehouse grow too, less dramatically than the oval, because the paths are shorter and more interrupted. The oval is the clean experiment: a long closed loop, a bias that integrates, a controller that steers from the pose.
 
@@ -52,9 +52,9 @@ while $\Delta\theta$ is still small and the feedback has only heard about the gh
 
 $$e(t) \approx \tfrac{1}{2} v b_\omega t^2$$
 
-plus the ordinary tracking error from lookahead and slip. The $t^2$ is why the first 15 seconds look fine and the last 15 seconds bend upward. A constant cross-track offset would be a bad gain. A cross-track that bends is a bias.
+plus the ordinary tracking error from lookahead and slip. The dot on $e$ is a rate of change, the same notation as in the bicycle lesson. The $t^2$ is why the first 15 seconds look fine and the last 15 seconds bend upward. If the error were a constant offset, you'd suspect a badly tuned gain (the knob that sets how hard the controller reacts). An error that bends upward over time is the signature of a bias.
 
-Feedback on the true $e$ would hold it. This program sees the odometry $e$. The localization module builds an $e$ the lidar can see, by comparing the scan to a known map, and then hands pursuit that pose.
+Feedback on the true $e$ would hold it. This program sees the odometry $e$. The localization module builds a pose the lidar can check against a known map, so the $e$ pursuit sees is close to the true one. It then hands pursuit that pose.
 
 Judge the controller by the colored trail against the planned path. The blue trail is the input the controller believes. A contact on the second lap is often the drift: the car is 2 m off the centerline and in the cones. Shortening the lookahead makes the first ten seconds prettier and tracks the bad pose more tightly after that.
 

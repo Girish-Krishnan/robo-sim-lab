@@ -6,7 +6,7 @@ export interface MapPose {
   x: number;
   /** North-south map axis, which is world z. */
   y: number;
-  /** Degrees. 0 faces north, 90 faces west (positive turns left). */
+  /** Degrees. 0 faces north, 90 faces east (a left turn decreases the heading). */
   heading: number;
 }
 
@@ -31,7 +31,7 @@ export function programPreamble(kind: PoseKind): string {
 # Your own random numbers should use np.random.default_rng(SEED) too.
 # START_POSE places the car on Run and Reset. x and y are meters on the map
 # (y runs north), and the third number is heading in degrees. 0 faces north,
-# and 90 faces west (positive turns left).
+# and 90 faces east (a left turn decreases the heading).
 # This chooses where the car starts. It is not a sensor reading.
 SEED = 1
 START_POSE = {

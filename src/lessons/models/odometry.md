@@ -16,11 +16,11 @@ In the sim: you drive. WASD or the arrow keys, Space to brake. The colored trail
 
 You start on the oval, nose north, on the route. The same drive works on the city streets, the forest trail, and the warehouse floor. Pick another world from the menu and take the same lap. Each world places you at that world's start.
 
-Each reset, the pose starts at $(0, 0, 0)$ in its own frame. Forward is the direction the car faced at that instant. After that, the only inputs are noisy wheel speed and the gyro yaw rate. A bias in either one walks the guess off the car, and the guess has no way to notice.
+Each reset, the pose starts at $(x, y, \theta) = (0, 0, 0)$ (meters, meters, radians) in its own frame. Forward is the direction the car faced at that instant. After that, the only inputs are noisy wheel speed and the gyro yaw rate. A bias in either one (a small error drawn once and then held) walks the guess off the car, and the guess has no way to notice.
 
 The blue trail is this pose, dropped into the world with the spawn transform (the shift from the odometry origin onto the map). At the first tick it lies on the car. Give it a minute and it peels away. That peel is the graph climbing.
 
-The steering angle is measured and published, with its own small bias, and the pose leaves it out. Heading comes from the gyro. Folding the steer measurement into the heading would turn a small bias into a constant curve, and one oval lap would leave the blue trail tens of meters from the car. A gyro bias of 0.0012 rad/s, one sigma, is a few degrees per minute. MEMS means the gyro is a small sensor etched onto a chip. That is the class of part this bias is standing in for.
+The steering angle is measured and published, with its own small bias, and the pose leaves it out. Heading comes from the gyro. Folding the steer measurement into the heading would turn a small bias into a constant curve, and one oval lap would leave the blue trail tens of meters from the car. A gyro bias of 0.0012 rad/s, one sigma (one standard deviation: a typical draw lands near that size), is a few degrees per minute. Real gyros like this are MEMS parts, tiny sensors etched onto a chip, and this bias stands in for theirs.
 
 <svg viewBox="0 0 480 230" role="img" aria-label="True path and odometry trail separating over one lap">
   <rect width="480" height="230" rx="12" fill="#10161a"/>
@@ -39,16 +39,16 @@ Let $v$ be the wheel-speed sample and $\omega$ the gyro yaw-rate sample, both al
 
 $$x \leftarrow x + v\cos\theta\,\Delta t,\quad y \leftarrow y + v\sin\theta\,\Delta t,\quad \theta \leftarrow \theta + \omega\,\Delta t.$$
 
-The speed sample is the true speed times $(1 + b_v)$ plus white noise. $b_v$ is drawn once per reset from a Gaussian with standard deviation 0.012, so a typical bias is about one percent. White noise on speed is 0.02 m/s. On a straight line the fractional distance error is about $b_v$: the bias is constant, so it scales the whole trip.
+The speed sample is the true speed times $(1 + b_v)$ plus white noise (a fresh random wiggle every sample). $b_v$ is drawn once per reset from a Gaussian with standard deviation 0.012, so a typical bias is about one percent. White noise on speed is 0.02 m/s. On a straight line the fractional distance error is about $b_v$: the bias is constant, so it scales the whole trip.
 
-Heading error from a constant gyro bias $b_\omega$ grows like $b_\omega t$. Cross-track then grows like distance times that angle. A small bias is centimeters in the first few seconds and meters on a long lap.
+Heading error from a constant gyro bias $b_\omega$ grows like $b_\omega t$. Cross-track error (how far sideways you are from where you think you are) then grows like distance times that angle. A small bias is centimeters in the first few seconds and meters on a long lap.
 
-There is no controller in this lesson on purpose. You are the driver, so the only thing moving the blue trail is the integral above. A later lesson puts a path tracker on top of this same guess and shows what that costs. Reset run puts the car back and replays the same bias. The pose lives in the odometry frame. Adding it to a world coordinate, or to the camera yaw, gives a number in a mixed frame.
+There is no controller in this lesson on purpose. You are the driver, so the only thing moving the blue trail is the sum above. A later lesson puts a path tracker on top of this same guess and shows what that costs. Reset run puts the car back and replays the same bias. The pose lives in the odometry frame (origin at the start, +x the way you faced; see Frames and angles in Sensors). Adding it to a map coordinate mixes two origins.
 
 This page has no program, so you are on seed 1. Reset run replays that same draw. A program with `SEED` at the top is how a later lesson picks a different one.
 
 ## Try it
 
-1. Drive the east straight, then the north bend. The blue trail should leave the colored one, and the graph should climb.
+1. Drive up the east-side straight you start on, then round the north bend. The blue trail should leave the colored one, and the graph should climb.
 2. Stop and read the graph. The number is the distance, in meters, between where you are and where the wheels say you are.
 3. Press Reset run and drive the same bend again. The peel should come back in the same direction. That is the bias, replayed.

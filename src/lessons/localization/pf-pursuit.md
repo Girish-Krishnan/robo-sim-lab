@@ -21,7 +21,7 @@ A tight roundabout still has some cross-track, because the body slides even with
 
 The steer below is computed from the filter's mean. The rest of the program is the filter from the previous lessons, still loaded so the cloud stays on screen.
 
-**Drive it yourself**, beside the sim note above, keeps this filter and lets you be the driver. Turn it on and the keys steer at once. The red estimate should stay near the car while the blue trail still peels away.
+The **Drive it yourself** button on the bar keeps this filter and lets you be the driver. Turn it on and the keys steer at once. The red estimate should stay near the car while the blue trail still peels away.
 
 ## The same arc, measured from the mean
 
@@ -33,9 +33,9 @@ $$y_b = -\sin\hat\theta\,(g_x - \hat x) + \cos\hat\theta\,(g_y - \hat y)$$
 
 $$\alpha = \operatorname{atan2}(y_b, x_b),\quad \kappa = \frac{2\sin\alpha}{L_d},\quad \delta = \arctan(\kappa L).$$
 
-That is the pursuit lesson with $\theta$ replaced by $\hat\theta$ and the position replaced by the mean. Speed still comes from `sensors.odometry.speed`. Wheel speed is a good sensor. The derivative of $\hat x$ would add the filter's jitter to the throttle.
+Here $\alpha$ is again the bearing to the lookahead point, and $L$ is the wheelbase, not $L_d$. That is the pursuit lesson with $\theta$ replaced by $\hat\theta$ and the position replaced by the mean. Speed still comes from `sensors.odometry.speed`. Wheel speed is a good sensor. The derivative of $\hat x$ would add the filter's jitter to the throttle.
 
-`LOOKAHEAD` is in meters. The other names are the filter's own settings, at the top of the program. `N` is the particle count for a known start.
+`LOOKAHEAD` is in meters. The other names are the filter's own settings, glossed in the particle-filter lesson. `N` is the particle count for a known start.
 
 {{code:settings}}
 
@@ -43,7 +43,7 @@ The function that turns the estimate into that steer:
 
 {{code:pursue}}
 
-The gap you can see between the red trail and the car is the position error. Heading error is the wrapped difference of yaw. On this oval a useful filter keeps that gap well under the 2 m raw odometry eventually reaches, and the heading error to a few degrees.
+The gap you can see between the red trail and the car is the position error. Heading error is the difference in yaw, wrapped into $-\pi \ldots \pi$ so $359^\circ$ versus $1^\circ$ counts as $2^\circ$. On this oval a useful filter keeps that gap well under the 2 m raw odometry eventually reaches, and the heading error to a few degrees.
 
 If the red trail leaves the car, pursuit follows the red trail and the bug is in the filter. If the red trail stays on the car and the car still leaves the path, the bug is in the body-frame transform or the lookahead index.
 

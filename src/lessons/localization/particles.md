@@ -11,7 +11,7 @@ status: ready
 
 Press **Scatter guesses** and watch pink dots fly 7 m out, then pull back onto the car. Dots whose predicted scan matches the real lidar survive; the red dot is where the car thinks it is.
 
-In the sim, the tracking cloud starts in a tight neighborhood of the car, so the first frame already agrees. Scatter guesses is what throws it wide. The Key on the map names the pink dots, the yellow ring, the red trail, and the blue odometry. The red trail is the filter's mean, drawn on top of the dots.
+In the sim, the tracking cloud starts in a tight neighborhood of the car, so the first frame already agrees. Scatter guesses is what throws it wide. The key on the view names the pink dots, the yellow ring, the red trail, and the blue odometry. The red trail is the filter's mean, drawn on top of the dots.
 
 The yellow ring is two standard deviations of the cloud, how far the guesses sit from their mean. A small ring means the guesses agree.
 
@@ -23,11 +23,11 @@ On a straight every stretch of wall looks the same, so the red mean can sit a fe
 
 The blocks below are one tick of that filter. They are slices of the same program that is driving the oval.
 
-How many guesses, and how far ahead pursuit looks. These names sit at the top of the program:
+How many guesses, and how far ahead pursuit looks. These names sit at the top of the program. `UNKNOWN_START` is false here (you know where the car began) and true in the kidnapped lesson. `N` is the number of guesses: 360 on a known start, 720 when the start is unknown. `TRACK_SPREAD` is how wide the starting cloud is, in meters (0.25). `BEAMS` is how many lidar beams each guess is scored on (40). `SIGMA` is the likelihood width for walls, in meters (0.5), and `LAND_SIGMA` is the tighter width for short edges such as cones, trunks, and crates (0.35). `WHEELBASE` is 1.9 m. `LOOKAHEAD` is how far ahead pursuit looks, in meters (3.2). `LIDAR_FORWARD` is the puck's 0.46 m offset in front of the body origin. `A1` through `A4` set how much noise the motion step adds: the two turns use `A1` on the squared turn and `A2` on the squared move, and the translation uses `A3` on the squared move and `A4` on the squared turns. The 0.09 floor on each beam's likelihood is in the likelihood block, not in this list.
 
 {{code:settings}}
 
-**Drive it yourself** runs this filter on whatever path you drive. Turn it on, then use WASD or the arrows. Space brakes. The cloud keeps scoring the live scan.
+**Drive it yourself** runs this filter on whatever path you drive. Turn it on, then use WASD or the arrows. Space brakes. The cloud keeps scoring the live scan. The loop below is one tick: predict, update, resample.
 
 <svg viewBox="0 0 480 250" role="img" aria-label="Predict, update, and resample as a cycle">
   <rect width="480" height="250" rx="12" fill="#10161a"/>
@@ -47,7 +47,7 @@ How many guesses, and how far ahead pursuit looks. These names sit at the top of
 
 ## Weight, then keep the particles that earned it
 
-Start with particles $x^{[i]}$ and weights $w^{[i]}$, usually uniform after a resample.
+Start with $N$ particles (guesses), numbered $i = 1 \ldots N$. $x^{[i]}$ is particle $i$'s pose (the whole pose, not the x coordinate) and $w^{[i]}$ its weight, usually uniform after a resample.
 
 **Predict.** Apply the noisy motion model to every particle. In the starter this is a vector of $N$ samples.
 
@@ -83,7 +83,7 @@ The starter adds a little noise even when the odometry delta is small, and it re
 
 The mean can sit between two disagreeing clumps, including inside a wall, when the cloud is split. On these maps one corridor usually wins. A pink cloud in two blobs grows the yellow ring until it covers both, and the red mean sits between them until one blob dies.
 
-Note: global localization, the kidnapped starter, is this same filter with a different initial cloud. A cloud that started on the answer and a cloud that found the answer are different experiments. This lesson is the first one.
+Note: global localization, the kidnapped starter, is this same filter with a different initial cloud. A cloud that started on the answer and a cloud that found the answer are different experiments. This lesson is the started-on-the-answer one.
 
 ## Try it
 
